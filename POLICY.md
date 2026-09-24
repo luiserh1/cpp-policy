@@ -214,6 +214,9 @@ These rules rely on review (and on agents following `AGENTS.md`):
 - `catch (...)` only at boundaries (section 3); tools do enforce that
   exceptions never escape `main` or `noexcept` functions
 - `dynamic_cast` / `typeid` being discouraged (section 3)
+- Project structure (section 11): layer dependency direction and file size
+  limits are planned audit checks; the helper extraction rule and comment
+  accuracy will always rely on review
 
 Every other rule in section 2 has a sample in `tests/bad/` proving it is
 rejected.
@@ -232,3 +235,67 @@ rejected.
 - **Major:** a new rule or tightened rule that can break existing code.
 - **Minor:** new optional features, new presets, tooling improvements.
 - **Patch:** fixes that don't change what passes or fails.
+
+## 11. Project structure
+
+These rules keep a codebase navigable as it grows, especially when AI agents
+make many small changes. Adapted from the Carreritas project.
+
+### 11.1 Layers and dependency direction
+
+- Source code is split into modules, one directory each under `src/`
+  (for example `src/message/`, `src/server/`).
+- Each project groups its modules into **layers** and documents them in its
+  `README.md` (and `AGENTS.md`), from lowest to highest.
+- Dependencies point **one way only**: a module may include headers from its
+  own layer's modules or from lower layers, never from higher ones.
+- `src/lowlevel/` (section 4) is always the lowest layer: it may not include
+  any other project module.
+- `main.cpp` is the top: it may include anything.
+- Includes are written from the `src/` root (`#include "server/local_server.hpp"`),
+  never with relative paths (`"../server/..."`), so the direction of every
+  dependency is visible in the include line.
+
+*Enforcement:* planned. The audit will read the layer list from CMake and
+reject includes that point upward.
+
+### 11.2 No catch-all utility modules
+
+- No `utils`, `helpers`, `common` or `misc` modules. Shared code goes in a
+  module named after what it does (`text_encoding`, `time_format`).
+- A helper stays private to its file (anonymous namespace) by default.
+- Extract a helper into a shared module only when **all** of these hold:
+  - it has at least two real users in different modules;
+  - its meaning is stable and independent of any one caller's domain;
+  - the destination module has a single, focused responsibility.
+- If extracting would create a broad, mixed-purpose API, keep the helper local,
+  even at the cost of a small duplication.
+
+*Enforcement:* review.
+
+### 11.3 File size
+
+| Threshold | Lines per `.cpp` / `.hpp` file | Meaning |
+|---|---|---|
+| Target | ≤ 250 | Normal size |
+| Review | > 350 | Split by responsibility before adding more |
+
+- When a new feature would push a file past the target, split the file by
+  responsibility first, then add the feature.
+- Function size is limited separately by clang-tidy
+  (`readability-function-size`, `readability-function-cognitive-complexity`).
+
+*Enforcement:* planned. The audit will report files over the review threshold.
+
+### 11.4 Comment accuracy
+
+- Comments describe the **current** behavior, never its history ("used to",
+  "now also").
+- When code changes, related comments change in the same commit.
+- Prefer describing meaning over repeating values that live in constants
+  ("at most `max_message_bytes`", not "at most 4096 bytes").
+- Temporary behavior is marked with `TODO:` and enough context for someone
+  else to resolve it.
+- Don't comment what the code already says clearly; comment why.
+
+*Enforcement:* review.
