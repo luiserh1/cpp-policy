@@ -1,0 +1,22 @@
+# cpp-policy formatting (clang-format 23). Do not edit in a consuming project.
+BasedOnStyle: LLVM
+IndentWidth: 4
+ColumnLimit: 100
+AccessModifierOffset: -4
+PointerAlignment: Left
+ReferenceAlignment: Left
+InsertBraces: true
+InsertNewlineAtEOF: true
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+BreakTemplateDeclarations: Yes
+IncludeBlocks: Regroup
+IncludeCategories:
+  # Project headers first, then third-party, then the standard library.
+  - Regex: '^"'
+    Priority: 1
+  - Regex: '^<.*\.(h|hpp)>'
+    Priority: 2
+  - Regex: '^<'
+    Priority: 3

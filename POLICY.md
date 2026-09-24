@@ -18,13 +18,15 @@ disagree.
 | Language standard | **C++23**, compiler extensions **off** (`CMAKE_CXX_EXTENSIONS OFF`) |
 | Compiler | **LLVM Clang** on all platforms: `clang++` on macOS/Linux, `clang-cl` on Windows |
 | LLVM version | **23.x** (clang, clang-tidy and clang-format from the same release) **[REVIEW]** |
-| Build system | CMake ≥ 3.28, driven only through `CMakePresets.json` |
+| Build system | CMake ≥ 3.29, driven only through `CMakePresets.json` |
 | Generator | Ninja |
 | Dependencies | vcpkg in manifest mode (`vcpkg.json`), only when a project needs them |
 
 Notes:
 - On macOS use Homebrew LLVM, not Apple Clang. Apple Clang has a different
   version scheme and doesn't ship clang-tidy.
+- clang-tidy and clang-format are located next to the compiler, so all three
+  always come from the same LLVM release.
 - GCC and MSVC's own compiler (`cl.exe`) are not supported. They may be
   added later as extra build jobs without changing these rules.
 
@@ -160,12 +162,38 @@ requires a change in `cpp-policy` itself.
 
 | Preset | Purpose | Settings |
 |---|---|---|
-| `dev` | Daily work | Debug, warnings as errors, AddressSanitizer + UndefinedBehaviorSanitizer, standard library hardening |
-| `release` | Shipping | Optimized, warnings as errors, lightweight library hardening **[REVIEW]** |
-| `check` | The gate (`tools/check`) | Full build + full clang-tidy + format check + tests under sanitizers + suppression audit |
+| `dev` | Daily work | Debug, warnings as errors, AddressSanitizer + UndefinedBehaviorSanitizer, standard library hardening (debug level) |
+| `release` | Shipping | Optimized, warnings as errors, standard library hardening (fast level), `_FORTIFY_SOURCE=3`, `-fstack-protector-strong`, `-fcf-protection` where supported |
+| `check` | The gate | Full build + full clang-tidy + format check + tests under sanitizers + suppression audit |
 
-Sanitizer availability differs on Windows (`clang-cl` supports ASan; UBSan
-support is partial). The `dev` preset adapts per platform.
+### 7.1 Warnings
+
+Always on, always errors: `-Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor
+-Wold-style-cast -Wcast-align -Wunused -Woverloaded-virtual -Wconversion
+-Wsign-conversion -Wnull-dereference -Wdouble-promotion -Wformat=2
+-Wimplicit-fallthrough -Wzero-as-null-pointer-constant -Wextra-semi -Werror`.
+With `clang-cl`, `/W4` replaces `-Wall -Wextra` (in `clang-cl`, `-Wall` means
+`-Weverything`).
+
+### 7.2 Standard library hardening
+
+Each platform uses a different standard library, so the policy sets the
+switch for all of them (each library ignores the others):
+
+| Library | Where | Switch |
+|---|---|---|
+| libc++ | macOS | `_LIBCPP_HARDENING_MODE` |
+| libstdc++ | Linux | `_GLIBCXX_ASSERTIONS` |
+| Microsoft STL | Windows | `_MSVC_STL_HARDENING` |
+
+### 7.3 Sanitizers on Windows (`clang-cl`)
+
+Known limitations:
+- AddressSanitizer **crashes on any `throw`**, even if caught. Code paths
+  that throw can only be sanitizer-tested on macOS/Linux.
+- ASan does not work with the debug C runtime, so the Windows `dev` preset
+  uses the release runtime (`/MD`) with debug info.
+- UBSan is not enabled on Windows.
 
 ## 8. Enforcement layers
 
@@ -179,6 +207,17 @@ support is partial). The `dev` preset adapts per platform.
 
 `tools/check` is the only definition of "passes the policy". Every other
 layer is a faster subset of it.
+
+### 8.1 What is not checked by tools
+
+These rules rely on review (and on agents following `AGENTS.md`):
+- `const char*` used as a string type (section 2.2)
+- `catch (...)` only at boundaries (section 3); tools do enforce that
+  exceptions never escape `main` or `noexcept` functions
+- `dynamic_cast` / `typeid` being discouraged (section 3)
+
+Every other rule in section 2 has a sample in `tests/bad/` proving it is
+rejected.
 
 ## 9. AI agents
 

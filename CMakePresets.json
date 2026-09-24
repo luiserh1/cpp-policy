@@ -1,0 +1,230 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 29,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "unix",
+      "hidden": true,
+      "inherits": "base",
+      "condition": {
+        "type": "notEquals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "clang++"
+      }
+    },
+    {
+      "name": "windows",
+      "hidden": true,
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "clang-cl"
+      }
+    },
+    {
+      "name": "cfg-dev",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CPP_POLICY_SANITIZERS": "ON",
+        "CPP_POLICY_HARDENING": "debug"
+      }
+    },
+    {
+      "name": "cfg-release",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CPP_POLICY_HARDENING": "fast"
+      }
+    },
+    {
+      "name": "cfg-check",
+      "hidden": true,
+      "inherits": "cfg-dev",
+      "cacheVariables": {
+        "CPP_POLICY_CLANG_TIDY": "ON"
+      }
+    },
+    {
+      "name": "cfg-windows-sanitized",
+      "hidden": true,
+      "description": "ASan needs the release C runtime and no /RTC1 (POLICY.md 7.3)",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    },
+    {
+      "name": "dev",
+      "displayName": "dev",
+      "inherits": [
+        "unix",
+        "cfg-dev"
+      ]
+    },
+    {
+      "name": "release",
+      "displayName": "release",
+      "inherits": [
+        "unix",
+        "cfg-release"
+      ]
+    },
+    {
+      "name": "check",
+      "displayName": "check",
+      "inherits": [
+        "unix",
+        "cfg-check"
+      ]
+    },
+    {
+      "name": "win-dev",
+      "displayName": "dev (Windows)",
+      "inherits": [
+        "windows",
+        "cfg-windows-sanitized",
+        "cfg-dev"
+      ]
+    },
+    {
+      "name": "win-release",
+      "displayName": "release (Windows)",
+      "inherits": [
+        "windows",
+        "cfg-release"
+      ]
+    },
+    {
+      "name": "win-check",
+      "displayName": "check (Windows)",
+      "inherits": [
+        "windows",
+        "cfg-windows-sanitized",
+        "cfg-check"
+      ]
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev"
+    },
+    {
+      "name": "release",
+      "configurePreset": "release"
+    },
+    {
+      "name": "check",
+      "configurePreset": "check",
+      "targets": [
+        "all",
+        "policy-audit",
+        "policy-format-check"
+      ]
+    },
+    {
+      "name": "win-dev",
+      "configurePreset": "win-dev"
+    },
+    {
+      "name": "win-release",
+      "configurePreset": "win-release"
+    },
+    {
+      "name": "win-check",
+      "configurePreset": "win-check",
+      "targets": [
+        "all",
+        "policy-audit",
+        "policy-format-check"
+      ]
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "check",
+      "configurePreset": "check",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "win-dev",
+      "configurePreset": "win-dev",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "win-check",
+      "configurePreset": "win-check",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "check",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "check"
+        },
+        {
+          "type": "build",
+          "name": "check"
+        },
+        {
+          "type": "test",
+          "name": "check"
+        }
+      ]
+    },
+    {
+      "name": "win-check",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "win-check"
+        },
+        {
+          "type": "build",
+          "name": "win-check"
+        },
+        {
+          "type": "test",
+          "name": "win-check"
+        }
+      ]
+    }
+  ]
+}
