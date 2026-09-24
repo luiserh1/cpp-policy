@@ -34,9 +34,40 @@ editors). The audit fails if they differ from this repository's copies.
 
 ## Requirements
 
-LLVM Clang 23.x (`clang++`, or `clang-cl` on Windows) with clang-tidy and
-clang-format next to it, CMake ≥ 3.29, Ninja. On macOS, Homebrew LLVM must be
-first in `PATH` (Apple Clang is rejected).
+- LLVM **23.x**: `clang++` (macOS/Linux) or `clang-cl` (Windows), with
+  `clang-tidy` and `clang-format` from the same installation
+- CMake ≥ 3.29
+- Ninja
+
+## Setup per platform
+
+The presets look for LLVM in the standard install locations first, so on most
+machines no configuration is needed:
+
+| Platform | Install | Location searched by the presets |
+|---|---|---|
+| macOS (Apple Silicon) | `brew install llvm ninja` | `/opt/homebrew/opt/llvm/bin` |
+| macOS (Intel) | `brew install llvm ninja` | `/usr/local/opt/llvm/bin` |
+| Debian / Ubuntu | [apt.llvm.org](https://apt.llvm.org) packages for LLVM 23, plus `ninja-build` | `/usr/lib/llvm-23/bin` |
+| Windows | Official LLVM installer (default path), Ninja, and Visual Studio or Build Tools (for the Windows SDK and runtime) | `C:\Program Files\LLVM\bin` |
+
+Things to know:
+
+- **macOS:** Xcode puts Apple Clang in `/usr/bin`, and Homebrew does not put
+  its LLVM ahead of it. That's why the presets search the Homebrew location
+  explicitly. Apple Clang is always rejected: it has its own version numbering
+  and ships without clang-tidy.
+- **Linux:** distributions often ship an older LLVM, or install it only under
+  versioned names (`clang++-23`). The unversioned binaries in
+  `/usr/lib/llvm-23/bin` are what the presets use.
+- **Windows:** the LLVM that comes with Visual Studio may be older than 23.
+  Use the official installer.
+
+**Non-standard install locations:** put that LLVM's `bin` directory first in
+`PATH` before running CMake. Do not edit `CMakePresets.json`.
+
+If the compiler check fails, the error message names the compiler that was
+found. Fix the installation or `PATH`; the check itself is intentional.
 
 ## Self-test
 

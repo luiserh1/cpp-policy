@@ -26,6 +26,9 @@
       },
       "cacheVariables": {
         "CMAKE_CXX_COMPILER": "clang++"
+      },
+      "environment": {
+        "PATH": "/opt/homebrew/opt/llvm/bin:/usr/local/opt/llvm/bin:/usr/lib/llvm-23/bin:$penv{PATH}"
       }
     },
     {
@@ -39,6 +42,9 @@
       },
       "cacheVariables": {
         "CMAKE_CXX_COMPILER": "clang-cl"
+      },
+      "environment": {
+        "PATH": "C:/Program Files/LLVM/bin;$penv{PATH}"
       }
     },
     {
