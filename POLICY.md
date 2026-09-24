@@ -1,7 +1,6 @@
 # C++ Project Policy
 
 > **Status:** v0.1. Enforced by the `cpp-policy` module, clang-tidy config and self-tests.
-> Items marked need an explicit decision.
 
 This document defines the restricted, modern subset of C++ used by every
 project that consumes `cpp-policy`. Most rules are enforced mechanically
