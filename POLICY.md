@@ -1,7 +1,7 @@
 # C++ Project Policy
 
-> **Status:** DRAFT v0.1, under review. Nothing here is enforced yet.
-> Items marked **[REVIEW]** need an explicit decision.
+> **Status:** v0.1. Enforced by the `cpp-policy` module, clang-tidy config and self-tests.
+> Items marked need an explicit decision.
 
 This document defines the restricted, modern subset of C++ used by every
 project that consumes `cpp-policy`. Most rules are enforced mechanically
@@ -17,7 +17,7 @@ disagree.
 |---|---|
 | Language standard | **C++23**, compiler extensions **off** (`CMAKE_CXX_EXTENSIONS OFF`) |
 | Compiler | **LLVM Clang** on all platforms: `clang++` on macOS/Linux, `clang-cl` on Windows |
-| LLVM version | **23.x** (clang, clang-tidy and clang-format from the same release) **[REVIEW]** |
+| LLVM version | **23.x** (clang, clang-tidy and clang-format from the same release) |
 | Build system | CMake ≥ 3.29, driven only through `CMakePresets.json` |
 | Generator | Ninja |
 | Dependencies | vcpkg in manifest mode (`vcpkg.json`), only when a project needs them |
@@ -71,7 +71,7 @@ normal code and what to use instead.
 |---|---|
 | Macros for constants | `constexpr` variables |
 | Function-like macros | `constexpr` / `consteval` functions, templates |
-| Include guards | `#pragma once` **[REVIEW]** |
+| Include guards | `#pragma once` |
 
 Macros are still allowed for platform detection, build configuration and
 include directives.
