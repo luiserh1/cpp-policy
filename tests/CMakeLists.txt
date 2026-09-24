@@ -30,6 +30,15 @@ foreach(sample IN LISTS bad_samples)
         PASS_REGULAR_EXPRESSION "error: [^\n]*[[,]${check}[],]")
 endforeach()
 
+# --- Format fixtures: files that must already be formatted (clang-format must not change them)
+file(GLOB format_fixtures "${CMAKE_CURRENT_SOURCE_DIR}/format/*.cpp")
+foreach(fixture IN LISTS format_fixtures)
+    cmake_path(GET fixture STEM name)
+    add_test(NAME format/${name}
+        COMMAND "${CPP_POLICY_CLANG_FORMAT_EXE}" --dry-run --Werror
+                "--style=file:${CPP_POLICY_ROOT}/.clang-format" "${fixture}")
+endforeach()
+
 # --- Audit fixtures: each directory is a mini project; expect.txt holds a regex
 file(GLOB audit_cases LIST_DIRECTORIES true "${CMAKE_CURRENT_SOURCE_DIR}/audit/*")
 foreach(case IN LISTS audit_cases)

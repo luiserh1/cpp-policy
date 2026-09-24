@@ -7,6 +7,8 @@ PointerAlignment: Left
 ReferenceAlignment: Left
 InsertBraces: true
 InsertNewlineAtEOF: true
+# Never re-wrap NOLINT comments: a wrapped NOLINTNEXTLINE would point at the wrong line.
+CommentPragmas: '^ *(IWYU pragma:|NOLINT)'
 AllowShortFunctionsOnASingleLine: Inline
 AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: false
