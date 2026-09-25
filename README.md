@@ -76,6 +76,26 @@ Things to know:
 If the compiler check fails, the error message names the compiler that was
 found. Fix the installation or `PATH`; the check itself is intentional.
 
+## Debugging
+
+Debuggers are not restricted. Use the `debug` preset (`win-debug` on
+Windows): a plain Debug build without sanitizers, so stepping follows the
+source line by line. `dev` also works on macOS and Linux, but sanitizers slow
+the program down; on Windows `win-dev` is optimized and hard to step through.
+
+```
+cmake --preset debug
+cmake --build --preset debug
+lldb build/debug/<program>        # or gdb on Linux
+```
+
+Any editor that reads `CMakePresets.json` (Visual Studio, VS Code, CLion, Qt
+Creator) can pick the preset and launch its own debugger. Launch settings are
+editor-specific, so none are committed (POLICY.md 6.1).
+
+To stop in the debugger at a sanitizer error in a `dev` build, instead of
+getting a report after the program exits, run with `ASAN_OPTIONS=abort_on_error=1`.
+
 ## Self-test
 
 ```

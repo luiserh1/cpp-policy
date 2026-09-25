@@ -66,6 +66,14 @@ numbers refer to that review's issue list.
   and added a `@….modmap` argument that only exists after a build, so clangd
   and clang-tidy on unbuilt files got a broken compile command. Modules aren't
   used (POLICY.md 2.4), and builds skip a step. (#40)
+- New `debug` / `win-debug` presets (Debug, no sanitizers) and a README
+  "Debugging" section. *Why:* no preset could be stepped through on Windows
+  (`win-dev` must be optimized for ASan), there was no sanitizer-free Debug
+  build anywhere, and debugging wasn't documented. Raised by the owner. (#33)
+- New `release` / `win-release` test presets and workflows run the tests on
+  the optimized build. *Why:* tests only ran in Debug, so bugs that appear
+  only with optimization, and release-only settings, went untested. Meant for
+  CI, not the pre-push hook (owner's choice). (#34)
 
 ### Self-tests
 

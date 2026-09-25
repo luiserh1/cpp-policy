@@ -233,6 +233,12 @@ looser, is made in `cpp-policy` itself.
 | `dev` | Daily work | Debug, warnings as errors, AddressSanitizer + UndefinedBehaviorSanitizer, standard library hardening (debug level) |
 | `release` | Shipping | Optimized, warnings as errors, standard library hardening (fast level), `_FORTIFY_SOURCE=3`, `-fstack-protector-strong`, `-fcf-protection` where supported |
 | `check` | The gate | Full build + full clang-tidy + format check + tests under sanitizers + suppression audit |
+| `debug` | Step-through debugging | Debug, no sanitizers, standard library hardening (debug level) |
+
+Windows presets carry a `win-` prefix. On Windows, `win-dev` and `win-check`
+are optimized (`RelWithDebInfo`, see 7.3), so `win-debug` is the one to step
+through. The `release` workflow runs the tests on the optimized build, where
+some bugs only appear; it is meant for CI rather than every push.
 
 ### 7.1 Warnings
 

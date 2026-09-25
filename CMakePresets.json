@@ -57,6 +57,15 @@
       }
     },
     {
+      "name": "cfg-debug",
+      "hidden": true,
+      "description": "Step-through debugging: no optimization, no sanitizers",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CPP_POLICY_HARDENING": "debug"
+      }
+    },
+    {
       "name": "cfg-release",
       "hidden": true,
       "cacheVariables": {
@@ -89,6 +98,14 @@
       ]
     },
     {
+      "name": "debug",
+      "displayName": "debug",
+      "inherits": [
+        "unix",
+        "cfg-debug"
+      ]
+    },
+    {
       "name": "release",
       "displayName": "release",
       "inherits": [
@@ -111,6 +128,14 @@
         "windows",
         "cfg-windows-sanitized",
         "cfg-dev"
+      ]
+    },
+    {
+      "name": "win-debug",
+      "displayName": "debug (Windows)",
+      "inherits": [
+        "windows",
+        "cfg-debug"
       ]
     },
     {
@@ -137,6 +162,10 @@
       "configurePreset": "dev"
     },
     {
+      "name": "debug",
+      "configurePreset": "debug"
+    },
+    {
       "name": "release",
       "configurePreset": "release"
     },
@@ -152,6 +181,10 @@
     {
       "name": "win-dev",
       "configurePreset": "win-dev"
+    },
+    {
+      "name": "win-debug",
+      "configurePreset": "win-debug"
     },
     {
       "name": "win-release",
@@ -183,6 +216,13 @@
       }
     },
     {
+      "name": "release",
+      "configurePreset": "release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
       "name": "win-dev",
       "configurePreset": "win-dev",
       "output": {
@@ -192,6 +232,13 @@
     {
       "name": "win-check",
       "configurePreset": "win-check",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "win-release",
+      "configurePreset": "win-release",
       "output": {
         "outputOnFailure": true
       }
@@ -216,6 +263,23 @@
       ]
     },
     {
+      "name": "release",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "release"
+        },
+        {
+          "type": "build",
+          "name": "release"
+        },
+        {
+          "type": "test",
+          "name": "release"
+        }
+      ]
+    },
+    {
       "name": "win-check",
       "steps": [
         {
@@ -229,6 +293,23 @@
         {
           "type": "test",
           "name": "win-check"
+        }
+      ]
+    },
+    {
+      "name": "win-release",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "win-release"
+        },
+        {
+          "type": "build",
+          "name": "win-release"
+        },
+        {
+          "type": "test",
+          "name": "win-release"
         }
       ]
     }
