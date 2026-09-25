@@ -1,6 +1,6 @@
 # Suppression audit (POLICY.md section 5).
 #
-#   cmake -DCONFIG=<cpp_policy_config.cmake> [-DCHECK_SYNC=ON] -P audit_suppressions.cmake
+#   cmake -DCONFIG=<cpp_policy_config.cmake> [-DCHECK_PROJECT_FILES=ON] -P audit_suppressions.cmake
 #
 # Fails if any NOLINT:
 #   - is outside a confined directory,
@@ -11,7 +11,8 @@
 #   - has no reason in a trailing comment: `#pragma ... ignored "-Wx" // reason`.
 # Fails if any `clang-format off` has no reason: `// clang-format off: reason`.
 # Fails if a header (.h .hpp .hh .hxx) lacks `#pragma once` or uses an include guard.
-# With CHECK_SYNC, also fails if the project's .clang-tidy / .clang-format differ from the policy's.
+# With CHECK_PROJECT_FILES, also fails if the project's .clang-tidy / .clang-format differ from
+# the policy's, or its .gitignore / .gitattributes lack any line of the policy's copies.
 
 cmake_minimum_required(VERSION 3.29)
 include("${CMAKE_CURRENT_LIST_DIR}/source_files.cmake")
@@ -101,7 +102,7 @@ endforeach()
 # policy's copies. A local edit would silently disagree with the build, so reject it.
 cmake_path(NORMAL_PATH SOURCE_DIR OUTPUT_VARIABLE source_norm)
 cmake_path(NORMAL_PATH POLICY_ROOT OUTPUT_VARIABLE policy_norm)
-if(CHECK_SYNC AND NOT source_norm STREQUAL policy_norm)
+if(CHECK_PROJECT_FILES AND NOT source_norm STREQUAL policy_norm)
     foreach(name IN ITEMS .clang-tidy .clang-format)
         if(NOT EXISTS "${SOURCE_DIR}/${name}")
             report("${name}" 1 "missing; copy it from cpp-policy (${POLICY_ROOT}/${name})")
@@ -112,6 +113,26 @@ if(CHECK_SYNC AND NOT source_norm STREQUAL policy_norm)
                 report("${name}" 1 "differs from cpp-policy's copy; policy files must not be edited locally")
             endif()
         endif()
+    endforeach()
+endif()
+
+# The policy's .gitignore and .gitattributes are the required minimum: a project's copies
+# must contain every line of them (comments and blank lines aside) and may add their own.
+if(CHECK_PROJECT_FILES)
+    foreach(name IN ITEMS .gitignore .gitattributes)
+        if(NOT EXISTS "${SOURCE_DIR}/${name}")
+            report("${name}" 1 "missing; start from cpp-policy's copy (${POLICY_ROOT}/${name})")
+            continue()
+        endif()
+        file(STRINGS "${SOURCE_DIR}/${name}" project_lines)
+        list(TRANSFORM project_lines STRIP)
+        file(STRINGS "${POLICY_ROOT}/${name}" required_lines REGEX "^[ \t]*[^# \t]")
+        foreach(required IN LISTS required_lines)
+            string(STRIP "${required}" required)
+            if(NOT required IN_LIST project_lines)
+                report("${name}" 1 "missing required line '${required}' (see cpp-policy's ${name})")
+            endif()
+        endforeach()
     endforeach()
 endif()
 

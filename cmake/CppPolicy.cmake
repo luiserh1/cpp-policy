@@ -170,7 +170,7 @@ function(cpp_policy_add_checks)
 
     set(scripts "${CPP_POLICY_ROOT}/cmake/scripts")
     add_custom_target(policy-audit
-        COMMAND "${CMAKE_COMMAND}" -DCONFIG=${config} -DCHECK_SYNC=ON -P "${scripts}/audit_suppressions.cmake"
+        COMMAND "${CMAKE_COMMAND}" -DCONFIG=${config} -DCHECK_PROJECT_FILES=ON -P "${scripts}/audit_suppressions.cmake"
         COMMENT "cpp-policy: auditing suppressions"
         VERBATIM)
     add_custom_target(policy-format-check

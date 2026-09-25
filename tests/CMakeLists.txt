@@ -43,7 +43,7 @@ endforeach()
 # --- Audit fixtures: each directory is a mini project.
 #   expect.txt    regex the audit output must match (include "file:line:" to pin the line)
 #   options.cmake optional; appended to the generated config to override its defaults
-#                 (e.g. set(CHECK_SYNC ON) or a different EXCLUDED_DIRS)
+#                 (e.g. set(CHECK_PROJECT_FILES ON) or a different EXCLUDED_DIRS)
 file(GLOB audit_cases CONFIGURE_DEPENDS LIST_DIRECTORIES true "${CMAKE_CURRENT_SOURCE_DIR}/audit/*")
 foreach(case IN LISTS audit_cases)
     if(NOT IS_DIRECTORY "${case}")

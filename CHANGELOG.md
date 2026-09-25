@@ -58,6 +58,9 @@ numbers refer to that review's issue list.
   its own rule. (#25)
 - The format fix target reports a clang-format failure as such, instead of
   telling you to run the fix target you just ran. (#31)
+- The audit's `CHECK_SYNC` switch is renamed `CHECK_PROJECT_FILES`, since it
+  now covers the ignore and attributes files too. Only affects someone calling
+  the script by hand.
 
 ### Self-tests
 
@@ -82,6 +85,14 @@ numbers refer to that review's issue list.
   rejects include guards. *Why:* POLICY.md 2.4 banned include guards but
   nothing enforced it; clang-tidy has no check for this (its only related
   check enforces the opposite). (#5)
+- New POLICY.md 6.1, repository files: a project's `.gitignore` and
+  `.gitattributes` must contain every line of cpp-policy's copies (checked by
+  the audit); nothing editor-specific is committed. cpp-policy's `.gitignore`
+  gains the Visual Studio, CLion, VS Code and Windows entries, and a
+  `.gitattributes` forces LF line endings. *Why:* ignore files were hand-
+  written per repo and neither ignored `.vs/`; Git for Windows' line-ending
+  conversion would break the audit's byte comparison of the `.clang-*` copies.
+  (#36, #30)
 
 ## 0.1.1
 

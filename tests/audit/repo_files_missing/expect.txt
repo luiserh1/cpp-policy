@@ -1,0 +1,1 @@
+\.gitattributes:1: error: missing; start from cpp-policy.s copy

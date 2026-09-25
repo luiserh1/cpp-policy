@@ -1,0 +1,4 @@
+# Required minimum for every project that uses cpp-policy (POLICY.md 6.1).
+# LF line endings on every platform: Git for Windows would otherwise convert
+# text files to CRLF, and the audit compares .clang-* copies byte for byte.
+* text=auto eol=lf

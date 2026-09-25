@@ -24,6 +24,10 @@ sources, so they show the same warnings and formatting while you type. The
 build never reads them; it always uses this repository's copies. The audit
 fails if the copies differ, so the editor and the build can't disagree.
 
+Start the project's `.gitignore` and `.gitattributes` from this repository's
+copies. Projects may add lines, but the audit fails if any of these are
+missing (POLICY.md 6.1).
+
 ## Options (set by presets)
 
 | Option | Default | Meaning |

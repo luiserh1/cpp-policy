@@ -185,6 +185,21 @@ policy's copies. A project may only tighten what the module's options allow
 (for example `CPP_POLICY_EXCEPTIONS OFF`). Any other change, stricter or
 looser, is made in `cpp-policy` itself.
 
+### 6.1 Repository files
+
+- **`.gitignore` and `.gitattributes`:** cpp-policy's copies are the required
+  minimum. A project's files must contain every line of them and may add their
+  own (the audit checks it). They ignore build output, personal and editor
+  state, and OS clutter, and force LF line endings on every platform.
+- **Committed:** everything that defines the build and the rules:
+  `CMakePresets.json`, `.clang-tidy`, `.clang-format`, `.gitignore`,
+  `.gitattributes`, `vcpkg.json` (with its baseline, which pins dependency
+  versions), `AGENTS.md` and agent settings.
+- **Nothing editor-specific is committed** (`.vscode/`, `.idea/`, `.vs/`). The
+  shared ground is `CMakePresets.json`, which Visual Studio, VS Code, CLion and
+  Qt Creator read, and the generated `compile_commands.json`, which clangd
+  reads in any editor.
+
 ## 7. Build configurations
 
 | Preset | Purpose | Settings |

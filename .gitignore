@@ -1,4 +1,21 @@
+# Required minimum for every project that uses cpp-policy (POLICY.md 6.1).
+# A project's .gitignore must contain every line below and may add its own.
+
+# Build output and generated files
 build/
+out/
+cmake-build-*/
+vcpkg_installed/
+compile_commands.json
+
+# Personal and tool state
 CMakeUserPresets.json
 .cache/
+.vs/
+.vscode/
+.idea/
+
+# Operating system clutter
 .DS_Store
+Thumbs.db
+desktop.ini
