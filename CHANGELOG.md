@@ -67,6 +67,18 @@ numbers refer to that review's issue list.
   with an `options.cmake`. *Why:* the copy check, line counting and exclusions
   were untested; breaking them on purpose now fails the self-test. (#37)
 
+### Rules
+
+- The audit detects diagnostic pragmas written as operators (`_Pragma`,
+  `__pragma`), and every diagnostic pragma must give a reason in a trailing
+  comment. *Why:* the operator form, usable inside macros, passed the audit
+  anywhere; and pragmas are suppressions like NOLINT, so they follow the same
+  reason rule. (#28)
+- `// clang-format off` must give a reason (`// clang-format off: reason`); it
+  stays allowed anywhere. *Why:* it is a formatting suppression that no rule
+  covered; it only affects layout, so confining it would add friction without
+  benefit. (#32)
+
 ## 0.1.1
 
 - `.clang-format` no longer re-wraps `NOLINT` comments. *Why:* a wrapped

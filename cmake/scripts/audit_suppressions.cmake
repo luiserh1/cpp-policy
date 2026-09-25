@@ -2,10 +2,14 @@
 #
 #   cmake -DCONFIG=<cpp_policy_config.cmake> [-DCHECK_SYNC=ON] -P audit_suppressions.cmake
 #
-# Fails if any NOLINT or diagnostic pragma:
+# Fails if any NOLINT:
 #   - is outside a confined directory,
 #   - does not name specific checks (bare or wildcard),
 #   - has no reason: `NOLINT(check-name): reason`.
+# Fails if any diagnostic pragma (#pragma, _Pragma or __pragma form):
+#   - is outside a confined directory,
+#   - has no reason in a trailing comment: `#pragma ... ignored "-Wx" // reason`.
+# Fails if any `clang-format off` has no reason: `// clang-format off: reason`.
 # With CHECK_SYNC, also fails if the project's .clang-tidy / .clang-format differ from the policy's.
 
 cmake_minimum_required(VERSION 3.29)
@@ -45,10 +49,23 @@ foreach(file IN LISTS files)
             endif()
         endif()
 
+        # A pragma can also be written as an operator (_Pragma, __pragma), for example in a macro.
         if(line MATCHES "#[ \t]*pragma[ \t]+(clang|GCC)[ \t]+diagnostic[ \t]+ignored"
-           OR line MATCHES "#[ \t]*pragma[ \t]+warning[ \t]*\\([ \t]*disable")
+           OR line MATCHES "#[ \t]*pragma[ \t]+warning[ \t]*\\([ \t]*disable"
+           OR line MATCHES "_Pragma[ \t]*\\([ \t]*\"[ \t]*(clang|GCC)[ \t]+diagnostic[ \t]+ignored"
+           OR line MATCHES "__pragma[ \t]*\\([ \t]*warning[ \t]*\\([ \t]*disable")
             if(NOT confined)
                 report("${file}" ${number} "diagnostic pragma outside a confined area (${CONFINED_DIRS})")
+            endif()
+            if(NOT line MATCHES "//[ \t]*[^ \t]")
+                report("${file}" ${number} "diagnostic pragma must give a reason in a trailing comment: // reason")
+            endif()
+        endif()
+
+        # Formatting may be switched off anywhere, but only with a reason.
+        if(line MATCHES "clang-format[ \t]+off(.*)$")
+            if(NOT CMAKE_MATCH_1 MATCHES "^:[ \t]*[^ \t*]")
+                report("${file}" ${number} "clang-format off must give a reason: // clang-format off: reason")
             endif()
         endif()
     endforeach()

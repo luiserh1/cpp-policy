@@ -1,0 +1,1 @@
+src/lowlevel/os.cpp:2: error: diagnostic pragma must give a reason

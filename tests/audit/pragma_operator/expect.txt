@@ -1,0 +1,1 @@
+src/app.hpp:2: error: diagnostic pragma outside a confined area

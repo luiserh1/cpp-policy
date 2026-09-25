@@ -1,0 +1,1 @@
+src/table.cpp:1: error: clang-format off must give a reason

@@ -145,16 +145,25 @@ loops.
 
 ## 5. Suppressions
 
-A suppression is any `NOLINT`, `NOLINTNEXTLINE`, `NOLINTBEGIN/END`, or
-`#pragma clang diagnostic ignored`.
+A suppression is any of:
+- a clang-tidy comment: `NOLINT`, `NOLINTNEXTLINE`, `NOLINTBEGIN` / `NOLINTEND`;
+- a diagnostic pragma that turns a compiler warning off, in any spelling:
+  `#pragma clang diagnostic ignored`, `#pragma warning(disable…)`, or the
+  operator forms `_Pragma(...)` and `__pragma(...)`;
+- a formatting switch: `// clang-format off`.
 
 Rules, enforced by the suppression audit (the `policy-audit` target,
 `cmake/scripts/audit_suppressions.cmake`):
 
-1. A suppression **must name the specific check**. A bare `// NOLINT` is rejected.
-2. A suppression **must give a reason** after the check name:
-   `// NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic): parsing packed header in-place`
-3. Suppressions are **only allowed inside confined areas** (section 4).
+1. A `NOLINT` **must name the specific check**. A bare `// NOLINT` is rejected.
+2. Every suppression **must give a reason**:
+   - `// NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic): parsing packed header in-place`
+     (`NOLINTEND` is exempt: its `NOLINTBEGIN` gives the reason);
+   - `#pragma clang diagnostic ignored "-Wold-style-cast" // SIG_ERR is a C cast`;
+   - `// clang-format off: columns aligned by hand`.
+3. `NOLINT` and diagnostic pragmas are **only allowed inside confined areas**
+   (section 4). `clang-format off` is allowed anywhere, since it only affects
+   layout.
 4. Wildcard suppressions (`NOLINT(*)`, `NOLINT(cppcoreguidelines-*)`) are rejected.
 
 If code outside a confined area cannot satisfy a rule, either the code
