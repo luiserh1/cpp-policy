@@ -431,11 +431,15 @@ as `#pragma once` and suppressions, have fixtures in `tests/audit/`.
 
 ## 10. Versioning
 
-- `cpp-policy` uses semantic versioning. Projects pin a tag.
+- `cpp-policy` uses semantic versioning. Projects pin the **commit** of a
+  release tag, with the tag name in a comment
+  (`GIT_TAG <commit>   # v0.3.0`). A tag can be moved to other code later; a
+  commit can't. That matters because cpp-policy's CMake code runs on every
+  machine that configures a project.
 - The version is defined once, in `project(cpp_policy VERSION ...)` in
   `CMakeLists.txt`. A release commit sets it, adds the release to
   `CHANGELOG.md` (each change with its reason), updates the tag in the
-  `README.md` example, and is tagged `v<version>`.
+  `README.md` example, and gets an annotated tag `v<version>`.
 - **Major:** a new rule or tightened rule that can break existing code.
 - **Minor:** new optional features, new presets, tooling improvements.
 - **Patch:** fixes that don't change what passes or fails.

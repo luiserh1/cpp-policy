@@ -10,13 +10,24 @@ The rules are in [POLICY.md](POLICY.md).
 include(FetchContent)
 FetchContent_Declare(cpp_policy
     GIT_REPOSITORY https://github.com/luiserh1/cpp-policy.git
-    GIT_TAG        v0.2.0)   # latest release; see CHANGELOG.md
+    GIT_TAG        <commit>)   # v0.2.0, the latest release; see CHANGELOG.md
 FetchContent_MakeAvailable(cpp_policy)
 
 add_executable(app src/main.cpp)
 cpp_policy_apply(app)       # every target you own (configuration fails otherwise)
 cpp_policy_add_checks()     # once: policy-audit, policy-format-check, policy-format-fix
 ```
+
+Pin the commit a release tag points to, with the tag in a comment, rather
+than the tag itself: a tag can be moved to other code later, a commit can't,
+and this repository's CMake code runs on every machine that configures the
+project (POLICY.md 10). The commit is the line ending in `^{}`:
+
+```
+git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.2.0*'
+```
+
+Don't add `GIT_SHALLOW`: it only works with branch and tag names.
 
 Copy `.clang-tidy` and `.clang-format` into the project root unchanged. The
 copies are for editors: clangd and IDEs look for these files next to the

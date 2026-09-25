@@ -38,6 +38,11 @@ Each entry says what changed and why. Projects read this before moving their
   `Waiting Wn` comment. *Why:* such decisions were scattered: some recorded in
   POLICY.md, others only in a code comment, with nothing prompting anyone to
   look again. (#61)
+- Projects pin the commit a release tag points to, with the tag in a comment,
+  instead of the tag (POLICY.md 10, README). *Why:* a tag can be moved to
+  other code later, for example by someone who takes over the repository's
+  account, and cpp-policy's CMake code runs on every machine that configures a
+  project. A commit can't be moved. (#55)
 
 ### Rules
 
