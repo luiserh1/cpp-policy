@@ -1,6 +1,7 @@
 # C++ Project Policy
 
-> **Status:** v0.1. Enforced by the `cpp-policy` module, clang-tidy config and self-tests.
+> **Version:** the `project()` version in `CMakeLists.txt`; changes are listed in
+> `CHANGELOG.md`. Enforced by the `cpp-policy` module, clang-tidy config and self-tests.
 
 This document defines the restricted, modern subset of C++ used by every
 project that consumes `cpp-policy`. Most rules are enforced mechanically
@@ -232,9 +233,15 @@ rejected.
 ## 10. Versioning
 
 - `cpp-policy` uses semantic versioning. Projects pin a tag.
+- The version is defined once, in `project(cpp_policy VERSION ...)` in
+  `CMakeLists.txt`. A release commit sets it, adds the release to
+  `CHANGELOG.md` (each change with its reason), updates the tag in the
+  `README.md` example, and is tagged `v<version>`.
 - **Major:** a new rule or tightened rule that can break existing code.
 - **Minor:** new optional features, new presets, tooling improvements.
 - **Patch:** fixes that don't change what passes or fails.
+- **Before 1.0**, the minor version takes the major's role: `0.x` to
+  `0.(x+1)` may break existing code, while patch releases still never do.
 
 ## 11. Project structure
 
