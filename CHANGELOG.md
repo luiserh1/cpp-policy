@@ -3,10 +3,22 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
-## Unreleased
+## 0.2.0 (2026-09-25)
 
-Changes from the first full walkthrough of the repository (2026-09-25). Item
-numbers refer to that review's issue list.
+Changes from the first full walkthrough of the repository. Item numbers refer
+to that review's issue list. Before 1.0 a minor release may break existing
+code: new rules below can reject code that passed 0.1.1.
+
+### Upgrading a project
+
+1. Set `GIT_TAG v0.2.0`.
+2. Copy `.clang-tidy` and `.clang-format` again (both changed).
+3. Add the missing lines of this repository's `.gitignore` to the project's,
+   and copy `.gitattributes`.
+4. Delete `CLAUDE.md`; keep a deny rule for creating it in the agent settings.
+5. Optionally copy the new `debug` and `release` presets from
+   `CMakePresets.json`.
+6. Run the gate and fix what the new rules report.
 
 ### Documentation
 
@@ -21,9 +33,9 @@ numbers refer to that review's issue list.
   23 does not provide it, so the recommendation could not compile. (#4)
 - POLICY.md sections 5, 8 and 9 name the real tools: the `policy-audit` target
   and the `check` workflow instead of a `tools/` folder that never existed;
-  the pre-commit hook is described as it is (audit and format check, no clang-
-  tidy); the agent hook and CI are marked as planned. *Why:* the text still
-  described the first draft, and agents follow it literally. (#7, #10)
+  the pre-commit hook is described as it is (audit and format check, no
+  clang-tidy); the agent hook and CI are marked as planned. *Why:* the text
+  still described the first draft, and agents follow it literally. (#7, #10)
 - POLICY.md sections 6 and 9 drop `CLAUDE.md`. *Why:* Claude Code reads
   `AGENTS.md` directly since v2.1.277, and only when there is no `CLAUDE.md`,
   so the import file is no longer needed and a stray one would hide the
@@ -40,6 +52,7 @@ numbers refer to that review's issue list.
   the reasons (experimental in CMake, immature clang-tidy support, Windows
   lag). *Why:* their absence looked like an oversight; now it is a recorded
   decision to revisit. (#6)
+- README pins the current release in its usage example. (#1)
 - README explains why projects copy `.clang-tidy` and `.clang-format`: editors
   read them, the build never does, and the audit keeps them identical. *Why:*
   the copies looked redundant; the reason was only hinted at. (#2)
@@ -85,10 +98,10 @@ numbers refer to that review's issue list.
 - Nine new bad samples: `malloc`, union type punning, functional casts,
   function-like macros, several declarations per line, missing `const`,
   implicit conversion operators, a non-virtual base destructor, and a
-  violation inside a header. Pointer + length parameters move to the review-
-  only list (no check flags the signature). *Why:* POLICY.md claimed every
-  section-2 rule had a sample; about ten did not, so a clang-tidy upgrade
-  could drop those rules unnoticed. (#11)
+  violation inside a header. Pointer + length parameters move to the
+  review-only list (no check flags the signature). *Why:* POLICY.md claimed
+  every section-2 rule had a sample; about ten did not, so a clang-tidy
+  upgrade could drop those rules unnoticed. (#11)
 - The good sample (`tests/good/`) now teaches the right lessons: its NOLINT
   covers a `reinterpret_cast` that is truly needed (viewing bytes as text)
   instead of pointer arithmetic that plain indexing avoids; the polymorphic
@@ -116,25 +129,26 @@ numbers refer to that review's issue list.
   `.gitattributes` must contain every line of cpp-policy's copies (checked by
   the audit); nothing editor-specific is committed. cpp-policy's `.gitignore`
   gains the Visual Studio, CLion, VS Code and Windows entries, and a
-  `.gitattributes` forces LF line endings. *Why:* ignore files were hand-
-  written per repo and neither ignored `.vs/`; Git for Windows' line-ending
-  conversion would break the audit's byte comparison of the `.clang-*` copies.
-  (#36, #30)
+  `.gitattributes` forces LF line endings. *Why:* ignore files were
+  hand-written per repo and neither ignored `.vs/`; Git for Windows'
+  line-ending conversion would break the audit's byte comparison of the
+  `.clang-*` copies. (#36, #30)
 - Configuration fails if a project target doesn't call `cpp_policy_apply()`,
   or if warnings or clang-tidy are switched off from CMake
   (`-Wno-…`/`/wd…`/`-w` on targets, sources or `CMAKE_CXX_FLAGS`;
   `SKIP_LINTING`; a changed `CXX_CLANG_TIDY`). *Why:* the suppression audit
   only looked at source code, so the whole policy could be switched off in
   `CMakeLists.txt`, which agents must be allowed to edit. (#29)
-- `short`, `long` and `long long` are banned (clang-tidy `google-runtime-
-  int`); use `<cstdint>` fixed-width types, `std::size_t`, or plain `int`.
-  *Why:* `long` is 64 bits on macOS/Linux and 32 on Windows, so the same code
-  can silently truncate on one platform. Raised by the owner. (#12)
-- Naming convention (POLICY.md 2.7), enforced by `readability-identifier-
-  naming`: PascalCase types, snake_case everything else, trailing `_` on
-  private members, UPPER_CASE macros. *Why:* the check was enabled without
-  options, so it checked nothing, and no convention was written down; the
-  chosen one is what the code already used. (#18)
+- `short`, `long` and `long long` are banned (clang-tidy
+  `google-runtime-int`); use `<cstdint>` fixed-width types, `std::size_t`, or
+  plain `int`. *Why:* `long` is 64 bits on macOS/Linux and 32 on Windows, so
+  the same code can silently truncate on one platform. Raised by the owner.
+  (#12)
+- Naming convention (POLICY.md 2.7), enforced by
+  `readability-identifier-naming`: PascalCase types, snake_case everything
+  else, trailing `_` on private members, UPPER_CASE macros. *Why:* the check
+  was enabled without options, so it checked nothing, and no convention was
+  written down; the chosen one is what the code already used. (#18)
 - Functions are limited to 80 lines, 6 parameters and 4 levels of nesting
   (`readability-function-size`), plus the existing cognitive complexity limit
   of 25. *Why:* POLICY.md 11.3 claimed a function size limit, but the check
