@@ -134,7 +134,8 @@ loops.
 A suppression is any `NOLINT`, `NOLINTNEXTLINE`, `NOLINTBEGIN/END`, or
 `#pragma clang diagnostic ignored`.
 
-Rules, enforced by `tools/audit-suppressions`:
+Rules, enforced by the suppression audit (the `policy-audit` target,
+`cmake/scripts/audit_suppressions.cmake`):
 
 1. A suppression **must name the specific check**. A bare `// NOLINT` is rejected.
 2. A suppression **must give a reason** after the check name:
@@ -200,12 +201,14 @@ Known limitations:
 | Layer | When | What |
 |---|---|---|
 | Editor (clangd) | While typing | clang-tidy diagnostics, formatting |
-| Agent hook (Claude Code) | After each file edit | clang-tidy on the edited file |
-| Git pre-commit | On commit | Format check, clang-tidy on changed files |
-| Git pre-push | On push | Full `tools/check` |
-| CI (future) | On push / PR | Same `tools/check` on all three OSes |
+| Agent hook (Claude Code), planned | After each file edit | clang-tidy on the edited file |
+| Git pre-commit | On commit | Suppression audit and format check |
+| Git pre-push | On push | The full gate (below) |
+| CI, planned | On push / PR | The same gate on all three OSes |
 
-`tools/check` is the only definition of "passes the policy". Every other
+The gate is `cmake --workflow --preset check` (`win-check` on Windows):
+configure, build with clang-tidy, audit, format check, and tests under
+sanitizers. It is the only definition of "passes the policy". Every other
 layer is a faster subset of it.
 
 ### 8.1 What is not checked by tools
@@ -225,7 +228,8 @@ rejected.
 ## 9. AI agents
 
 - Agent instructions live in `AGENTS.md`. `CLAUDE.md` only imports it.
-- Agents must run `tools/check` before declaring work complete.
+- Agents must run the gate (`cmake --workflow --preset check`, section 8)
+  before declaring work complete.
 - Agents must not add suppressions, edit policy files (section 6), or bypass
   git hooks (`--no-verify`). Where the agent supports permission rules, this is
   also enforced technically.

@@ -19,7 +19,11 @@ numbers refer to that review's issue list.
   references. *Why:* the rule could not be followed as written. (#3)
 - POLICY.md 2.3 no longer recommends `std::start_lifetime_as`. *Why:* libc++
   23 does not provide it, so the recommendation could not compile. (#4)
-
+- POLICY.md sections 5, 8 and 9 name the real tools: the `policy-audit` target
+  and the `check` workflow instead of a `tools/` folder that never existed;
+  the pre-commit hook is described as it is (audit and format check, no clang-
+  tidy); the agent hook and CI are marked as planned. *Why:* the text still
+  described the first draft, and agents follow it literally. (#7, #10)
 
 ## 0.1.1
 
