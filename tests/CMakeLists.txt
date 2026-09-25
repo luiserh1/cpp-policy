@@ -11,9 +11,9 @@ add_test(NAME good/run COMMAND policy_good_test)
 # --- Bad samples: each must be rejected with the check named in its EXPECT line
 file(GLOB bad_samples CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/bad/*.cpp")
 add_library(policy_bad_samples OBJECT EXCLUDE_FROM_ALL ${bad_samples})
+# Never built (EXCLUDE_FROM_ALL): the target only puts the samples in compile_commands.json,
+# so the tests below can run clang-tidy on them with the policy's flags.
 cpp_policy_apply(policy_bad_samples)
-# Only listed so they appear in compile_commands.json; the tests below run clang-tidy on them.
-set_target_properties(policy_bad_samples PROPERTIES CXX_CLANG_TIDY "")
 
 foreach(sample IN LISTS bad_samples)
     cmake_path(GET sample STEM name)
@@ -66,4 +66,23 @@ foreach(case IN LISTS audit_cases)
     add_test(NAME audit/${name}
         COMMAND "${CMAKE_COMMAND}" -DCONFIG=${config} -P "${CPP_POLICY_ROOT}/cmake/scripts/audit_suppressions.cmake")
     set_tests_properties(audit/${name} PROPERTIES PASS_REGULAR_EXPRESSION "${expect}")
+endforeach()
+
+# --- CMake bypass fixtures: each directory is a mini project that configures with the
+# policy (clang-tidy on); expect.txt holds a regex its configure output must match.
+file(GLOB bypass_cases CONFIGURE_DEPENDS LIST_DIRECTORIES true "${CMAKE_CURRENT_SOURCE_DIR}/bypass/*")
+foreach(case IN LISTS bypass_cases)
+    if(NOT IS_DIRECTORY "${case}")
+        continue()
+    endif()
+    cmake_path(GET case FILENAME name)
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${case}/expect.txt")
+    file(READ "${case}/expect.txt" expect)
+    string(STRIP "${expect}" expect)
+    add_test(NAME bypass/${name}
+        COMMAND "${CMAKE_COMMAND}" --fresh -S "${case}" -B "${CMAKE_CURRENT_BINARY_DIR}/bypass_${name}"
+                -G Ninja "-DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}"
+                "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}" -DCPP_POLICY_CLANG_TIDY=ON
+                "-DPOLICY_ROOT=${CPP_POLICY_ROOT}")
+    set_tests_properties(bypass/${name} PROPERTIES PASS_REGULAR_EXPRESSION "${expect}")
 endforeach()

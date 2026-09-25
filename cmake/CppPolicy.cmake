@@ -66,6 +66,8 @@ endfunction()
 # ---------------------------------------------------------------------------
 function(cpp_policy_apply target)
     _cpp_policy_verify_toolchain()
+    # Checked at the end of configuration (_cpp_policy_verify_targets).
+    set_target_properties(${target} PROPERTIES CPP_POLICY_APPLIED TRUE)
 
     # "clang-cl" uses the MSVC command-line syntax.
     if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
@@ -152,6 +154,98 @@ function(cpp_policy_apply target)
 endfunction()
 
 # ---------------------------------------------------------------------------
+# Target verification: the policy can't be bypassed from CMake
+# ---------------------------------------------------------------------------
+# Lists the targets defined in `dir` and its subdirectories, skipping fetched
+# dependencies (inside the build tree) and the excluded directories.
+function(_cpp_policy_project_targets dir out)
+    get_property(targets DIRECTORY "${dir}" PROPERTY BUILDSYSTEM_TARGETS)
+    get_property(subdirs DIRECTORY "${dir}" PROPERTY SUBDIRECTORIES)
+    foreach(sub IN LISTS subdirs)
+        cmake_path(IS_PREFIX CMAKE_BINARY_DIR "${sub}" NORMALIZE in_build_tree)
+        cmake_path(RELATIVE_PATH sub BASE_DIRECTORY "${CMAKE_SOURCE_DIR}" OUTPUT_VARIABLE rel)
+        set(excluded FALSE)
+        foreach(dir_name IN LISTS CPP_POLICY_EXCLUDED_DIRS)
+            if(rel STREQUAL dir_name OR rel MATCHES "^${dir_name}/")
+                set(excluded TRUE)
+            endif()
+        endforeach()
+        if(NOT in_build_tree AND NOT excluded)
+            _cpp_policy_project_targets("${sub}" sub_targets)
+            list(APPEND targets ${sub_targets})
+        endif()
+    endforeach()
+    set(${out} ${targets} PARENT_SCOPE)
+endfunction()
+
+# Appends a problem to the list named by `out_list` for each option that turns warnings off.
+# (The parameter must not be called `problems`: it would shadow the caller's list.)
+function(_cpp_policy_check_options what options out_list)
+    set(found ${${out_list}})
+    foreach(option IN LISTS options)
+        if(option MATCHES "-Wno-|/wd[0-9]" OR option MATCHES "^[-/]w$" OR option STREQUAL "/W0")
+            list(APPEND found "${what} turns warnings off: ${option}")
+        endif()
+    endforeach()
+    set(${out_list} ${found} PARENT_SCOPE)
+endfunction()
+
+# Runs once, after the whole project is configured (deferred by cpp_policy_add_checks).
+function(_cpp_policy_verify_targets)
+    set(problems "")
+    foreach(var IN ITEMS CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
+                         CMAKE_CXX_FLAGS_RELWITHDEBINFO CMAKE_CXX_FLAGS_MINSIZEREL)
+        separate_arguments(flags NATIVE_COMMAND "${${var}}")
+        _cpp_policy_check_options("${var}" "${flags}" problems)
+    endforeach()
+
+    _cpp_policy_project_targets("${CMAKE_SOURCE_DIR}" targets)
+    foreach(target IN LISTS targets)
+        get_target_property(type ${target} TYPE)
+        if(NOT type MATCHES "^(EXECUTABLE|STATIC_LIBRARY|SHARED_LIBRARY|MODULE_LIBRARY|OBJECT_LIBRARY)$")
+            continue()
+        endif()
+        get_target_property(applied ${target} CPP_POLICY_APPLIED)
+        if(NOT applied)
+            list(APPEND problems "target '${target}' does not call cpp_policy_apply()")
+            continue()
+        endif()
+        foreach(property IN ITEMS COMPILE_OPTIONS INTERFACE_COMPILE_OPTIONS)
+            get_target_property(options ${target} ${property})
+            if(options)
+                _cpp_policy_check_options("target '${target}' (${property})" "${options}" problems)
+            endif()
+        endforeach()
+        if(CPP_POLICY_CLANG_TIDY)
+            get_target_property(tidy ${target} CXX_CLANG_TIDY)
+            if(NOT tidy STREQUAL "${CPP_POLICY_CLANG_TIDY_EXE};--config-file=${CPP_POLICY_ROOT}/.clang-tidy")
+                list(APPEND problems "target '${target}' changes CXX_CLANG_TIDY")
+            endif()
+        endif()
+        get_target_property(sources ${target} SOURCES)
+        foreach(source IN LISTS sources)
+            get_source_file_property(skip "${source}" TARGET_DIRECTORY ${target} SKIP_LINTING)
+            if(skip)
+                list(APPEND problems "target '${target}': ${source} sets SKIP_LINTING")
+            endif()
+            foreach(property IN ITEMS COMPILE_OPTIONS COMPILE_FLAGS)
+                get_source_file_property(options "${source}" TARGET_DIRECTORY ${target} ${property})
+                if(options)
+                    separate_arguments(options NATIVE_COMMAND "${options}")
+                    _cpp_policy_check_options("target '${target}': ${source}" "${options}" problems)
+                endif()
+            endforeach()
+        endforeach()
+    endforeach()
+
+    if(problems)
+        list(JOIN problems "\n  " problem_list)
+        message(FATAL_ERROR "cpp-policy: the policy is bypassed in CMake:\n  ${problem_list}\n"
+            "Every target must call cpp_policy_apply() and keep its settings (POLICY.md 6).")
+    endif()
+endfunction()
+
+# ---------------------------------------------------------------------------
 # Project-wide checks: suppression audit and format check/fix
 # ---------------------------------------------------------------------------
 function(cpp_policy_add_checks)
@@ -159,6 +253,7 @@ function(cpp_policy_add_checks)
     if(TARGET policy-audit)
         return()
     endif()
+    cmake_language(DEFER DIRECTORY "${CMAKE_SOURCE_DIR}" CALL _cpp_policy_verify_targets)
 
     set(config "${CMAKE_BINARY_DIR}/cpp_policy_config.cmake")
     file(WRITE "${config}"

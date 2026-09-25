@@ -93,6 +93,12 @@ numbers refer to that review's issue list.
   written per repo and neither ignored `.vs/`; Git for Windows' line-ending
   conversion would break the audit's byte comparison of the `.clang-*` copies.
   (#36, #30)
+- Configuration fails if a project target doesn't call `cpp_policy_apply()`,
+  or if warnings or clang-tidy are switched off from CMake
+  (`-Wno-…`/`/wd…`/`-w` on targets, sources or `CMAKE_CXX_FLAGS`;
+  `SKIP_LINTING`; a changed `CXX_CLANG_TIDY`). *Why:* the suppression audit
+  only looked at source code, so the whole policy could be switched off in
+  `CMakeLists.txt`, which agents must be allowed to edit. (#29)
 
 ## 0.1.1
 

@@ -179,6 +179,13 @@ The following files define enforcement and must not be weakened in a project:
 - `tools/` scripts, git hook scripts
 - `AGENTS.md`, agent settings (`.claude/settings.json`)
 
+Rules can't be switched off from CMake either. At the end of configuration
+the module checks that every target the project builds (fetched dependencies
+and excluded directories aside) calls `cpp_policy_apply()` and keeps its
+settings: no options that turn warnings off (`-Wno-…`, `/wd…`, `-w`) on
+targets, source files or `CMAKE_CXX_FLAGS`, no `SKIP_LINTING`, and no changes
+to `CXX_CLANG_TIDY`. Configuration fails otherwise.
+
 Projects can't change the rules locally: their `.clang-tidy` and
 `.clang-format` must match the policy's, and the build always uses the
 policy's copies. A project may only tighten what the module's options allow

@@ -14,7 +14,7 @@ FetchContent_Declare(cpp_policy
 FetchContent_MakeAvailable(cpp_policy)
 
 add_executable(app src/main.cpp)
-cpp_policy_apply(app)       # every target you own
+cpp_policy_apply(app)       # every target you own (configuration fails otherwise)
 cpp_policy_add_checks()     # once: policy-audit, policy-format-check, policy-format-fix
 ```
 

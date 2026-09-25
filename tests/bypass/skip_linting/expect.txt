@@ -1,0 +1,1 @@
+app.cpp sets SKIP_LINTING

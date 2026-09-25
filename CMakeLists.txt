@@ -8,7 +8,7 @@ include(cmake/CppPolicy.cmake)
 if(PROJECT_IS_TOP_LEVEL)
     set(CPP_POLICY_CONFINED_DIRS "tests/good/lowlevel")
     # The audit fixtures and bad samples violate the policy on purpose.
-    list(APPEND CPP_POLICY_EXCLUDED_DIRS tests/audit tests/bad tests/format)
+    list(APPEND CPP_POLICY_EXCLUDED_DIRS tests/audit tests/bad tests/bypass tests/format)
     enable_testing()
     cpp_policy_add_checks()
     add_subdirectory(tests)
