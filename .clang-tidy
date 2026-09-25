@@ -55,6 +55,10 @@ CheckOptions:
   cppcoreguidelines-special-member-functions.AllowSoleDefaultDtor: true
   # Ignoring an error-carrying return value is a bug.
   bugprone-unused-return-value.CheckedReturnTypes: '::std::error_code;::std::error_condition;::std::errc;::std::expected'
+  # Function size (POLICY.md 11.3); cognitive complexity keeps its default of 25.
+  readability-function-size.LineThreshold: 80
+  readability-function-size.ParameterThreshold: 6
+  readability-function-size.NestingThreshold: 4
   # Naming (POLICY.md 2.7): PascalCase for types, snake_case for everything else,
   # a trailing underscore on private and protected data members, UPPER_CASE macros.
   readability-identifier-naming.NamespaceCase: lower_case

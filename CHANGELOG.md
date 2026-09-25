@@ -113,6 +113,10 @@ numbers refer to that review's issue list.
   private members, UPPER_CASE macros. *Why:* the check was enabled without
   options, so it checked nothing, and no convention was written down; the
   chosen one is what the code already used. (#18)
+- Functions are limited to 80 lines, 6 parameters and 4 levels of nesting
+  (`readability-function-size`), plus the existing cognitive complexity limit
+  of 25. *Why:* POLICY.md 11.3 claimed a function size limit, but the check
+  had no thresholds set (only 800 statements), so it never fired. (#15)
 
 ## 0.1.1
 

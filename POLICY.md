@@ -367,8 +367,9 @@ reject includes that point upward.
 
 - When a new feature would push a file past the target, split the file by
   responsibility first, then add the feature.
-- Function size is limited separately by clang-tidy
-  (`readability-function-size`, `readability-function-cognitive-complexity`).
+- Functions are limited separately by clang-tidy: at most 80 lines, 6
+  parameters and 4 levels of nesting (`readability-function-size`), and a
+  cognitive complexity of 25 (`readability-function-cognitive-complexity`).
 
 *Enforcement:* planned. The audit will report files over the review threshold.
 
