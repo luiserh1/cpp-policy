@@ -24,6 +24,10 @@ numbers refer to that review's issue list.
   the pre-commit hook is described as it is (audit and format check, no clang-
   tidy); the agent hook and CI are marked as planned. *Why:* the text still
   described the first draft, and agents follow it literally. (#7, #10)
+- POLICY.md sections 6 and 9 drop `CLAUDE.md`. *Why:* Claude Code reads
+  `AGENTS.md` directly since v2.1.277, and only when there is no `CLAUDE.md`,
+  so the import file is no longer needed and a stray one would hide the
+  instructions. (#17)
 
 ## 0.1.1
 

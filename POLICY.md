@@ -154,7 +154,7 @@ The following files define enforcement and must not be weakened in a project:
 - `.clang-tidy`, `.clang-format`
 - `CMakePresets.json` and any CMake code that sets compile flags
 - `tools/` scripts, git hook scripts
-- `AGENTS.md`, `CLAUDE.md`, agent settings
+- `AGENTS.md`, agent settings (`.claude/settings.json`)
 
 A project may only **add** checks or **tighten** rules locally. Relaxing a rule
 requires a change in `cpp-policy` itself.
@@ -227,7 +227,10 @@ rejected.
 
 ## 9. AI agents
 
-- Agent instructions live in `AGENTS.md`. `CLAUDE.md` only imports it.
+- Agent instructions live in `AGENTS.md`. Projects don't have a `CLAUDE.md`:
+  Claude Code (v2.1.277 or later) reads `AGENTS.md` directly, but only when no
+  `CLAUDE.md` exists, so adding one would hide `AGENTS.md` from it. Agent
+  settings deny creating `CLAUDE.md`.
 - Agents must run the gate (`cmake --workflow --preset check`, section 8)
   before declaring work complete.
 - Agents must not add suppressions, edit policy files (section 6), or bypass
