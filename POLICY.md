@@ -283,6 +283,8 @@ layer is a faster subset of it.
 These rules rely on review (and on agents following `AGENTS.md`):
 - `const char*` used as a string type (section 2.2)
 - File names in `snake_case` (section 2.7)
+- Pointer + length parameters (section 2.2): no check flags the signature,
+  but indexing the pointer is caught as pointer arithmetic
 - `catch (...)` only at boundaries (section 3); tools do enforce that
   exceptions never escape `main` or `noexcept` functions
 - `dynamic_cast` / `typeid` being discouraged (section 3)
@@ -293,8 +295,10 @@ These rules rely on review (and on agents following `AGENTS.md`):
   limits are planned audit checks; the helper extraction rule and comment
   accuracy will always rely on review
 
-Every other rule in section 2 has a sample in `tests/bad/` proving it is
-rejected.
+Every other rule in section 2, and the function size limits of section 11.3,
+has a sample in `tests/bad/` proving clang-tidy rejects it (one of them in a
+header, proving headers are checked). The rules enforced by the audit, such
+as `#pragma once` and suppressions, have fixtures in `tests/audit/`.
 
 ## 9. AI agents
 

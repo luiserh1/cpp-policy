@@ -74,6 +74,13 @@ numbers refer to that review's issue list.
   characters CMake lists treat specially. A fixture may override its config
   with an `options.cmake`. *Why:* the copy check, line counting and exclusions
   were untested; breaking them on purpose now fails the self-test. (#37)
+- Nine new bad samples: `malloc`, union type punning, functional casts,
+  function-like macros, several declarations per line, missing `const`,
+  implicit conversion operators, a non-virtual base destructor, and a
+  violation inside a header. Pointer + length parameters move to the review-
+  only list (no check flags the signature). *Why:* POLICY.md claimed every
+  section-2 rule had a sample; about ten did not, so a clang-tidy upgrade
+  could drop those rules unnoticed. (#11)
 
 ### Rules
 
