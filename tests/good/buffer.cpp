@@ -23,8 +23,8 @@ std::expected<int, ParseError> parse_int(std::string_view text) {
     return value;
 }
 
-long long sum(std::span<const int> values) {
-    return std::accumulate(values.begin(), values.end(), 0LL);
+std::int64_t sum(std::span<const int> values) {
+    return std::accumulate(values.begin(), values.end(), std::int64_t{0});
 }
 
 std::vector<std::unique_ptr<Shape>> make_squares(std::span<const double> sides) {

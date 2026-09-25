@@ -1,6 +1,6 @@
 // POLICY 2.3: typedef.
 // EXPECT: modernize-use-using
-typedef unsigned long Id;
+typedef unsigned int Id;
 
 Id next(Id id) {
     return id + 1;

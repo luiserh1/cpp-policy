@@ -9,6 +9,7 @@ Checks: >
   clang-analyzer-*,
   concurrency-*,
   cppcoreguidelines-*,
+  google-runtime-int,
   misc-*,
   modernize-*,
   performance-*,

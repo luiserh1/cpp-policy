@@ -99,6 +99,10 @@ numbers refer to that review's issue list.
   `SKIP_LINTING`; a changed `CXX_CLANG_TIDY`). *Why:* the suppression audit
   only looked at source code, so the whole policy could be switched off in
   `CMakeLists.txt`, which agents must be allowed to edit. (#29)
+- `short`, `long` and `long long` are banned (clang-tidy `google-runtime-
+  int`); use `<cstdint>` fixed-width types, `std::size_t`, or plain `int`.
+  *Why:* `long` is 64 bits on macOS/Linux and 32 on Windows, so the same code
+  can silently truncate on one platform. Raised by the owner. (#12)
 
 ## 0.1.1
 

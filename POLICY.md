@@ -64,6 +64,11 @@ normal code and what to use instead.
 | Implicit narrowing conversions | Brace initialization, explicit `static_cast`, `std::in_range` checks |
 | `NULL`, `0` as a pointer | `nullptr` |
 | `typedef` | `using` |
+| `short`, `long`, `long long` (and their `unsigned` forms) | `<cstdint>` fixed-width types (`std::int32_t`, `std::uint16_t`…) where the size matters; `std::size_t` for sizes and indexes; plain `int` for small counters and arithmetic |
+
+`long` is 64 bits on macOS and Linux but 32 bits on Windows, so code that
+stores a large value in a `long` works on one platform and silently truncates
+on another. `int` is 32 bits on every supported platform.
 
 ### 2.4 Preprocessor
 
