@@ -8,6 +8,15 @@ target_link_libraries(policy_good_test PRIVATE policy_good)
 cpp_policy_apply(policy_good_test)
 add_test(NAME good/run COMMAND policy_good_test)
 
+# --- clang-cl: slash-form options must reach the compiler and clang-tidy. If they don't,
+# this target fails to build (see the comment in the source).
+if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+    add_executable(policy_clang_cl_slash_options clang_cl/slash_options.cpp)
+    target_compile_options(policy_clang_cl_slash_options PRIVATE /DCPP_POLICY_SLASH_OPTION)
+    cpp_policy_apply(policy_clang_cl_slash_options)
+    add_test(NAME clang_cl/slash_options COMMAND policy_clang_cl_slash_options)
+endif()
+
 # --- LeakSanitizer: a deliberate leak must be reported (ASan builds on macOS and Linux).
 # The dev and check test presets turn leak detection on (it is off by default on macOS);
 # the test only appends abort_on_error=0, so it fails if the preset stops doing that.
