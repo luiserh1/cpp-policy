@@ -1,0 +1,1 @@
+src/lowlevel/lines.cpp:5: error: suppression must name the specific check

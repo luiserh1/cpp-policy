@@ -25,13 +25,14 @@ foreach(sample IN LISTS bad_samples)
     add_test(NAME bad/${name}
         COMMAND "${CPP_POLICY_CLANG_TIDY_EXE}" "--config-file=${CPP_POLICY_ROOT}/.clang-tidy"
                 -p "${CMAKE_BINARY_DIR}" "${sample}")
-    # The run must fail AND report the expected check as an error.
+    # The output must report the expected check as an error. A pass regex overrides
+    # the exit code; an "error:" line from clang-tidy implies the run failed.
     set_tests_properties(bad/${name} PROPERTIES
         PASS_REGULAR_EXPRESSION "error: [^\n]*[[,]${check}[],]")
 endforeach()
 
 # --- Format fixtures: files that must already be formatted (clang-format must not change them)
-file(GLOB format_fixtures "${CMAKE_CURRENT_SOURCE_DIR}/format/*.cpp")
+file(GLOB format_fixtures CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/format/*.cpp")
 foreach(fixture IN LISTS format_fixtures)
     cmake_path(GET fixture STEM name)
     add_test(NAME format/${name}
@@ -39,13 +40,17 @@ foreach(fixture IN LISTS format_fixtures)
                 "--style=file:${CPP_POLICY_ROOT}/.clang-format" "${fixture}")
 endforeach()
 
-# --- Audit fixtures: each directory is a mini project; expect.txt holds a regex
-file(GLOB audit_cases LIST_DIRECTORIES true "${CMAKE_CURRENT_SOURCE_DIR}/audit/*")
+# --- Audit fixtures: each directory is a mini project.
+#   expect.txt    regex the audit output must match (include "file:line:" to pin the line)
+#   options.cmake optional; appended to the generated config to override its defaults
+#                 (e.g. set(CHECK_SYNC ON) or a different EXCLUDED_DIRS)
+file(GLOB audit_cases CONFIGURE_DEPENDS LIST_DIRECTORIES true "${CMAKE_CURRENT_SOURCE_DIR}/audit/*")
 foreach(case IN LISTS audit_cases)
     if(NOT IS_DIRECTORY "${case}")
         continue()
     endif()
     cmake_path(GET case FILENAME name)
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${case}/expect.txt")
     file(READ "${case}/expect.txt" expect)
     string(STRIP "${expect}" expect)
     set(config "${CMAKE_CURRENT_BINARY_DIR}/audit_${name}.cmake")
@@ -54,6 +59,10 @@ foreach(case IN LISTS audit_cases)
         "set(POLICY_ROOT [==[${CPP_POLICY_ROOT}]==])\n"
         "set(CONFINED_DIRS [==[src/lowlevel]==])\n"
         "set(EXCLUDED_DIRS [==[]==])\n")
+    if(EXISTS "${case}/options.cmake")
+        set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${case}/options.cmake")
+        file(APPEND "${config}" "include([==[${case}/options.cmake]==])\n")
+    endif()
     add_test(NAME audit/${name}
         COMMAND "${CMAKE_COMMAND}" -DCONFIG=${config} -P "${CPP_POLICY_ROOT}/cmake/scripts/audit_suppressions.cmake")
     set_tests_properties(audit/${name} PROPERTIES PASS_REGULAR_EXPRESSION "${expect}")

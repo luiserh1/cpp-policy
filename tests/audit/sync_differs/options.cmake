@@ -1,0 +1,1 @@
+set(CHECK_SYNC ON)

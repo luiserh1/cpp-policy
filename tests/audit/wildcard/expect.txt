@@ -1,1 +1,1 @@
-wildcard suppressions are not allowed
+src/lowlevel/wild.cpp:1: error: wildcard suppressions are not allowed

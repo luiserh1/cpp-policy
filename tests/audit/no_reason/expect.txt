@@ -1,1 +1,1 @@
-must give a reason
+src/lowlevel/noreason.cpp:2: error: suppression must give a reason

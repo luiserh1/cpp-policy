@@ -1,0 +1,1 @@
+\.clang-tidy:1: error: differs from cpp-policy.s copy

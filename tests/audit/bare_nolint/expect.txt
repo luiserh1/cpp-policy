@@ -1,1 +1,1 @@
-must name the specific check
+src/lowlevel/bare.cpp:2: error: suppression must name the specific check

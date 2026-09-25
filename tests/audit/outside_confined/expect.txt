@@ -1,1 +1,1 @@
-suppression outside a confined area
+src/app.cpp:2: error: suppression outside a confined area

@@ -59,6 +59,14 @@ numbers refer to that review's issue list.
 - The format fix target reports a clang-format failure as such, instead of
   telling you to run the fix target you just ran. (#31)
 
+### Self-tests
+
+- Audit fixtures now pin line numbers (`file:line:`) and cover the config copy
+  check, `NOLINTBEGIN`/`END`, excluded folders, and lines containing
+  characters CMake lists treat specially. A fixture may override its config
+  with an `options.cmake`. *Why:* the copy check, line counting and exclusions
+  were untested; breaking them on purpose now fails the self-test. (#37)
+
 ## 0.1.1
 
 - `.clang-format` no longer re-wraps `NOLINT` comments. *Why:* a wrapped
