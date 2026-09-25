@@ -19,6 +19,11 @@ IncludeCategories:
   # operating-system headers), then the standard library.
   - Regex: '^"'
     Priority: 1
+  # Windows: <winsock2.h> must precede every other Windows header (they pull in
+  # <windows.h>, which includes the old <winsock.h> and causes redefinition errors).
+  - Regex: '^<winsock2\.h>$'
+    Priority: 2
+    SortPriority: 1
   - Regex: '^<.*\.(h|hpp)>'
     Priority: 2
   - Regex: '^<'

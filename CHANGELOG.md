@@ -125,6 +125,14 @@ numbers refer to that review's issue list.
   of 25. *Why:* POLICY.md 11.3 claimed a function size limit, but the check
   had no thresholds set (only 800 statements), so it never fired. (#15)
 
+### Formatting
+
+- `<winsock2.h>` always sorts first among the non-standard headers. *Why:*
+  alphabetical sorting put `<iphlpapi.h>` and `<windows.h>` before it; on
+  Windows that pulls in the old `<winsock.h>` and breaks the build with
+  redefinition errors (SimpleLocalServer's `network_interfaces.cpp` was
+  affected, never compiled on Windows yet). (#20)
+
 ## 0.1.1
 
 - `.clang-format` no longer re-wraps `NOLINT` comments. *Why:* a wrapped
