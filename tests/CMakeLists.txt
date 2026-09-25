@@ -1,5 +1,5 @@
 # --- Good code: must build with every check enabled and pass its tests -------
-add_library(policy_good good/buffer.cpp good/lowlevel/packed_header.cpp)
+add_library(policy_good good/numbers.cpp good/shapes.cpp good/lowlevel/byte_view.cpp)
 target_include_directories(policy_good PUBLIC good)
 cpp_policy_apply(policy_good)
 

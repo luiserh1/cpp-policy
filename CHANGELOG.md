@@ -81,6 +81,13 @@ numbers refer to that review's issue list.
   only list (no check flags the signature). *Why:* POLICY.md claimed every
   section-2 rule had a sample; about ten did not, so a clang-tidy upgrade
   could drop those rules unnoticed. (#11)
+- The good sample (`tests/good/`) now teaches the right lessons: its NOLINT
+  covers a `reinterpret_cast` that is truly needed (viewing bytes as text)
+  instead of pointer arithmetic that plain indexing avoids; the polymorphic
+  `Shape` base has protected copy and move, so it can't be sliced; `buffer.*`
+  is split into `numbers.*` and `shapes.*`. *Why:* people and agents copy
+  examples, and the old one showed suppressing a rule instead of fixing the
+  code. (#39)
 
 ### Rules
 

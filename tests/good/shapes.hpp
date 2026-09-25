@@ -1,33 +1,25 @@
 #pragma once
 
-#include <cstdint>
-#include <expected>
 #include <memory>
 #include <span>
-#include <string>
-#include <string_view>
 #include <vector>
 
 namespace policy_sample {
 
-enum class ParseError : std::uint8_t { empty, invalid_digit, overflow };
-
-// Expected failure -> std::expected, not an exception.
-[[nodiscard]] std::expected<int, ParseError> parse_int(std::string_view text);
-
-// Non-owning view of a buffer -> std::span, not pointer + length.
-[[nodiscard]] std::int64_t sum(std::span<const int> values);
-
+// A polymorphic base: copy and move are protected, so a Shape& can't be copied
+// by accident, which would copy only the Shape part of a Square ("slicing").
 class Shape {
 public:
     Shape() = default;
+    virtual ~Shape() = default;
+
+    [[nodiscard]] virtual double area() const = 0;
+
+protected:
     Shape(const Shape&) = default;
     Shape(Shape&&) = default;
     Shape& operator=(const Shape&) = default;
     Shape& operator=(Shape&&) = default;
-    virtual ~Shape() = default;
-
-    [[nodiscard]] virtual double area() const = 0;
 };
 
 class Square final : public Shape {

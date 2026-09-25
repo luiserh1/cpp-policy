@@ -1,5 +1,6 @@
-#include "buffer.hpp"
-#include "lowlevel/packed_header.hpp"
+#include "lowlevel/byte_view.hpp"
+#include "numbers.hpp"
+#include "shapes.hpp"
 
 #include <array>
 #include <cstddef>
@@ -35,6 +36,9 @@ bool run_all() {
 
     constexpr std::array bytes{std::byte{0x01}, std::byte{0x02}, std::byte{0x00}, std::byte{0x00}};
     ok &= check(read_u32_le(bytes) == 0x0201U, "read_u32_le");
+
+    constexpr std::array text{std::byte{'o'}, std::byte{'k'}};
+    ok &= check(as_text(text) == "ok", "as_text");
 
     return ok;
 }
