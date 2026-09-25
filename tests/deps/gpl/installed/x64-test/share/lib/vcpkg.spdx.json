@@ -1,0 +1,6 @@
+{
+  "packages": [
+    { "name": "lib", "licenseConcluded": "GPL-3.0-only" },
+    { "name": "lib:x64-test", "licenseConcluded": "GPL-3.0-only" }
+  ]
+}

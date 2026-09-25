@@ -1,0 +1,1 @@
+error: vcpkg.json: dependency 'lib' must say why it is needed

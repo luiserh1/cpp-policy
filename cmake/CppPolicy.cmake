@@ -295,6 +295,30 @@ function(_cpp_policy_check_git_hooks)
 endfunction()
 
 # ---------------------------------------------------------------------------
+# Dependencies: vcpkg.json entries and the licenses of what vcpkg installed (POLICY.md 1.1)
+# ---------------------------------------------------------------------------
+function(_cpp_policy_check_dependencies)
+    if(NOT EXISTS "${CMAKE_SOURCE_DIR}/vcpkg.json")
+        return()
+    endif()
+    # Set by vcpkg's toolchain file, which has already installed everything by now.
+    set(installed "")
+    if(DEFINED VCPKG_INSTALLED_DIR)
+        foreach(triplet IN ITEMS ${VCPKG_TARGET_TRIPLET} ${VCPKG_HOST_TRIPLET})
+            list(APPEND installed "${VCPKG_INSTALLED_DIR}/${triplet}")
+        endforeach()
+        list(REMOVE_DUPLICATES installed)
+    endif()
+    execute_process(
+        COMMAND "${CMAKE_COMMAND}" "-DMANIFEST=${CMAKE_SOURCE_DIR}/vcpkg.json"
+                "-DINSTALLED_DIRS=${installed}" -P "${CPP_POLICY_ROOT}/cmake/scripts/dependencies.cmake"
+        RESULT_VARIABLE failed OUTPUT_VARIABLE output ERROR_VARIABLE output)
+    if(failed)
+        message(FATAL_ERROR "cpp-policy: the dependencies break the policy (POLICY.md 1.1):\n${output}")
+    endif()
+endfunction()
+
+# ---------------------------------------------------------------------------
 # Project-wide checks: suppression audit and format check/fix
 # ---------------------------------------------------------------------------
 function(cpp_policy_add_checks)
@@ -304,6 +328,7 @@ function(cpp_policy_add_checks)
     endif()
     cmake_language(DEFER DIRECTORY "${CMAKE_SOURCE_DIR}" CALL _cpp_policy_verify_targets)
     _cpp_policy_check_git_hooks()
+    _cpp_policy_check_dependencies()
 
     set(config "${CMAKE_BINARY_DIR}/cpp_policy_config.cmake")
     file(WRITE "${config}"

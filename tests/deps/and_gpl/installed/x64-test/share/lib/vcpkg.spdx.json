@@ -1,0 +1,6 @@
+{
+  "packages": [
+    { "name": "lib", "licenseConcluded": "MIT AND GPL-2.0-only" },
+    { "name": "lib:x64-test", "licenseConcluded": "MIT AND GPL-2.0-only" }
+  ]
+}

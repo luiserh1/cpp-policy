@@ -26,6 +26,11 @@ Each entry says what changed and why. Projects read this before moving their
   names what they miss (shell edits, `git -c core.hooksPath=…`) and what
   catches it afterwards. *Why:* the text said the rules were "enforced
   technically", which overstated what a deny list can do. (#43)
+- POLICY.md 1.1 gives the lines a vcpkg project puts before `project()` so a
+  missing VCPKG_ROOT is reported by name. *Why:* without it, CMake only
+  reports a toolchain path starting with `/scripts/` plus an unrelated Ninja
+  error, and the policy module can't check it because it loads after
+  `project()`. (#46)
 
 ### Rules
 
@@ -39,6 +44,17 @@ Each entry says what changed and why. Projects read this before moving their
   threads beyond allowing `catch (...)` at thread boundaries, so an exception
   escaping a thread (which ends the program without reaching main's handlers)
   broke no written rule. (#48, #47)
+- New POLICY.md 1.1, Dependencies: the standard library first; permissive
+  licenses only (no GPL, since projects link statically); few transitive
+  dependencies; optional features off; maintained; each dependency's reason
+  recorded in a `$reason` field; baseline moves only after reading what
+  changed; no untrusted binary caches. Configuration now fails when a
+  vcpkg.json dependency is a plain name or lacks `"default-features": false`
+  or a `$reason`, or when any installed package declares a license outside the
+  list (read from vcpkg's SPDX files). *Why:* the policy only said to use
+  vcpkg. SimpleLocalServer showed the cost: cpp-httplib's default features
+  compiled and linked a compression library (brotli) that the program never
+  uses. (#54, #53)
 
 ### Presets
 

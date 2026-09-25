@@ -1,0 +1,4 @@
+{
+  "name": "bypass-dependencies",
+  "dependencies": [ "fmt" ]
+}

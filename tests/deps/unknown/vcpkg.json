@@ -1,0 +1,6 @@
+{
+  "name": "fixture",
+  "dependencies": [
+    { "name": "lib", "default-features": false, "$reason": "Parses things; header-only, MIT" }
+  ]
+}

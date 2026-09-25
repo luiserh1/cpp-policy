@@ -119,3 +119,22 @@ if(NOT WIN32)
                 "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/hooks" "-DCXX=${CMAKE_CXX_COMPILER}"
                 "-DMAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}" -P "${CMAKE_CURRENT_SOURCE_DIR}/hooks/run.cmake")
 endif()
+
+# --- Dependency fixtures: each directory has a vcpkg.json, optionally a fake vcpkg install
+# tree (installed/<triplet>/share/<port>/vcpkg.spdx.json), and expect.txt, a regex the
+# dependency check's output must match.
+file(GLOB deps_cases CONFIGURE_DEPENDS LIST_DIRECTORIES true "${CMAKE_CURRENT_SOURCE_DIR}/deps/*")
+foreach(case IN LISTS deps_cases)
+    if(NOT IS_DIRECTORY "${case}")
+        continue()
+    endif()
+    cmake_path(GET case FILENAME name)
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${case}/expect.txt")
+    file(READ "${case}/expect.txt" expect)
+    string(STRIP "${expect}" expect)
+    file(GLOB installed LIST_DIRECTORIES true "${case}/installed/*")
+    add_test(NAME deps/${name}
+        COMMAND "${CMAKE_COMMAND}" "-DMANIFEST=${case}/vcpkg.json" "-DINSTALLED_DIRS=${installed}"
+                -P "${CPP_POLICY_ROOT}/cmake/scripts/dependencies.cmake")
+    set_tests_properties(deps/${name} PROPERTIES PASS_REGULAR_EXPRESSION "${expect}")
+endforeach()

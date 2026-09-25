@@ -1,0 +1,1 @@
+dependencies break the policy.*dependency 'fmt' must be an object

@@ -1,0 +1,1 @@
+error: vcpkg.json: dependency 'lib' must set .default-features.: false

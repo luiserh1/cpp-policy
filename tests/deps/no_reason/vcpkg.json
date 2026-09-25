@@ -1,0 +1,4 @@
+{
+  "name": "fixture",
+  "dependencies": [ { "name": "lib", "default-features": false } ]
+}

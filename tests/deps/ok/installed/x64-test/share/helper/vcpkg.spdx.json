@@ -1,0 +1,6 @@
+{
+  "packages": [
+    { "name": "helper", "licenseConcluded": "Apache-2.0 WITH LLVM-exception" },
+    { "name": "helper:x64-test", "licenseConcluded": "Apache-2.0 WITH LLVM-exception" }
+  ]
+}

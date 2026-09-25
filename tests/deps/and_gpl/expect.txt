@@ -1,0 +1,1 @@
+error: lib: license 'MIT AND GPL-2.0-only' is not allowed

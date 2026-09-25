@@ -20,7 +20,7 @@ disagree.
 | LLVM version | **23.x** (clang, clang-tidy and clang-format from the same release) |
 | Build system | CMake ≥ 3.29, driven only through `CMakePresets.json` |
 | Generator | Ninja |
-| Dependencies | vcpkg in manifest mode (`vcpkg.json`), only when a project needs them |
+| Dependencies | vcpkg in manifest mode (`vcpkg.json`), only when a project needs them (section 1.1) |
 
 Notes:
 - On macOS use Homebrew LLVM, not Apple Clang. Apple Clang has a different
@@ -29,6 +29,58 @@ Notes:
   always come from the same LLVM release.
 - GCC and MSVC's own compiler (`cl.exe`) are not supported. They may be
   added later as extra build jobs without changing these rules.
+
+### 1.1 Dependencies
+
+Prefer the standard library. Add a library only when it saves real work the
+project would otherwise have to write and maintain. When one is needed:
+
+- **License:** permissive open source only: MIT, BSD-2-Clause, BSD-3-Clause,
+  Apache-2.0, BSL-1.0, Zlib, ISC, 0BSD, Unlicense, CC0-1.0. No GPL: projects
+  link statically, so the GPL would cover the whole program. LGPL or any other
+  license needs a review and a change to this list, made in cpp-policy.
+- **Lightweight:** few dependencies of its own; header-only or small is
+  better. Optional features stay off: every dependency sets
+  `"default-features": false` and lists the features it uses in `"features"`.
+- **Alive:** maintained (recent releases) and available in vcpkg's registry.
+- **Recorded:** every dependency says why it is there, in a `"$reason"` field
+  (vcpkg ignores fields that start with `$`).
+
+```json
+"dependencies": [
+  {
+    "name": "cpp-httplib",
+    "default-features": false,
+    "$reason": "HTTP server; header-only, MIT"
+  }
+]
+```
+
+Supply chain:
+- Versions change only when a commit moves `builtin-baseline`. Before moving
+  it, read what changed in the ports the project uses, and why.
+- Don't use vcpkg binary caches you don't control: they replace the
+  hash-checked build from source.
+- cpp-policy itself is pinned by commit, not only by tag (section 10).
+
+*Enforcement:* configuration fails if a `vcpkg.json` dependency is a plain
+name, lacks `"default-features": false` or a `"$reason"`, or if any installed
+package (dependencies of dependencies included) declares a license outside
+the list, or none. Licenses come from the SPDX files vcpkg writes for every
+package. Being lightweight and alive is review.
+
+**`VCPKG_ROOT`:** the presets load vcpkg's toolchain from `$env{VCPKG_ROOT}`.
+When the variable is missing (a new machine, CI, a git app that doesn't load
+the shell profile), CMake's error only shows a path starting with `/scripts/`.
+The policy module can't check it, since it is loaded after `project()`, which
+is where the error happens. Projects that use vcpkg put this first in their
+`CMakeLists.txt`:
+
+```cmake
+if(NOT DEFINED ENV{VCPKG_ROOT})
+    message(FATAL_ERROR "VCPKG_ROOT is not set: set it to the vcpkg directory (README: Building).")
+endif()
+```
 
 ## 2. Language subset
 
