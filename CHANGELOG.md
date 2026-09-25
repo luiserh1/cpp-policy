@@ -32,6 +32,10 @@ numbers refer to that review's issue list.
   only tighten through the module's options. *Why:* there was no way to do it,
   since project configs must match the policy's and the build uses the
   policy's copies. May be revisited in a later version. (#8)
+- POLICY.md 8.1 lists two more review-only rules: `[[nodiscard]]` on functions
+  returning `std::expected`, and the "why" comment in confined files, which
+  now explicitly applies to `.cpp` files only. *Why:* both read as enforced
+  but nothing checks them. (#9)
 
 ## 0.1.1
 

@@ -111,8 +111,8 @@ include directives.
   through a `cpp-policy` option, for example for embedded targets.
 - `dynamic_cast` and `typeid` are discouraged. Prefer virtual functions or
   `std::variant` + `std::visit`.
-- Never ignore a returned `std::expected`. Functions returning it are
-  `[[nodiscard]]`.
+- Never ignore a returned `std::expected` (enforced by clang-tidy). Mark
+  functions that return it `[[nodiscard]]` so the compiler warns too.
 - `catch (...)` is only allowed at thread or program boundaries, and must log or
   rethrow.
 
@@ -126,8 +126,9 @@ loops.
   A project may declare more in its CMake configuration.
 - Confined code exposes a **safe interface** (for example `std::span`,
   RAII types). Callers outside the area never see raw pointers or casts.
-- Each confined file starts with a comment explaining why it needs to be
-  there.
+- Each confined source file (`.cpp`) starts with a comment explaining why it
+  needs to be there. Its header is the safe interface and needs no such
+  comment.
 
 ## 5. Suppressions
 
@@ -221,6 +222,9 @@ These rules rely on review (and on agents following `AGENTS.md`):
 - `catch (...)` only at boundaries (section 3); tools do enforce that
   exceptions never escape `main` or `noexcept` functions
 - `dynamic_cast` / `typeid` being discouraged (section 3)
+- `[[nodiscard]]` on functions returning `std::expected` (section 3); ignoring
+  the result is enforced, the attribute itself is not
+- The "why" comment at the top of confined source files (section 4)
 - Project structure (section 11): layer dependency direction and file size
   limits are planned audit checks; the helper extraction rule and comment
   accuracy will always rely on review
