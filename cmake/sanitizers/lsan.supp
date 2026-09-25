@@ -1,0 +1,10 @@
+# LeakSanitizer suppressions, owned by cpp-policy (POLICY.md 5). Projects can't add their own.
+# Only proven false positives in the operating system or the sanitizer runtime, never
+# project or library code. Each entry says why it is false and how that was shown.
+
+# macOS: dyld allocates thread-local storage for the sanitizer runtime's own qsort on
+# system (GCD) worker threads. Those threads are pooled, so the storage is still alive at
+# the leak check, and LeakSanitizer doesn't scan thread-local storage. Shown by
+# tests/leak/os_false_positive.cpp, which allocates nothing itself; the same qsort on a
+# std::thread that ends reports nothing. Reached in practice through getaddrinfo.
+leak:dyld::ThreadLocalVariables::instantiateVariable

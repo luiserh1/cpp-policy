@@ -331,6 +331,11 @@ function(cpp_policy_add_checks)
     _cpp_policy_check_git_hooks()
     _cpp_policy_check_dependencies()
 
+    # The test presets point LeakSanitizer at this copy: build/<preset>/ is the same path in
+    # every project, while the policy's own folder is not.
+    configure_file("${CPP_POLICY_ROOT}/cmake/sanitizers/lsan.supp"
+        "${CMAKE_BINARY_DIR}/cpp_policy_lsan.supp" COPYONLY)
+
     set(config "${CMAKE_BINARY_DIR}/cpp_policy_config.cmake")
     file(WRITE "${config}"
         "set(SOURCE_DIR [==[${CMAKE_SOURCE_DIR}]==])\n"

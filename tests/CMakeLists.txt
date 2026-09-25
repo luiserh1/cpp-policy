@@ -18,6 +18,13 @@ if(CPP_POLICY_SANITIZERS AND NOT CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "M
     set_tests_properties(leak/detected PROPERTIES
         PASS_REGULAR_EXPRESSION "LeakSanitizer: detected memory leaks"
         ENVIRONMENT_MODIFICATION "ASAN_OPTIONS=string_append::abort_on_error=0")
+    # A false positive inside macOS: must pass only because the presets apply the policy's
+    # suppression list (cmake/sanitizers/lsan.supp).
+    if(APPLE)
+        add_executable(policy_leak_os_false_positive leak/os_false_positive.cpp)
+        cpp_policy_apply(policy_leak_os_false_positive)
+        add_test(NAME leak/os_false_positive COMMAND policy_leak_os_false_positive)
+    endif()
 endif()
 
 # --- ThreadSanitizer: a deliberate race must be reported (only in a TSan build)

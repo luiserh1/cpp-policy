@@ -254,7 +254,8 @@ A suppression is any of:
 - a diagnostic pragma that turns a compiler warning off, in any spelling:
   `#pragma clang diagnostic ignored`, `#pragma warning(disable…)`, or the
   operator forms `_Pragma(...)` and `__pragma(...)`;
-- a formatting switch: `// clang-format off`.
+- a formatting switch: `// clang-format off`;
+- a sanitizer suppression: an entry in a sanitizer's suppression list.
 
 Rules, enforced by the suppression audit (the `policy-audit` target,
 `cmake/scripts/audit_suppressions.cmake`):
@@ -269,6 +270,12 @@ Rules, enforced by the suppression audit (the `policy-audit` target,
    (section 4). `clang-format off` is allowed anywhere, since it only affects
    layout.
 4. Wildcard suppressions (`NOLINT(*)`, `NOLINT(cppcoreguidelines-*)`) are rejected.
+5. Sanitizer suppressions exist only in cpp-policy
+   (`cmake/sanitizers/lsan.supp`, applied by the `dev` and `check` test
+   presets). Each entry is a proven false positive inside the operating
+   system or the sanitizer runtime, never project or library code, and says
+   how it was shown to be false; the self-test reproduces it. Projects can't
+   add their own.
 
 If code outside a confined area cannot satisfy a rule, either the code
 moves into a confined area behind a safe interface, or the rule is
@@ -334,8 +341,9 @@ Test presets:
   up a push (CTest's own default is 25 minutes). A project may set a shorter
   `TIMEOUT` on its tests.
 - The `dev` and `check` test presets turn on AddressSanitizer's leak
-  detection (`ASAN_OPTIONS=detect_leaks=1`). It is on by default on Linux and
-  off on macOS; `clang-cl` doesn't provide it.
+  detection (`ASAN_OPTIONS=detect_leaks=1`) and apply the policy's
+  suppression list for false positives in the OS (section 5). Detection is on
+  by default on Linux and off on macOS; `clang-cl` doesn't provide it.
 
 ### 7.1 Warnings
 
@@ -442,7 +450,8 @@ as `#pragma once` and suppressions, have fixtures in `tests/audit/`.
   `README.md` example, and gets an annotated tag `v<version>`.
 - **Major:** a new rule or tightened rule that can break existing code.
 - **Minor:** new optional features, new presets, tooling improvements.
-- **Patch:** fixes that don't change what passes or fails.
+- **Patch:** fixes that never make passing code fail, for example removing a
+  false positive.
 - **Before 1.0**, the minor version takes the major's role: `0.x` to
   `0.(x+1)` may break existing code, while patch releases still never do.
 

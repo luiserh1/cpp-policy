@@ -10,7 +10,7 @@ The rules are in [POLICY.md](POLICY.md).
 include(FetchContent)
 FetchContent_Declare(cpp_policy
     GIT_REPOSITORY https://github.com/luiserh1/cpp-policy.git
-    GIT_TAG        <commit>)   # v0.3.0, the latest release; see CHANGELOG.md
+    GIT_TAG        <commit>)   # v0.3.1, the latest release; see CHANGELOG.md
 FetchContent_MakeAvailable(cpp_policy)
 
 add_executable(app src/main.cpp)
@@ -24,7 +24,7 @@ and this repository's CMake code runs on every machine that configures the
 project (POLICY.md 10). The commit is the line ending in `^{}`:
 
 ```
-git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.3.0*'
+git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.3.1*'
 ```
 
 Don't add `GIT_SHALLOW`: it only works with branch and tag names.
@@ -118,6 +118,11 @@ editor-specific, so none are committed (POLICY.md 6.1).
 
 To stop in the debugger at a sanitizer error in a `dev` build, instead of
 getting a report after the program exits, run with `ASAN_OPTIONS=abort_on_error=1`.
+
+Tests run through the presets get leak detection and the policy's list of
+known OS false positives. To get the same when running a `dev` program
+directly on macOS, set both:
+`ASAN_OPTIONS=detect_leaks=1 LSAN_OPTIONS=suppressions=build/dev/cpp_policy_lsan.supp`.
 
 ## Self-test
 
