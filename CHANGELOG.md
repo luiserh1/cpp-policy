@@ -61,6 +61,11 @@ numbers refer to that review's issue list.
 - The audit's `CHECK_SYNC` switch is renamed `CHECK_PROJECT_FILES`, since it
   now covers the ignore and attributes files too. Only affects someone calling
   the script by hand.
+- `cpp_policy_apply()` turns off CMake's module scanning
+  (`CXX_SCAN_FOR_MODULES OFF`). *Why:* with C++23, CMake scanned every file
+  and added a `@….modmap` argument that only exists after a build, so clangd
+  and clang-tidy on unbuilt files got a broken compile command. Modules aren't
+  used (POLICY.md 2.4), and builds skip a step. (#40)
 
 ### Self-tests
 
