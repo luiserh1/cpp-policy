@@ -79,9 +79,10 @@ function(cpp_policy_apply target)
 
     # Standard: C++23, no GNU/MS extensions.
     target_compile_features(${target} PRIVATE cxx_std_23)
-    # Modules are not used (POLICY.md 2.4). Without this, CMake scans every C++23 file for
-    # them and adds a @<file>.modmap argument that only exists after a build, which breaks
-    # tools that read compile_commands.json first (clangd, clang-tidy on unbuilt files).
+    # Waiting W1 (POLICY.md 12): modules are not used yet. Without this, CMake scans every
+    # C++23 file for them and adds a @<file>.modmap argument that only exists after a build,
+    # which breaks tools that read compile_commands.json first (clangd, clang-tidy on unbuilt
+    # files).
     set_target_properties(${target} PROPERTIES
         CXX_EXTENSIONS OFF
         CXX_SCAN_FOR_MODULES OFF

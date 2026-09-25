@@ -138,3 +138,17 @@ foreach(case IN LISTS deps_cases)
                 -P "${CPP_POLICY_ROOT}/cmake/scripts/dependencies.cmake")
     set_tests_properties(deps/${name} PROPERTIES PASS_REGULAR_EXPRESSION "${expect}")
 endforeach()
+
+# --- Waiting-on-the-toolchain probes (POLICY.md 12): each must still fail to compile. They
+# are about libc++, the macOS standard library, so they only run there.
+if(APPLE)
+    file(GLOB probes CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/probes/w*.cpp")
+    foreach(probe IN LISTS probes)
+        cmake_path(GET probe STEM name)
+        string(REGEX MATCH "^w[0-9]+" item "${name}")
+        string(TOUPPER "${item}" item)
+        add_test(NAME waiting/${name}
+            COMMAND "${CMAKE_COMMAND}" "-DCXX=${CMAKE_CXX_COMPILER}" "-DSOURCE=${probe}"
+                    "-DITEM=${item}" -P "${CMAKE_CURRENT_SOURCE_DIR}/probes/probe.cmake")
+    endforeach()
+endif()

@@ -31,6 +31,13 @@ Each entry says what changed and why. Projects read this before moving their
   reports a toolchain path starting with `/scripts/` plus an unrelated Ninja
   error, and the policy module can't check it because it loads after
   `project()`. (#46)
+- New POLICY.md 12, Waiting on the toolchain: a register of decisions that
+  work around missing toolchain features (W1 modules and `import std`, W2
+  libc++ time zones, W3 libc++ parallel algorithms), each with its workaround,
+  what would end it and how it is checked. Workarounds in code carry a
+  `Waiting Wn` comment. *Why:* such decisions were scattered: some recorded in
+  POLICY.md, others only in a code comment, with nothing prompting anyone to
+  look again. (#61)
 
 ### Rules
 
@@ -73,6 +80,13 @@ Each entry says what changed and why. Projects read this before moving their
 - Every test preset sets a 60-second timeout per test. *Why:* CTest's default
   is 1500 seconds, so a hung test (a server waiting on a firewall prompt, say)
   held the pre-push hook for up to 25 minutes before failing. (#62)
+
+### Self-test
+
+- Probes for W2 and W3 (tests/probes/, macOS only): each uses the missing
+  feature and must fail to compile; the day it compiles, the test fails and
+  says to revisit the item. *Why:* toolchain upgrades are when these items
+  resolve, and a failing test is harder to overlook than a note. (#61)
 
 ## 0.2.0 (2026-09-25)
 

@@ -144,7 +144,7 @@ C++23 `import std`. Reasons, as of LLVM 23 and CMake 4.4:
   platforms.
 - Third-party libraries are headers anyway.
 
-To be revisited when CMake makes `import std` stable.
+Tracked as W1 in section 12.
 
 ### 2.5 Initialization and declarations
 
@@ -213,7 +213,7 @@ Rules:
 Data races are found at run time by ThreadSanitizer, in the `tsan` preset
 (section 7), wherever tests exercise the code from several threads. The rest
 is review (section 8.1). Parallel computation (parallel algorithms, thread
-pools) is not covered yet.
+pools) is not covered yet (W3, section 12).
 
 ## 3. Error handling
 
@@ -506,3 +506,24 @@ reject includes that point upward.
 - Don't comment what the code already says clearly; comment why.
 
 *Enforcement:* review.
+
+## 12. Waiting on the toolchain
+
+Some decisions work around features the toolchain doesn't provide yet. Each
+one is listed here with what would end it. The code that works around it
+carries a `Waiting Wn` comment, so every place to change can be found when
+the item resolves.
+
+Items are reviewed at every toolchain upgrade (LLVM releases a major version
+about every six months, CMake a minor one about every four). Where a compile
+can tell, a probe in the self-test does it for us: it fails, on purpose, the
+day the feature appears (`tests/probes/`).
+
+| Item | Wanted | Workaround today | Resolves when | Checked by |
+|---|---|---|---|---|
+| W1 | C++ modules and `import std` | `#include` (section 2.4); module scanning off (`CXX_SCAN_FOR_MODULES OFF` in `CppPolicy.cmake`) | CMake makes `import std` stable, clang-tidy handles modules, and `clang-cl` with the Microsoft library catches up | Hand, at each CMake and LLVM upgrade |
+| W2 | Time zones in libc++ on macOS (`std::chrono::zoned_time`, `current_zone`) | Local time through `localtime_r` / `localtime_s`, in a confined file | libc++ ships its time zone database on macOS | Probe `waiting/w2_zoned_time` (macOS) |
+| W3 | Parallel algorithms (`std::execution::par`) in libc++ without `-fexperimental-library` | Not used; parallel computation isn't covered by the policy yet | libc++ makes them stable | Probe `waiting/w3_parallel_algorithms` (macOS) |
+
+When an item resolves: remove its workarounds (search for `Waiting Wn`),
+delete its row and probe, and record the change in `CHANGELOG.md`.
