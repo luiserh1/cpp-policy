@@ -78,6 +78,10 @@ numbers refer to that review's issue list.
   stays allowed anywhere. *Why:* it is a formatting suppression that no rule
   covered; it only affects layout, so confining it would add friction without
   benefit. (#32)
+- The audit requires `#pragma once` in every header (`.h .hpp .hh .hxx`) and
+  rejects include guards. *Why:* POLICY.md 2.4 banned include guards but
+  nothing enforced it; clang-tidy has no check for this (its only related
+  check enforces the opposite). (#5)
 
 ## 0.1.1
 

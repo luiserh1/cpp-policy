@@ -1,0 +1,1 @@
+src/answer.hpp:1: error: include guards are not allowed; use #pragma once

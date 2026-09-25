@@ -71,7 +71,7 @@ normal code and what to use instead.
 |---|---|
 | Macros for constants | `constexpr` variables |
 | Function-like macros | `constexpr` / `consteval` functions, templates |
-| Include guards | `#pragma once` |
+| Include guards | `#pragma once` (the audit requires it in every header) |
 
 Macros are still allowed for platform detection, build configuration and
 include directives.

@@ -1,0 +1,1 @@
+src/answer.hpp:1: error: header must use #pragma once

@@ -10,6 +10,7 @@
 #   - is outside a confined directory,
 #   - has no reason in a trailing comment: `#pragma ... ignored "-Wx" // reason`.
 # Fails if any `clang-format off` has no reason: `// clang-format off: reason`.
+# Fails if a header (.h .hpp .hh .hxx) lacks `#pragma once` or uses an include guard.
 # With CHECK_SYNC, also fails if the project's .clang-tidy / .clang-format differ from the policy's.
 
 cmake_minimum_required(VERSION 3.29)
@@ -28,8 +29,19 @@ foreach(file IN LISTS files)
     cpp_policy_in_dirs("${file}" "${CONFINED_DIRS}" confined)
     cpp_policy_read_lines("${SOURCE_DIR}/${file}" lines)
     set(number 0)
+    set(has_pragma_once FALSE)
+    set(directives "")
     foreach(line IN LISTS lines)
         math(EXPR number "${number} + 1")
+
+        # Remember the first two preprocessor directives to recognize an include guard.
+        if(line MATCHES "^[ \t]*#[ \t]*pragma[ \t]+once")
+            set(has_pragma_once TRUE)
+        endif()
+        list(LENGTH directives directive_count)
+        if(directive_count LESS 2 AND line MATCHES "^[ \t]*#[ \t]*([a-z]+)[ \t]*([A-Za-z0-9_]*)")
+            list(APPEND directives "${CMAKE_MATCH_1} ${CMAKE_MATCH_2}")
+        endif()
 
         if(line MATCHES "NOLINT(NEXTLINE|BEGIN|END)?(\\(([^)]*)\\))?(.*)$")
             set(kind "${CMAKE_MATCH_1}")
@@ -69,6 +81,20 @@ foreach(file IN LISTS files)
             endif()
         endif()
     endforeach()
+
+    if(file MATCHES "\\.(h|hpp|hh|hxx)$")
+        if(NOT has_pragma_once)
+            report("${file}" 1 "header must use #pragma once")
+        endif()
+        list(LENGTH directives directive_count)
+        if(directive_count EQUAL 2)
+            list(GET directives 0 first)
+            list(GET directives 1 second)
+            if(first MATCHES "^ifndef (.+)$" AND second STREQUAL "define ${CMAKE_MATCH_1}")
+                report("${file}" 1 "include guards are not allowed; use #pragma once")
+            endif()
+        endif()
+    endif()
 endforeach()
 
 # The project's config files exist for editors (clangd); the build always uses the
