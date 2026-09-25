@@ -116,6 +116,20 @@ To be revisited when CMake makes `import std` stable.
   non-virtual destructor.
 - No `protected` data members.
 
+### 2.7 Naming
+
+| Kind | Style | Example |
+|---|---|---|
+| Classes, structs, enums, type aliases, template parameters | `PascalCase` | `LocalServer`, `Error`, `Sink` |
+| Namespaces, functions, variables, parameters, constants, enum values | `snake_case` | `sls::server`, `max_message_bytes`, `Error::too_large` |
+| Private and protected data members | `snake_case_` | `sink_`, `mutex_` |
+| Public data members (plain structs) | `snake_case` | `Options::port` |
+| Macros (where allowed) | `UPPER_CASE` | |
+| File names | `snake_case` | `local_server.cpp` |
+
+Enforced by clang-tidy (`readability-identifier-naming`), except file names,
+which rely on review.
+
 ## 3. Error handling
 
 | Situation | Mechanism |
@@ -268,6 +282,7 @@ layer is a faster subset of it.
 
 These rules rely on review (and on agents following `AGENTS.md`):
 - `const char*` used as a string type (section 2.2)
+- File names in `snake_case` (section 2.7)
 - `catch (...)` only at boundaries (section 3); tools do enforce that
   exceptions never escape `main` or `noexcept` functions
 - `dynamic_cast` / `typeid` being discouraged (section 3)

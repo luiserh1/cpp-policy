@@ -103,6 +103,11 @@ numbers refer to that review's issue list.
   int`); use `<cstdint>` fixed-width types, `std::size_t`, or plain `int`.
   *Why:* `long` is 64 bits on macOS/Linux and 32 on Windows, so the same code
   can silently truncate on one platform. Raised by the owner. (#12)
+- Naming convention (POLICY.md 2.7), enforced by `readability-identifier-
+  naming`: PascalCase types, snake_case everything else, trailing `_` on
+  private members, UPPER_CASE macros. *Why:* the check was enabled without
+  options, so it checked nothing, and no convention was written down; the
+  chosen one is what the code already used. (#18)
 
 ## 0.1.1
 
