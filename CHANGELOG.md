@@ -48,6 +48,15 @@ Each entry says what changed and why. Projects read this before moving their
   a thread-safe Tally that must pass under it. *Why:* AddressSanitizer does
   not detect data races, and ThreadSanitizer can't share its build, so races
   went unchecked. Like `release`, it is meant for CI. (#48)
+- The `dev` and `check` test presets turn on leak detection
+  (`ASAN_OPTIONS=detect_leaks=1`), and the self-test proves it with a
+  deliberate leak (tests/leak/leak.cpp). *Why:* AddressSanitizer finds leaks
+  on macOS with LLVM 23 but keeps that off by default there, so leaks were
+  only caught on Linux. We had assumed macOS couldn't detect them at all;
+  checking it during the walkthrough showed otherwise.
+- Every test preset sets a 60-second timeout per test. *Why:* CTest's default
+  is 1500 seconds, so a hung test (a server waiting on a firewall prompt, say)
+  held the pre-push hook for up to 25 minutes before failing. (#62)
 
 ## 0.2.0 (2026-09-25)
 

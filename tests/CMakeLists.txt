@@ -8,6 +8,18 @@ target_link_libraries(policy_good_test PRIVATE policy_good)
 cpp_policy_apply(policy_good_test)
 add_test(NAME good/run COMMAND policy_good_test)
 
+# --- LeakSanitizer: a deliberate leak must be reported (ASan builds on macOS and Linux).
+# The dev and check test presets turn leak detection on (it is off by default on macOS);
+# the test only appends abort_on_error=0, so it fails if the preset stops doing that.
+if(CPP_POLICY_SANITIZERS AND NOT CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+    add_executable(policy_leak leak/leak.cpp)
+    cpp_policy_apply(policy_leak)
+    add_test(NAME leak/detected COMMAND policy_leak)
+    set_tests_properties(leak/detected PROPERTIES
+        PASS_REGULAR_EXPRESSION "LeakSanitizer: detected memory leaks"
+        ENVIRONMENT_MODIFICATION "ASAN_OPTIONS=string_append::abort_on_error=0")
+endif()
+
 # --- ThreadSanitizer: a deliberate race must be reported (only in a TSan build)
 if(CPP_POLICY_THREAD_SANITIZER)
     add_executable(policy_tsan_race tsan/race.cpp)

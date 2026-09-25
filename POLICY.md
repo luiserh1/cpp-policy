@@ -264,7 +264,7 @@ looser, is made in `cpp-policy` itself.
 
 | Preset | Purpose | Settings |
 |---|---|---|
-| `dev` | Daily work | Debug, warnings as errors, AddressSanitizer + UndefinedBehaviorSanitizer, standard library hardening (debug level) |
+| `dev` | Daily work | Debug, warnings as errors, AddressSanitizer (with leak detection) + UndefinedBehaviorSanitizer, standard library hardening (debug level) |
 | `release` | Shipping | Optimized, warnings as errors, standard library hardening (fast level), `_FORTIFY_SOURCE=3`, `-fstack-protector-strong`, `-fcf-protection` where supported |
 | `check` | The gate | Full build + full clang-tidy + format check + tests under sanitizers + suppression audit |
 | `debug` | Step-through debugging | Debug, no sanitizers, standard library hardening (debug level) |
@@ -276,6 +276,14 @@ through. The `release` workflow runs the tests on the optimized build, where
 some bugs only appear; it is meant for CI rather than every push. So is the
 `tsan` workflow: ThreadSanitizer can't be combined with AddressSanitizer, so
 it needs a build of its own, and `clang-cl` doesn't provide it.
+
+Test presets:
+- Every test has a 60-second timeout, so a hung test fails instead of holding
+  up a push (CTest's own default is 25 minutes). A project may set a shorter
+  `TIMEOUT` on its tests.
+- The `dev` and `check` test presets turn on AddressSanitizer's leak
+  detection (`ASAN_OPTIONS=detect_leaks=1`). It is on by default on Linux and
+  off on macOS; `clang-cl` doesn't provide it.
 
 ### 7.1 Warnings
 
