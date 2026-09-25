@@ -3,7 +3,7 @@
 #   cmake -DCONFIG=<cpp_policy_config.cmake> -DMODE=check|fix -P format.cmake
 
 cmake_minimum_required(VERSION 3.29)
-include("${CMAKE_CURRENT_LIST_DIR}/common.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/source_files.cmake")
 include("${CONFIG}")
 
 cpp_policy_collect_sources("${SOURCE_DIR}" "${EXCLUDED_DIRS}" files)
@@ -30,7 +30,11 @@ endforeach()
 list(LENGTH files count)
 if(failed)
     list(JOIN failed "\n  " failed_list)
-    message(FATAL_ERROR "cpp-policy format: badly formatted files:\n  ${failed_list}\n"
-                        "Run: cmake --build --preset <preset> --target policy-format-fix")
+    if(MODE STREQUAL "check")
+        message(FATAL_ERROR "cpp-policy format: badly formatted files:\n  ${failed_list}\n"
+                            "Run: cmake --build --preset <preset> --target policy-format-fix")
+    endif()
+    message(FATAL_ERROR "cpp-policy format: clang-format failed on:\n  ${failed_list}\n"
+                        "See its output above (usually a file it could not parse).")
 endif()
 message("cpp-policy format ${MODE}: OK (${count} files)")

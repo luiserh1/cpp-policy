@@ -43,6 +43,9 @@ numbers refer to that review's issue list.
 - README explains why projects copy `.clang-tidy` and `.clang-format`: editors
   read them, the build never does, and the audit keeps them identical. *Why:*
   the copies looked redundant; the reason was only hinted at. (#2)
+- Corrected two comments that described the wrong behavior (the `CMakeFiles/`
+  filter and the `.clang-format` include groups). *Why:* POLICY.md 11.4,
+  comment accuracy. (#21, #24)
 
 ### Tooling
 
@@ -50,6 +53,11 @@ numbers refer to that review's issue list.
   in PATH) instead of also suggesting `CMakeUserPresets.json`. *Why:* two
   different fixes for one problem; PATH is what the presets rely on and keeps
   clang-tidy and clang-format from the same folder. (#22)
+- `cmake/scripts/common.cmake` is renamed `source_files.cmake`. *Why:*
+  POLICY.md 11.2 bans catch-all names like `common`; the policy repo follows
+  its own rule. (#25)
+- The format fix target reports a clang-format failure as such, instead of
+  telling you to run the fix target you just ran. (#31)
 
 ## 0.1.1
 

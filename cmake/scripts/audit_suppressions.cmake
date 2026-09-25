@@ -9,7 +9,7 @@
 # With CHECK_SYNC, also fails if the project's .clang-tidy / .clang-format differ from the policy's.
 
 cmake_minimum_required(VERSION 3.29)
-include("${CMAKE_CURRENT_LIST_DIR}/common.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/source_files.cmake")
 include("${CONFIG}")
 
 set(errors 0)

@@ -1,4 +1,5 @@
-# Helpers shared by the cpp-policy scripts (run with cmake -P).
+# Source file helpers for the cpp-policy scripts (run with cmake -P): which files
+# count as C++ sources, and how to read them line by line.
 
 set(CPP_POLICY_SOURCE_GLOBS *.cpp *.cc *.cxx *.h *.hpp *.hh *.hxx *.ipp *.ixx *.cppm)
 
@@ -27,7 +28,7 @@ function(cpp_policy_collect_sources root excluded out)
     set(result "")
     foreach(file IN LISTS files)
         cpp_policy_in_dirs("${file}" "${excluded}" skip)
-        # Build directories created by presets are excluded by name anywhere in the path.
+        # CMake's own CMakeFiles/ folders (compiler probe sources) are skipped at any depth.
         if(NOT skip AND NOT file MATCHES "(^|/)CMakeFiles/")
             list(APPEND result "${file}")
         endif()
