@@ -14,6 +14,12 @@ numbers refer to that review's issue list.
   procedure; POLICY.md explains what `0.x` versions mean. *Why:* the version
   was written in three places and two were stale (the README still said
   v0.1.0, `project()` said 0.1.0 after v0.1.1 was tagged). (#14)
+- POLICY.md 2.1: the pointer-parameter row said "may be null *and* are
+  required", which contradicts itself; it now says required arguments use
+  references. *Why:* the rule could not be followed as written. (#3)
+- POLICY.md 2.3 no longer recommends `std::start_lifetime_as`. *Why:* libc++
+  23 does not provide it, so the recommendation could not compile. (#4)
+
 
 ## 0.1.1
 

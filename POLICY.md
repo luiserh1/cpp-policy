@@ -41,7 +41,7 @@ normal code and what to use instead.
 |---|---|
 | `new` / `delete`, `malloc` / `free` | Values, containers, `std::make_unique`, `std::make_shared` |
 | Owning raw pointers | `std::unique_ptr` (default), `std::shared_ptr` (only for real shared ownership) |
-| Raw pointer parameters that may be null *and* are required | References (`T&`, `const T&`) |
+| Raw pointer parameters for arguments that must always be present | References (`T&`, `const T&`) |
 | Non-owning raw pointers | Allowed, meaning "optional, non-owning, may be null" |
 
 ### 2.2 Arrays, buffers and strings
@@ -59,7 +59,7 @@ normal code and what to use instead.
 | Banned | Use instead |
 |---|---|
 | C-style casts `(T)x`, functional casts `T(x)` on non-class types | `static_cast`, and in confined areas only: `reinterpret_cast`, `const_cast` |
-| `reinterpret_cast` for type punning | `std::bit_cast`, `std::memcpy`, `std::start_lifetime_as` |
+| `reinterpret_cast` for type punning | `std::bit_cast`, `std::memcpy` |
 | Unions for type punning | `std::variant` (sum types), `std::bit_cast` (punning) |
 | Implicit narrowing conversions | Brace initialization, explicit `static_cast`, `std::in_range` checks |
 | `NULL`, `0` as a pointer | `nullptr` |
