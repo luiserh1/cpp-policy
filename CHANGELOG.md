@@ -28,6 +28,10 @@ numbers refer to that review's issue list.
   `AGENTS.md` directly since v2.1.277, and only when there is no `CLAUDE.md`,
   so the import file is no longer needed and a stray one would hide the
   instructions. (#17)
+- POLICY.md section 6 no longer says projects may add checks locally; they may
+  only tighten through the module's options. *Why:* there was no way to do it,
+  since project configs must match the policy's and the build uses the
+  policy's copies. May be revisited in a later version. (#8)
 
 ## 0.1.1
 

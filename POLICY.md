@@ -156,8 +156,11 @@ The following files define enforcement and must not be weakened in a project:
 - `tools/` scripts, git hook scripts
 - `AGENTS.md`, agent settings (`.claude/settings.json`)
 
-A project may only **add** checks or **tighten** rules locally. Relaxing a rule
-requires a change in `cpp-policy` itself.
+Projects can't change the rules locally: their `.clang-tidy` and
+`.clang-format` must match the policy's, and the build always uses the
+policy's copies. A project may only tighten what the module's options allow
+(for example `CPP_POLICY_EXCEPTIONS OFF`). Any other change, stricter or
+looser, is made in `cpp-policy` itself.
 
 ## 7. Build configurations
 
