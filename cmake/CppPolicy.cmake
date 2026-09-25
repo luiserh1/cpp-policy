@@ -38,8 +38,8 @@ function(_cpp_policy_verify_toolchain)
         message(FATAL_ERROR
             "cpp-policy requires LLVM Clang ${CPP_POLICY_LLVM_MAJOR}.x, found "
             "'${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}' (${CMAKE_CXX_COMPILER}).\n"
-            "On macOS, Apple Clang is not accepted: put Homebrew LLVM first in PATH "
-            "or set CMAKE_CXX_COMPILER in CMakeUserPresets.json.")
+            "On macOS, Apple Clang is not accepted. Install Homebrew LLVM, or put your "
+            "LLVM ${CPP_POLICY_LLVM_MAJOR} bin directory first in PATH (README: Setup per platform).")
     endif()
     string(REGEX MATCH "^[0-9]+" major "${CMAKE_CXX_COMPILER_VERSION}")
     if(NOT major EQUAL CPP_POLICY_LLVM_MAJOR)

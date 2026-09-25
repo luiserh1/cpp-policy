@@ -18,8 +18,11 @@ cpp_policy_apply(app)       # every target you own
 cpp_policy_add_checks()     # once: policy-audit, policy-format-check, policy-format-fix
 ```
 
-Copy `.clang-tidy` and `.clang-format` into the project root unchanged (for
-editors). The audit fails if they differ from this repository's copies.
+Copy `.clang-tidy` and `.clang-format` into the project root unchanged. The
+copies are for editors: clangd and IDEs look for these files next to the
+sources, so they show the same warnings and formatting while you type. The
+build never reads them; it always uses this repository's copies. The audit
+fails if the copies differ, so the editor and the build can't disagree.
 
 ## Options (set by presets)
 

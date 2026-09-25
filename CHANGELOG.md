@@ -40,6 +40,16 @@ numbers refer to that review's issue list.
   the reasons (experimental in CMake, immature clang-tidy support, Windows
   lag). *Why:* their absence looked like an oversight; now it is a recorded
   decision to revisit. (#6)
+- README explains why projects copy `.clang-tidy` and `.clang-format`: editors
+  read them, the build never does, and the audit keeps them identical. *Why:*
+  the copies looked redundant; the reason was only hinted at. (#2)
+
+### Tooling
+
+- The Apple Clang error now gives the same fix as the README (put LLVM first
+  in PATH) instead of also suggesting `CMakeUserPresets.json`. *Why:* two
+  different fixes for one problem; PATH is what the presets rely on and keeps
+  clang-tidy and clang-format from the same folder. (#22)
 
 ## 0.1.1
 
