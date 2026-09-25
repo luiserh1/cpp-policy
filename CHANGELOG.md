@@ -3,6 +3,38 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.3.1 (2026-09-25)
+
+A fix for 0.3.0: its new leak detection on macOS reported a false positive
+inside the operating system, so projects that make network lookups (for
+example an HTTP client) failed their tests without leaking anything.
+
+### Upgrading a project
+
+1. Pin the commit of `v0.3.1`.
+2. Copy the `LSAN_OPTIONS` setting of the `dev` and `check` test presets
+   from `CMakePresets.json`.
+
+### Fixes
+
+- Leak detection applies a suppression list owned by cpp-policy
+  (`cmake/sanitizers/lsan.supp`), copied into every build folder and used by
+  the `dev` and `check` test presets. Its one entry covers thread-local
+  storage that dyld allocates for the sanitizer runtime's own `qsort` on
+  system worker threads, which stay alive at the leak check. *Why:*
+  SimpleLocalServer's HTTP test failed on 0.3.0 with this "leak", reached
+  through `getaddrinfo`. A program that allocates nothing reproduces it
+  (tests/leak/os_false_positive.cpp), and the same `qsort` on an ordinary
+  thread reports nothing, so it is not a leak in any project's code.
+- POLICY.md 5 adds sanitizer suppressions to the kinds of suppression: only
+  in cpp-policy, only proven false positives in the OS or the sanitizer
+  runtime, each reproduced by the self-test. *Why:* a suppression list is as
+  easy to misuse as `NOLINT`, so it gets the same kind of rules.
+- POLICY.md 10: a patch release may remove false positives; it still never
+  makes passing code fail. *Why:* the old wording ("doesn't change what
+  passes or fails") would have made this fix a minor release, though it can
+  only turn wrong failures into passes.
+
 ## 0.3.0 (2026-09-25)
 
 Changes from the walkthrough of SimpleLocalServer, the project that pilots
