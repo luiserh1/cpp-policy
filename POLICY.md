@@ -76,6 +76,19 @@ normal code and what to use instead.
 Macros are still allowed for platform detection, build configuration and
 include directives.
 
+**Modules are not used yet.** Code uses `#include`, not C++20 modules or
+C++23 `import std`. Reasons, as of LLVM 23 and CMake 4.4:
+- CMake's `import std` support is still experimental (behind
+  `CMAKE_EXPERIMENTAL_CXX_IMPORT_STD`), and the policy promises reproducible
+  builds.
+- clang-tidy, the main enforcement layer, needs the compiled module files,
+  and its integration with CMake for modules is immature.
+- `clang-cl` with the Microsoft standard library lags behind the other
+  platforms.
+- Third-party libraries are headers anyway.
+
+To be revisited when CMake makes `import std` stable.
+
 ### 2.5 Initialization and declarations
 
 - Always initialize variables. Uninitialized locals are an error.

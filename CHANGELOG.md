@@ -36,6 +36,10 @@ numbers refer to that review's issue list.
   returning `std::expected`, and the "why" comment in confined files, which
   now explicitly applies to `.cpp` files only. *Why:* both read as enforced
   but nothing checks them. (#9)
+- POLICY.md 2.4 states that modules and `import std` are not used yet, with
+  the reasons (experimental in CMake, immature clang-tidy support, Windows
+  lag). *Why:* their absence looked like an oversight; now it is a recorded
+  decision to revisit. (#6)
 
 ## 0.1.1
 
