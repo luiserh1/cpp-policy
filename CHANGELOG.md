@@ -3,6 +3,30 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## Unreleased
+
+### Git hooks
+
+- cpp-policy now ships the git hooks (tools/hooks/pre-commit and pre-push).
+  Projects copy them unchanged, the audit rejects edited or missing copies,
+  and configuration warns while a clone hasn't run `git config core.hooksPath
+  tools/hooks`. *Why:* every project carried its own hand-made hooks that
+  nothing compared, and a clone without the setting silently skipped every
+  check; both undermined the gate the hooks exist to run. (#43)
+- pre-push refuses to run while the working folder has uncommitted changes,
+  and pre-commit warns when files have unstaged changes. *Why:* both hooks
+  check the files on disk, but git commits the staged version and pushes
+  commits; an uncommitted fix could make the gate pass while broken commits
+  were pushed. pre-commit only warns so partial staging (`git add -p`) keeps
+  working. (#66)
+
+### Documentation
+
+- POLICY.md 9 says agent permission rules enforce the agent rules only partly,
+  names what they miss (shell edits, `git -c core.hooksPath=…`) and what
+  catches it afterwards. *Why:* the text said the rules were "enforced
+  technically", which overstated what a deny list can do. (#43)
+
 ## 0.2.0 (2026-09-25)
 
 Changes from the first full walkthrough of the repository. Item numbers refer

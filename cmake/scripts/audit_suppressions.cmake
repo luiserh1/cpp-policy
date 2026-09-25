@@ -11,8 +11,9 @@
 #   - has no reason in a trailing comment: `#pragma ... ignored "-Wx" // reason`.
 # Fails if any `clang-format off` has no reason: `// clang-format off: reason`.
 # Fails if a header (.h .hpp .hh .hxx) lacks `#pragma once` or uses an include guard.
-# With CHECK_PROJECT_FILES, also fails if the project's .clang-tidy / .clang-format differ from
-# the policy's, or its .gitignore / .gitattributes lack any line of the policy's copies.
+# With CHECK_PROJECT_FILES, also fails if the project's .clang-tidy, .clang-format or git hooks
+# (tools/hooks/) differ from the policy's, or its .gitignore / .gitattributes lack any line of
+# the policy's copies.
 
 cmake_minimum_required(VERSION 3.29)
 include("${CMAKE_CURRENT_LIST_DIR}/source_files.cmake")
@@ -100,10 +101,11 @@ endforeach()
 
 # The project's config files exist for editors (clangd); the build always uses the
 # policy's copies. A local edit would silently disagree with the build, so reject it.
+# The git hooks run the gate, so an edited hook would weaken it without anyone noticing.
 cmake_path(NORMAL_PATH SOURCE_DIR OUTPUT_VARIABLE source_norm)
 cmake_path(NORMAL_PATH POLICY_ROOT OUTPUT_VARIABLE policy_norm)
 if(CHECK_PROJECT_FILES AND NOT source_norm STREQUAL policy_norm)
-    foreach(name IN ITEMS .clang-tidy .clang-format)
+    foreach(name IN ITEMS .clang-tidy .clang-format tools/hooks/pre-commit tools/hooks/pre-push)
         if(NOT EXISTS "${SOURCE_DIR}/${name}")
             report("${name}" 1 "missing; copy it from cpp-policy (${POLICY_ROOT}/${name})")
         else()

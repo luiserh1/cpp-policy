@@ -86,3 +86,12 @@ foreach(case IN LISTS bypass_cases)
                 "-DPOLICY_ROOT=${CPP_POLICY_ROOT}")
     set_tests_properties(bypass/${name} PROPERTIES PASS_REGULAR_EXPRESSION "${expect}")
 endforeach()
+
+# --- Git hooks: run in a throwaway repository with a stub gate (they are POSIX shell scripts;
+# Git for Windows runs them with its own sh, which this test doesn't cover).
+if(NOT WIN32)
+    add_test(NAME hooks/behavior
+        COMMAND "${CMAKE_COMMAND}" "-DPOLICY_ROOT=${CPP_POLICY_ROOT}"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/hooks" "-DCXX=${CMAKE_CXX_COMPILER}"
+                "-DMAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}" -P "${CMAKE_CURRENT_SOURCE_DIR}/hooks/run.cmake")
+endif()

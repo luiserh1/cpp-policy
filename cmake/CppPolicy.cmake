@@ -250,6 +250,36 @@ function(_cpp_policy_verify_targets)
 endfunction()
 
 # ---------------------------------------------------------------------------
+# Git hooks: they only run once a clone points git at them (POLICY.md 8)
+# ---------------------------------------------------------------------------
+function(_cpp_policy_check_git_hooks)
+    find_package(Git QUIET)
+    if(NOT Git_FOUND OR NOT EXISTS "${CMAKE_SOURCE_DIR}/tools/hooks")
+        return()
+    endif()
+    execute_process(COMMAND "${GIT_EXECUTABLE}" rev-parse --show-toplevel
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        RESULT_VARIABLE failed OUTPUT_VARIABLE top
+        OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+    if(failed)
+        return()
+    endif()
+    # Only a project at the root of its own repository: not one nested in another repository.
+    file(REAL_PATH "${top}" top)
+    file(REAL_PATH "${CMAKE_SOURCE_DIR}" source)
+    if(NOT top STREQUAL source)
+        return()
+    endif()
+    execute_process(COMMAND "${GIT_EXECUTABLE}" config --get core.hooksPath
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        OUTPUT_VARIABLE hooks_path OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+    if(NOT hooks_path STREQUAL "tools/hooks")
+        message(WARNING "cpp-policy: the git hooks are not enabled in this clone, so commits and "
+            "pushes skip the checks. Enable them once with:\n  git config core.hooksPath tools/hooks")
+    endif()
+endfunction()
+
+# ---------------------------------------------------------------------------
 # Project-wide checks: suppression audit and format check/fix
 # ---------------------------------------------------------------------------
 function(cpp_policy_add_checks)
@@ -258,6 +288,7 @@ function(cpp_policy_add_checks)
         return()
     endif()
     cmake_language(DEFER DIRECTORY "${CMAKE_SOURCE_DIR}" CALL _cpp_policy_verify_targets)
+    _cpp_policy_check_git_hooks()
 
     set(config "${CMAKE_BINARY_DIR}/cpp_policy_config.cmake")
     file(WRITE "${config}"

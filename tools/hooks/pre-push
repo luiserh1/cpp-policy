@@ -1,0 +1,21 @@
+#!/bin/sh
+# cpp-policy pre-push hook: the full gate (POLICY.md 8).
+# Copy unchanged into the project's tools/hooks/ and enable once per clone with:
+#   git config core.hooksPath tools/hooks
+set -e
+
+# The gate builds the files on disk, but git pushes commits. Refuse to vouch for
+# commits with a working folder that differs from them.
+changes=$(git status --porcelain)
+if [ -n "$changes" ]; then
+    echo "pre-push: the working folder has uncommitted changes, so the gate would not"
+    echo "test what is being pushed. Commit or stash them first:"
+    echo "$changes" | sed 's/^/  /'
+    exit 1
+fi
+
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*) preset=win-check ;;
+    *) preset=check ;;
+esac
+cmake --workflow --preset "$preset"

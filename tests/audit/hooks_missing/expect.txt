@@ -1,0 +1,1 @@
+tools/hooks/pre-commit:1: error: missing; copy it from cpp-policy

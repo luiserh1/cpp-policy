@@ -1,0 +1,18 @@
+#!/bin/sh
+# cpp-policy pre-commit hook: suppression audit and format check (POLICY.md 8).
+# Copy unchanged into the project's tools/hooks/ and enable once per clone with:
+#   git config core.hooksPath tools/hooks
+set -e
+
+# The checks read the files on disk, but git commits the staged version. Say so
+# when the two differ, so a pass or failure isn't mistaken for the commit's.
+unstaged=$(git diff --name-only)
+if [ -n "$unstaged" ]; then
+    echo "pre-commit: warning: checking the working folder; these files have unstaged changes:"
+    echo "$unstaged" | sed 's/^/  /'
+fi
+
+if [ ! -f build/check/CMakeCache.txt ]; then
+    cmake --preset check >/dev/null
+fi
+cmake --build --preset check --target policy-audit policy-format-check

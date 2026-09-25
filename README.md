@@ -28,6 +28,17 @@ Start the project's `.gitignore` and `.gitattributes` from this repository's
 copies. Projects may add lines, but the audit fails if any of these are
 missing (POLICY.md 6.1).
 
+Copy `tools/hooks/` unchanged as well, and enable the hooks once per clone:
+
+```
+git config core.hooksPath tools/hooks
+```
+
+`pre-commit` runs the suppression audit and format check; `pre-push` runs the
+full gate and refuses to start while there are uncommitted changes, so it
+tests exactly what is pushed. The audit fails if the hooks differ from these,
+and configuration warns while a clone hasn't enabled them.
+
 ## Options (set by presets)
 
 | Option | Default | Meaning |

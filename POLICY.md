@@ -195,7 +195,7 @@ The following files define enforcement and must not be weakened in a project:
 
 - `.clang-tidy`, `.clang-format`
 - `CMakePresets.json` and any CMake code that sets compile flags
-- `tools/` scripts, git hook scripts
+- the git hooks in `tools/hooks/`, and any other `tools/` scripts
 - `AGENTS.md`, agent settings (`.claude/settings.json`)
 
 Rules can't be switched off from CMake either. At the end of configuration
@@ -205,9 +205,10 @@ settings: no options that turn warnings off (`-Wno-…`, `/wd…`, `-w`) on
 targets, source files or `CMAKE_CXX_FLAGS`, no `SKIP_LINTING`, and no changes
 to `CXX_CLANG_TIDY`. Configuration fails otherwise.
 
-Projects can't change the rules locally: their `.clang-tidy` and
-`.clang-format` must match the policy's, and the build always uses the
-policy's copies. A project may only tighten what the module's options allow
+Projects can't change the rules locally: their `.clang-tidy`,
+`.clang-format` and git hooks (`tools/hooks/pre-commit`, `pre-push`) must
+match the policy's (the audit compares them byte for byte), and the build
+always uses the policy's copies of the configuration files. A project may only tighten what the module's options allow
 (for example `CPP_POLICY_EXCEPTIONS OFF`). Any other change, stricter or
 looser, is made in `cpp-policy` itself.
 
@@ -275,9 +276,13 @@ Known limitations:
 |---|---|---|
 | Editor (clangd) | While typing | clang-tidy diagnostics, formatting |
 | Agent hook (Claude Code), planned | After each file edit | clang-tidy on the edited file |
-| Git pre-commit | On commit | Suppression audit and format check |
-| Git pre-push | On push | The full gate (below) |
+| Git pre-commit | On commit | Suppression audit and format check; warns when files have unstaged changes, since it checks the working folder |
+| Git pre-push | On push | The full gate (below); refuses to run with uncommitted changes, so it tests exactly what is pushed |
 | CI, planned | On push / PR | The same gate on all three OSes |
+
+The git hooks come from cpp-policy (`tools/hooks/`); projects copy them
+unchanged and enable them once per clone with `git config core.hooksPath
+tools/hooks`. Configuration warns while a clone hasn't done so.
 
 The gate is `cmake --workflow --preset check` (`win-check` on Windows):
 configure, build with clang-tidy, audit, format check, and tests under
@@ -315,8 +320,15 @@ as `#pragma once` and suppressions, have fixtures in `tests/audit/`.
 - Agents must run the gate (`cmake --workflow --preset check`, section 8)
   before declaring work complete.
 - Agents must not add suppressions, edit policy files (section 6), or bypass
-  git hooks (`--no-verify`). Where the agent supports permission rules, this is
-  also enforced technically.
+  git hooks (`--no-verify`).
+- Where the agent supports permission rules, they back these rules up, but
+  only partly: they block the agent's own file-editing tools and the
+  `--no-verify` flag, not every shell command that could do the same (such as
+  `sed -i` on a policy file, or `git -c core.hooksPath=…`). What an agent
+  can't be stopped from doing is caught afterwards: the audit rejects edited
+  copies of the policy files and hooks, configuration rejects weakened build
+  settings, and CI (planned) will run the gate again. Agent settings are a
+  guide, not a security boundary.
 
 ## 10. Versioning
 
