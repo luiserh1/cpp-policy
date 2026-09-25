@@ -3,7 +3,29 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
-## Unreleased
+## 0.3.0 (2026-09-25)
+
+Changes from the walkthrough of SimpleLocalServer, the project that pilots
+this policy. Item numbers continue the list started for 0.2.0. Before 1.0 a
+minor release may break existing code: the dependency check and the hook
+copy check below can reject projects that passed 0.2.0. `.clang-tidy` and
+`.clang-format` are unchanged.
+
+### Upgrading a project
+
+1. Pin the commit of `v0.3.0` instead of a tag, with the tag in a comment,
+   and drop `GIT_SHALLOW` (README: "Use in a project" shows how to find it).
+2. Copy `tools/hooks/` from this repository over the project's own hooks, and
+   run `git config core.hooksPath tools/hooks` in every clone.
+3. If the project uses vcpkg: make each dependency an object with
+   `"default-features": false`, the `"features"` it uses, and a `"$reason"`;
+   put the `VCPKG_ROOT` lines from POLICY.md 1.1 before `project()`.
+4. Copy the `tsan` presets and the test presets' `timeout` and
+   `ASAN_OPTIONS` settings from `CMakePresets.json`.
+5. Make sure every thread function catches exceptions at its top
+   (POLICY.md 2.8; review only).
+6. Run the gate: leak detection is now on for macOS, so it may report leaks
+   that went unnoticed before.
 
 ### Git hooks
 
