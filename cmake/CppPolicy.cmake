@@ -16,6 +16,7 @@ cmake_path(NORMAL_PATH CPP_POLICY_ROOT)
 set(CPP_POLICY_LLVM_MAJOR 23 CACHE INTERNAL "Required LLVM major version")
 
 option(CPP_POLICY_SANITIZERS "Enable AddressSanitizer + UndefinedBehaviorSanitizer" OFF)
+option(CPP_POLICY_THREAD_SANITIZER "Enable ThreadSanitizer (not with CPP_POLICY_SANITIZERS)" OFF)
 option(CPP_POLICY_CLANG_TIDY "Run clang-tidy as part of the build" OFF)
 option(CPP_POLICY_EXCEPTIONS "Enable C++ exceptions and RTTI" ON)
 set(CPP_POLICY_HARDENING "fast" CACHE STRING "Standard library hardening level: none, fast, debug")
@@ -148,6 +149,20 @@ function(cpp_policy_apply target)
             target_compile_options(${target} PRIVATE ${san})
             target_link_options(${target} PRIVATE ${san})
         endif()
+    endif()
+
+    # ThreadSanitizer finds data races (POLICY.md 2.8). It can't share a build with ASan.
+    if(CPP_POLICY_THREAD_SANITIZER)
+        if(CPP_POLICY_SANITIZERS)
+            message(FATAL_ERROR "cpp-policy: CPP_POLICY_THREAD_SANITIZER can't be combined with "
+                "CPP_POLICY_SANITIZERS; use the tsan preset")
+        endif()
+        if(msvc_cli)
+            message(FATAL_ERROR "cpp-policy: ThreadSanitizer is not available with clang-cl")
+        endif()
+        set(tsan -fsanitize=thread -fno-omit-frame-pointer)
+        target_compile_options(${target} PRIVATE ${tsan})
+        target_link_options(${target} PRIVATE ${tsan})
     endif()
 
     # clang-tidy always uses the policy's configuration, whatever .clang-tidy the project has.

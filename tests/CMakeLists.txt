@@ -1,5 +1,5 @@
 # --- Good code: must build with every check enabled and pass its tests -------
-add_library(policy_good good/numbers.cpp good/shapes.cpp good/lowlevel/byte_view.cpp)
+add_library(policy_good good/numbers.cpp good/shapes.cpp good/tally.cpp good/lowlevel/byte_view.cpp)
 target_include_directories(policy_good PUBLIC good)
 cpp_policy_apply(policy_good)
 
@@ -7,6 +7,18 @@ add_executable(policy_good_test good/main.cpp)
 target_link_libraries(policy_good_test PRIVATE policy_good)
 cpp_policy_apply(policy_good_test)
 add_test(NAME good/run COMMAND policy_good_test)
+
+# --- ThreadSanitizer: a deliberate race must be reported (only in a TSan build)
+if(CPP_POLICY_THREAD_SANITIZER)
+    add_executable(policy_tsan_race tsan/race.cpp)
+    cpp_policy_apply(policy_tsan_race)
+    add_test(NAME tsan/race COMMAND policy_tsan_race)
+    # On macOS sanitizers abort after a report by default, and CTest counts an abort as a
+    # failure whatever the output says; exit normally so the report can be matched.
+    set_tests_properties(tsan/race PROPERTIES
+        PASS_REGULAR_EXPRESSION "ThreadSanitizer: data race"
+        ENVIRONMENT "TSAN_OPTIONS=abort_on_error=0")
+endif()
 
 # --- Bad samples: each must be rejected with the check named in its EXPECT line
 file(GLOB bad_samples CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/bad/*.cpp")

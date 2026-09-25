@@ -82,6 +82,16 @@
       }
     },
     {
+      "name": "cfg-tsan",
+      "hidden": true,
+      "description": "Data races (POLICY.md 2.8); ThreadSanitizer can't be combined with ASan",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CPP_POLICY_THREAD_SANITIZER": "ON",
+        "CPP_POLICY_HARDENING": "debug"
+      }
+    },
+    {
       "name": "cfg-windows-sanitized",
       "hidden": true,
       "description": "ASan needs the release C runtime and no /RTC1 (POLICY.md 7.3)",
@@ -119,6 +129,14 @@
       "inherits": [
         "unix",
         "cfg-check"
+      ]
+    },
+    {
+      "name": "tsan",
+      "displayName": "tsan",
+      "inherits": [
+        "unix",
+        "cfg-tsan"
       ]
     },
     {
@@ -179,6 +197,10 @@
       ]
     },
     {
+      "name": "tsan",
+      "configurePreset": "tsan"
+    },
+    {
       "name": "win-dev",
       "configurePreset": "win-dev"
     },
@@ -218,6 +240,13 @@
     {
       "name": "release",
       "configurePreset": "release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "tsan",
+      "configurePreset": "tsan",
       "output": {
         "outputOnFailure": true
       }
@@ -276,6 +305,23 @@
         {
           "type": "test",
           "name": "release"
+        }
+      ]
+    },
+    {
+      "name": "tsan",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "tsan"
+        },
+        {
+          "type": "build",
+          "name": "tsan"
+        },
+        {
+          "type": "test",
+          "name": "tsan"
         }
       ]
     },

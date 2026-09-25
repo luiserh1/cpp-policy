@@ -27,6 +27,28 @@ Each entry says what changed and why. Projects read this before moving their
   catches it afterwards. *Why:* the text said the rules were "enforced
   technically", which overstated what a deny list can do. (#43)
 
+### Rules
+
+- New POLICY.md 2.8, Concurrency: std::jthread instead of std::thread and
+  detach(), no unsynchronized shared data, std::scoped_lock, no functions that
+  aren't thread-safe, subtle atomics only in confined areas, short critical
+  sections, and a catch at the top of every thread function. clang-tidy
+  already enforced two of these (concurrency-mt-unsafe,
+  modernize-use-scoped-lock); they now have samples in tests/bad/, and the
+  rest is listed as review-only in 8.1. *Why:* the policy said nothing about
+  threads beyond allowing `catch (...)` at thread boundaries, so an exception
+  escaping a thread (which ends the program without reaching main's handlers)
+  broke no written rule. (#48, #47)
+
+### Presets
+
+- New `tsan` configure, build, test and workflow presets (macOS and Linux) and
+  the CPP_POLICY_THREAD_SANITIZER option. The self-test proves the preset
+  reports a deliberate race (tests/tsan/race.cpp), and the good sample gained
+  a thread-safe Tally that must pass under it. *Why:* AddressSanitizer does
+  not detect data races, and ThreadSanitizer can't share its build, so races
+  went unchecked. Like `release`, it is meant for CI. (#48)
+
 ## 0.2.0 (2026-09-25)
 
 Changes from the first full walkthrough of the repository. Item numbers refer

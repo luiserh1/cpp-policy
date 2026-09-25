@@ -1,6 +1,7 @@
 #include "lowlevel/byte_view.hpp"
 #include "numbers.hpp"
 #include "shapes.hpp"
+#include "tally.hpp"
 
 #include <array>
 #include <cstddef>
@@ -39,6 +40,10 @@ bool run_all() {
 
     constexpr std::array text{std::byte{'o'}, std::byte{'k'}};
     ok &= check(as_text(text) == "ok", "as_text");
+
+    Tally tally;
+    add_concurrently(tally, 8, 5);
+    ok &= check(tally.total() == 40, "add_concurrently");
 
     return ok;
 }

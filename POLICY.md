@@ -130,6 +130,39 @@ To be revisited when CMake makes `import std` stable.
 Enforced by clang-tidy (`readability-identifier-naming`), except file names,
 which rely on review.
 
+### 2.8 Concurrency
+
+Most code runs on one thread. Add a thread only for a reason: blocking work
+that must not stop the rest (a server loop, waiting for a signal), or a hot
+spot that measurements show benefits from it.
+
+| Banned | Use instead |
+|---|---|
+| `std::thread`, `detach()` | `std::jthread`: it joins when destroyed and can be asked to stop (`std::stop_token`) |
+| Data written by one thread while another reads or writes it, without synchronization | A mutex that guards the data, a `std::atomic`, or no sharing: each thread owns its data and hands results over when it ends |
+| `std::lock_guard`, manual `lock()` / `unlock()` | `std::scoped_lock` |
+| Functions that are not thread-safe (`localtime`, `strtok`, `rand`…) | Their reentrant forms (`localtime_r` / `localtime_s`) or the C++ alternatives |
+| Atomics beyond simple flags and counters, lock-free structures | Confined areas only (section 4) |
+
+Rules:
+- Keep critical sections short: prepare outside the lock, lock only to touch
+  the shared data.
+- Don't call code you don't control (callbacks, another object's virtual
+  functions) while holding a lock; that is how deadlocks start. When two locks
+  are needed, take them together with one `std::scoped_lock`.
+- **Every thread function catches all exceptions at its top.** An exception
+  that escapes a thread ends the program through `std::terminate`; `main`'s
+  handlers never see it. Store it (`std::exception_ptr`) and rethrow it where
+  the thread is joined, or report it there.
+- A class that is safe to use from several threads says so in a comment.
+
+*Enforcement:* clang-tidy rejects functions that are not thread-safe
+(`concurrency-mt-unsafe`) and `std::lock_guard` (`modernize-use-scoped-lock`).
+Data races are found at run time by ThreadSanitizer, in the `tsan` preset
+(section 7), wherever tests exercise the code from several threads. The rest
+is review (section 8.1). Parallel computation (parallel algorithms, thread
+pools) is not covered yet.
+
 ## 3. Error handling
 
 | Situation | Mechanism |
@@ -146,7 +179,7 @@ which rely on review.
 - Never ignore a returned `std::expected` (enforced by clang-tidy). Mark
   functions that return it `[[nodiscard]]` so the compiler warns too.
 - `catch (...)` is only allowed at thread or program boundaries, and must log or
-  rethrow.
+  rethrow. Every thread function has such a boundary (section 2.8).
 
 ## 4. Confined low-level areas
 
@@ -235,11 +268,14 @@ looser, is made in `cpp-policy` itself.
 | `release` | Shipping | Optimized, warnings as errors, standard library hardening (fast level), `_FORTIFY_SOURCE=3`, `-fstack-protector-strong`, `-fcf-protection` where supported |
 | `check` | The gate | Full build + full clang-tidy + format check + tests under sanitizers + suppression audit |
 | `debug` | Step-through debugging | Debug, no sanitizers, standard library hardening (debug level) |
+| `tsan` | Data races | Debug, ThreadSanitizer, standard library hardening (debug level); macOS and Linux only |
 
 Windows presets carry a `win-` prefix. On Windows, `win-dev` and `win-check`
 are optimized (`RelWithDebInfo`, see 7.3), so `win-debug` is the one to step
 through. The `release` workflow runs the tests on the optimized build, where
-some bugs only appear; it is meant for CI rather than every push.
+some bugs only appear; it is meant for CI rather than every push. So is the
+`tsan` workflow: ThreadSanitizer can't be combined with AddressSanitizer, so
+it needs a build of its own, and `clang-cl` doesn't provide it.
 
 ### 7.1 Warnings
 
@@ -302,6 +338,9 @@ These rules rely on review (and on agents following `AGENTS.md`):
 - `[[nodiscard]]` on functions returning `std::expected` (section 3); ignoring
   the result is enforced, the attribute itself is not
 - The "why" comment at the top of confined source files (section 4)
+- Concurrency (section 2.8): `std::thread` and `detach()`, lock scope and
+  order, and the catch at the top of every thread function; data races are
+  found at run time by the `tsan` preset only where tests exercise them
 - Project structure (section 11): layer dependency direction and file size
   limits are planned audit checks; the helper extraction rule and comment
   accuracy will always rely on review

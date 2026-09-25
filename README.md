@@ -44,6 +44,7 @@ and configuration warns while a clone hasn't enabled them.
 | Option | Default | Meaning |
 |---|---|---|
 | `CPP_POLICY_SANITIZERS` | `OFF` | ASan + UBSan (ASan only on Windows) |
+| `CPP_POLICY_THREAD_SANITIZER` | `OFF` | ThreadSanitizer (not with the option above; not on Windows) |
 | `CPP_POLICY_CLANG_TIDY` | `OFF` | Run clang-tidy during the build |
 | `CPP_POLICY_HARDENING` | `fast` | Standard library hardening: `none`, `fast`, `debug` |
 | `CPP_POLICY_EXCEPTIONS` | `ON` | Exceptions and RTTI |
