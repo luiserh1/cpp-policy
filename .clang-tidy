@@ -80,3 +80,7 @@ CheckOptions:
   readability-identifier-naming.ProtectedMemberCase: lower_case
   readability-identifier-naming.ProtectedMemberSuffix: _
   readability-identifier-naming.MacroDefinitionCase: UPPER_CASE
+  # Types whose const-ness differs between standard libraries (POLICY.md 2.5). libstdc++
+  # declares std::stop_source::request_stop() const; libc++ and the standard don't. So on
+  # Linux the check demands a const that the macOS build rejects. Anchored: only that type.
+  misc-const-correctness.AllowedTypes: '^std::stop_source$'

@@ -154,7 +154,12 @@ Tracked as W1 in section 12.
 - `auto` is allowed when the type is obvious from the right-hand side or
   irrelevant. It is not required everywhere.
 - One declaration per line.
-- `const` by default for locals that are not modified.
+- `const` by default for locals that are not modified. Types whose
+  const-ness differs between standard libraries are exempted from the check
+  (`misc-const-correctness.AllowedTypes` in `.clang-tidy`), because the
+  `const` one library asks for, the other rejects. The list:
+  - `std::stop_source`: libstdc++ (GCC 16, `<stop_token>`) declares
+    `request_stop()` `const`; libc++ and the standard don't.
 
 ### 2.6 Classes
 
@@ -344,6 +349,13 @@ Test presets:
   detection (`ASAN_OPTIONS=detect_leaks=1`) and apply the policy's
   suppression list for false positives in the OS (section 5). Detection is on
   by default on Linux and off on macOS; `clang-cl` doesn't provide it.
+
+ThreadSanitizer on Linux: threads that glibc creates internally, without
+`pthread_create` (for example the helper threads of `getaddrinfo_a`), are
+invisible to the runtime, and the first allocation on one of them crashes
+the program. Check how your dependencies resolve names: cpp-httplib's
+non-blocking `getaddrinfo` takes that path, so SimpleLocalServer removes that
+option from its `tsan` build only.
 
 ### 7.1 Warnings
 

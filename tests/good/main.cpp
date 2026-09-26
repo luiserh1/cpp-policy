@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <exception>
 #include <print>
+#include <stop_token>
 
 namespace {
 
@@ -44,6 +45,12 @@ bool run_all() {
     Tally tally;
     add_concurrently(tally, 8, 5);
     ok &= check(tally.total() == 40, "add_concurrently");
+
+    // A stop_source used the standard way. request_stop() is const in libstdc++ only, so
+    // without the exemption in .clang-tidy this line fails misc-const-correctness on Linux.
+    std::stop_source stop;
+    stop.request_stop();
+    ok &= check(stop.get_token().stop_requested(), "stop_source");
 
     return ok;
 }
