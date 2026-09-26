@@ -63,6 +63,58 @@ function(_cpp_policy_verify_toolchain)
 endfunction()
 
 # ---------------------------------------------------------------------------
+# AddressSanitizer runtime with clang-cl
+# ---------------------------------------------------------------------------
+# Returns the full path of a file in the compiler's runtime directories, or fails.
+function(_cpp_policy_runtime_file name out)
+    execute_process(COMMAND "${CMAKE_CXX_COMPILER}" "/clang:-print-file-name=${name}"
+        OUTPUT_VARIABLE path OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+    # clang prints the bare name back when it can't find the file.
+    if(NOT IS_ABSOLUTE "${path}" OR NOT EXISTS "${path}")
+        message(FATAL_ERROR "cpp-policy: ${CMAKE_CXX_COMPILER} can't find its AddressSanitizer "
+            "runtime file ${name}; the LLVM installation is incomplete.")
+    endif()
+    cmake_path(NORMAL_PATH path)
+    set(${out} "${path}" PARENT_SCOPE)
+endfunction()
+
+# The clang-cl driver adds the ASan runtime when it links, but CMake calls lld-link directly,
+# so without these options every sanitized program fails to link with undefined __asan_*
+# symbols. The options are what the driver passes for /fsanitize=address with /MD (LLVM 23).
+# The runtime DLL is copied next to each program so ctest, a debugger and running the
+# program by hand all find it without changing PATH.
+function(_cpp_policy_windows_asan_runtime target)
+    get_property(runtime GLOBAL PROPERTY _CPP_POLICY_ASAN_RUNTIME)
+    if(NOT runtime)
+        if(CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "x64")
+            set(arch x86_64)
+        elseif(CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "ARM64")
+            set(arch aarch64)
+        else()
+            message(FATAL_ERROR "cpp-policy: AddressSanitizer with clang-cl supports x64 and ARM64, "
+                "not '${CMAKE_CXX_COMPILER_ARCHITECTURE_ID}'")
+        endif()
+        _cpp_policy_runtime_file("clang_rt.asan_dynamic-${arch}.lib" lib)
+        _cpp_policy_runtime_file("clang_rt.asan_dynamic_runtime_thunk-${arch}.lib" thunk)
+        _cpp_policy_runtime_file("clang_rt.asan_dynamic-${arch}.dll" dll)
+        set(runtime "${lib};${thunk};${dll}")
+        set_property(GLOBAL PROPERTY _CPP_POLICY_ASAN_RUNTIME "${runtime}")
+    endif()
+    list(GET runtime 0 lib)
+    list(GET runtime 1 thunk)
+    list(GET runtime 2 dll)
+
+    get_target_property(type ${target} TYPE)
+    if(type MATCHES "^(EXECUTABLE|SHARED_LIBRARY|MODULE_LIBRARY)$")
+        target_link_options(${target} PRIVATE
+            "${lib}" "/wholearchive:${thunk}" "/include:__asan_seh_interceptor")
+        add_custom_command(TARGET ${target} POST_BUILD
+            COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${dll}" "$<TARGET_FILE_DIR:${target}>"
+            VERBATIM)
+    endif()
+endfunction()
+
+# ---------------------------------------------------------------------------
 # Per-target policy
 # ---------------------------------------------------------------------------
 function(cpp_policy_apply target)
@@ -154,6 +206,7 @@ function(cpp_policy_apply target)
         if(msvc_cli)
             target_compile_options(${target} PRIVATE /fsanitize=address)
             set_target_properties(${target} PROPERTIES MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
+            _cpp_policy_windows_asan_runtime(${target})
         else()
             set(san -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
             target_compile_options(${target} PRIVATE ${san})
