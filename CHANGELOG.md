@@ -3,6 +3,56 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.3.2 (2026-09-26)
+
+Fixes for Windows (`clang-cl`), found the first time the policy ran there:
+`win-check` failed in every project, first in clang-tidy and then at link
+time. Nothing had passed on Windows before, so no passing code starts
+failing (POLICY.md 10). The changes only apply with `clang-cl`.
+
+### Upgrading a project
+
+1. Pin the commit of `v0.3.2`.
+2. Windows: install the Visual Studio component "C++ AddressSanitizer"
+   (README: Setup per platform).
+
+### Fixes
+
+- clang-tidy sees the slash-form options of `clang-cl`. `cpp_policy_apply`
+  adds `--driver-mode=cl` to the compile options. *Why:* CMake passes
+  clang-tidy `--extra-arg-before=--driver-mode=cl`, but clang-tidy drops the
+  arguments after `--` that look like input files before it applies that, and
+  in GCC mode every slash-form option looks like a path. So every slash-form
+  flag was invisible to clang-tidy: `/EHsc` (it reported "cannot use 'try'
+  with exceptions disabled"), `/W4`, `/DNDEBUG`, and CMake's `/DWIN32
+  /D_WINDOWS`. Dash-form `-D` definitions from `target_compile_definitions`
+  did get through. A copy of the flag among the compile options is read in
+  time (verified with LLVM 23.1.2).
+- Sanitized programs link with `clang-cl`. `cpp_policy_apply` links the ASan
+  runtime (`clang_rt.asan_dynamic-<arch>.lib`, the runtime thunk as a whole
+  archive, `/include:__asan_seh_interceptor`), with paths asked from the
+  compiler; configuration fails if they are missing. *Why:* the `clang-cl`
+  driver adds these when it links, but CMake calls `lld-link` directly, so
+  every program failed with undefined `__asan_*` symbols.
+- The ASan runtime DLL is copied next to each sanitized program. *Why:* the
+  tests, a debugger and running the program by hand find it without any
+  change to `PATH` or to a project's presets.
+
+### Documentation
+
+- README: the Windows setup needs the Visual Studio component "C++
+  AddressSanitizer" (`Microsoft.VisualStudio.Component.VC.ASAN`), which
+  provides `stl_asan.lib`; without it the link fails.
+- POLICY.md 7.3: a caught exception works under ASan with LLVM 23.1.2. *Why:*
+  the old text ("crashes on any `throw`") was never verified; the new
+  self-test throws and catches under ASan in `win-check`.
+
+### Self-test
+
+- `tests/clang_cl/slash_options.cpp` (only with `clang-cl`) fails to build
+  if clang-tidy loses a `/D` option or `/EHsc`, and throws and catches at run
+  time. Removing either fix above makes `win-check` fail again.
+
 ## 0.3.1 (2026-09-25)
 
 A fix for 0.3.0: its new leak detection on macOS reported a false positive

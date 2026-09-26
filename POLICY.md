@@ -367,9 +367,12 @@ switch for all of them (each library ignores the others):
 
 ### 7.3 Sanitizers on Windows (`clang-cl`)
 
-Known limitations:
-- AddressSanitizer **crashes on any `throw`**, even if caught. Code paths
-  that throw can only be sanitizer-tested on macOS/Linux.
+What to know:
+- A thrown and caught exception works under AddressSanitizer (verified with
+  LLVM 23.1.2: tests/clang_cl/slash_options.cpp throws and catches in the
+  `win-check` tests). Older clang-cl releases crashed on any `throw`.
+- The link needs the ASan runtime, which `cpp_policy_apply` adds, and the
+  Visual Studio component "C++ AddressSanitizer" for `stl_asan.lib` (README).
 - ASan does not work with the debug C runtime, so the Windows `dev` preset
   uses the release runtime (`/MD`) with debug info.
 - UBSan is not enabled on Windows.
