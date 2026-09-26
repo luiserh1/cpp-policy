@@ -12,7 +12,13 @@ if [ -n "$unstaged" ]; then
     echo "$unstaged" | sed 's/^/  /'
 fi
 
-if [ ! -f build/check/CMakeCache.txt ]; then
-    cmake --preset check >/dev/null
+# The check presets are per platform: `check` is disabled on Windows (Git for
+# Windows runs hooks with its own sh, where uname reports MINGW or MSYS).
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*) preset=win-check ;;
+    *) preset=check ;;
+esac
+if [ ! -f "build/$preset/CMakeCache.txt" ]; then
+    cmake --preset "$preset" >/dev/null
 fi
-cmake --build --preset check --target policy-audit policy-format-check
+cmake --build --preset "$preset" --target policy-audit policy-format-check

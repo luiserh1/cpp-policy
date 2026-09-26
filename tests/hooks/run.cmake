@@ -69,8 +69,22 @@ expect("NOT;code;EQUAL;0;AND;found;GREATER;-1" "pre-push must refuse a working f
 
 run(${with_stub} tools/hooks/pre-commit)
 string(FIND "${out}" "unstaged changes" warned)
-string(FIND "${out}" "stub cmake --build" checked)
+string(FIND "${out}" "stub cmake --build --preset check " checked)
 expect("code;EQUAL;0;AND;warned;GREATER;-1;AND;checked;GREATER;-1"
     "pre-commit must warn about unstaged changes and still run its checks")
+
+# Under Git for Windows, uname reports MINGW64_NT-...; both hooks must then use the
+# win-check preset, which the `check` preset's condition disables there. A stub uname
+# stands in for that shell, so the case is covered on every platform.
+file(WRITE "${WORK}/stub/uname" "#!/bin/sh\necho MINGW64_NT-10.0-19045\n")
+file(CHMOD "${WORK}/stub/uname" PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE)
+run(${with_stub} tools/hooks/pre-commit)
+string(FIND "${out}" "stub cmake --build --preset win-check " checked)
+expect("code;EQUAL;0;AND;checked;GREATER;-1"
+    "pre-commit must use the win-check preset under Git for Windows")
+run("${GIT_EXECUTABLE}" checkout -- tracked.txt)
+run(${with_stub} tools/hooks/pre-push)
+string(FIND "${out}" "stub cmake --workflow --preset win-check" found)
+expect("code;EQUAL;0;AND;found;GREATER;-1" "pre-push must use the win-check preset under Git for Windows")
 
 message("hooks: OK")
