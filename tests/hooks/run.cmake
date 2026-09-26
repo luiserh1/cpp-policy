@@ -11,6 +11,13 @@
 cmake_minimum_required(VERSION 3.29)
 find_package(Git REQUIRED)
 
+# Git exports GIT_DIR (and at times GIT_WORK_TREE and GIT_INDEX_FILE) to hooks. When pre-push runs
+# the gate in a linked worktree, GIT_DIR is an absolute path to the real repository, and every git
+# command below would act on it instead of the throwaway one (it once set core.bare there).
+foreach(variable IN ITEMS GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY)
+    unset(ENV{${variable}})
+endforeach()
+
 set(repo "${WORK}/repo")
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${repo}/tools" "${WORK}/stub")

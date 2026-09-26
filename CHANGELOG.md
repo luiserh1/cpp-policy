@@ -42,6 +42,14 @@ release (POLICY.md 10); the flags apply to every configuration but Debug.
   or not, so it can't be the criterion; the function table can.
 - `tests/bypass/hardening_option`: a target that passes `/GS- -guard:cf-`
   (one of each spelling) must be rejected at configure time.
+- `hooks/behavior` clears the `GIT_*` variables git exports to hooks, and
+  always runs with `GIT_DIR` pointing at a decoy. *Why:* pushing from a
+  linked worktree runs the gate with `GIT_DIR` set to an absolute path into
+  the real repository, so the test's throwaway-repository commands acted on
+  the real one: `git init` set `core.bare = true` there and the push failed.
+  From an ordinary clone `GIT_DIR` is `.git`, relative, which is why it had
+  not shown up. Found while pushing this release's fixture fix from a
+  worktree.
 
 ## 0.3.4 (2026-09-26)
 

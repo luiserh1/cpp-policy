@@ -148,6 +148,10 @@ if(NOT WIN32)
         COMMAND "${CMAKE_COMMAND}" "-DPOLICY_ROOT=${CPP_POLICY_ROOT}"
                 "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/hooks" "-DCXX=${CMAKE_CXX_COMPILER}"
                 "-DMAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}" -P "${CMAKE_CURRENT_SOURCE_DIR}/hooks/run.cmake")
+    # Always run as if from a hook in a linked worktree: GIT_DIR points elsewhere (a decoy in
+    # the build folder), and the test must still act only on its throwaway repository.
+    set_tests_properties(hooks/behavior PROPERTIES
+        ENVIRONMENT "GIT_DIR=${CMAKE_CURRENT_BINARY_DIR}/hooks_decoy.git")
 endif()
 
 # --- Dependency fixtures: each directory has a vcpkg.json, optionally a fake vcpkg install
