@@ -1,7 +1,7 @@
 // clang-cl only: slash-form options (/D, /EHsc) must reach the compiler and clang-tidy.
 // CMake passes CPP_POLICY_SLASH_OPTION as /D and /EHsc comes from its default flags; if
 // clang-tidy drops them, the #error below or the try block fails the build.
-#if !defined(CPP_POLICY_SLASH_OPTION)
+#ifndef CPP_POLICY_SLASH_OPTION
 #error "a slash-form option (/DCPP_POLICY_SLASH_OPTION) was dropped"
 #endif
 

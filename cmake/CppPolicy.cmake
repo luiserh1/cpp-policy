@@ -77,6 +77,15 @@ function(cpp_policy_apply target)
         set(msvc_cli FALSE)
     endif()
 
+    # clang-cl: without this, clang-tidy never sees the slash-form options (/EHsc, /D..., /W4).
+    # CMake passes it --extra-arg-before=--driver-mode=cl, but clang-tidy drops the arguments
+    # after "--" that look like input files before it applies that, and in GCC mode every
+    # slash-form option looks like a path. A copy among the compile options is read in time
+    # (verified with LLVM 23.1.2). tests/clang_cl/slash_options.cpp fails without it.
+    if(msvc_cli)
+        target_compile_options(${target} PRIVATE --driver-mode=cl)
+    endif()
+
     # Standard: C++23, no GNU/MS extensions.
     target_compile_features(${target} PRIVATE cxx_std_23)
     # Waiting W1 (POLICY.md 12): modules are not used yet. Without this, CMake scans every
