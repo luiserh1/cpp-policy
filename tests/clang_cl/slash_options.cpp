@@ -19,12 +19,11 @@ int non_negative(int value) {
 
 } // namespace
 
+// Nothing is thrown at run time: with clang-cl, ASan crashes on any throw (POLICY.md 7.3).
+// Compiling the try and the throw is the test.
 int main() {
     try {
-        static_cast<void>(non_negative(-1));
-        return EXIT_FAILURE; // not reached: non_negative must throw
-    } catch (const std::invalid_argument&) {
-        return EXIT_SUCCESS;
+        return non_negative(1) == 1 ? EXIT_SUCCESS : EXIT_FAILURE;
     } catch (...) {
         return EXIT_FAILURE;
     }

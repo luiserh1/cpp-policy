@@ -79,7 +79,7 @@ machines no configuration is needed:
 | macOS (Apple Silicon) | `brew install llvm ninja` | `/opt/homebrew/opt/llvm/bin` |
 | macOS (Intel) | `brew install llvm ninja` | `/usr/local/opt/llvm/bin` |
 | Debian / Ubuntu | [apt.llvm.org](https://apt.llvm.org) packages for LLVM 23, plus `ninja-build` | `/usr/lib/llvm-23/bin` |
-| Windows | Official LLVM installer (default path), Ninja, and Visual Studio or Build Tools (for the Windows SDK and runtime) | `C:\Program Files\LLVM\bin` |
+| Windows | Official LLVM installer (default path), Ninja, and Visual Studio or Build Tools with the "C++ AddressSanitizer" component (for the Windows SDK, the runtime and `stl_asan.lib`) | `C:\Program Files\LLVM\bin` |
 
 Things to know:
 
@@ -92,6 +92,11 @@ Things to know:
   `/usr/lib/llvm-23/bin` are what the presets use.
 - **Windows:** the LLVM that comes with Visual Studio may be older than 23.
   Use the official installer.
+- **Windows:** the `win-dev` and `win-check` presets build with AddressSanitizer,
+  and the MSVC standard library then links `stl_asan.lib`. It comes with the
+  Visual Studio component "C++ AddressSanitizer"
+  (`Microsoft.VisualStudio.Component.VC.ASAN`); without it the link fails with
+  `could not open 'stl_asan.lib'`.
 
 **Non-standard install locations:** put that LLVM's `bin` directory first in
 `PATH` before running CMake. Do not edit `CMakePresets.json`.
