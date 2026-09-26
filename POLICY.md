@@ -538,8 +538,8 @@ day the feature appears (`tests/probes/`).
 | Item | Wanted | Workaround today | Resolves when | Checked by |
 |---|---|---|---|---|
 | W1 | C++ modules and `import std` | `#include` (section 2.4); module scanning off (`CXX_SCAN_FOR_MODULES OFF` in `CppPolicy.cmake`) | CMake makes `import std` stable, clang-tidy handles modules, and `clang-cl` with the Microsoft library catches up | Hand, at each CMake and LLVM upgrade |
-| W2 | Time zones in libc++ on macOS (`std::chrono::zoned_time`, `current_zone`) | Local time through `localtime_r` / `localtime_s`, in a confined file | libc++ ships its time zone database on macOS | Probe `waiting/w2_zoned_time` (macOS) |
-| W3 | Parallel algorithms (`std::execution::par`) in libc++ without `-fexperimental-library` | Not used; parallel computation isn't covered by the policy yet | libc++ makes them stable | Probe `waiting/w3_parallel_algorithms` (macOS) |
+| W2 | Time zones in libc++ on macOS (`std::chrono::zoned_time`, `current_zone`) | Local time through `localtime_r` / `localtime_s`, in a confined file | libc++ ships its time zone database on macOS. (libstdc++ already has it: verified with GCC 16 on Linux.) | Probe `waiting/w2_zoned_time` (macOS) |
+| W3 | Parallel algorithms (`std::execution::par`) in libc++ without `-fexperimental-library` | Not used; parallel computation isn't covered by the policy yet | libc++ makes them stable. (libstdc++ has them with GCC 16 on Linux, but only by linking TBB, a compiled dependency that section 1.1 would have to admit.) | Probe `waiting/w3_parallel_algorithms` (macOS) |
 
 When an item resolves: remove its workarounds (search for `Waiting Wn`),
 delete its row and probe, and record the change in `CHANGELOG.md`.

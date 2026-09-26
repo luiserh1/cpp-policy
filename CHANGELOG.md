@@ -3,6 +3,20 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## Unreleased
+
+### Documentation
+
+- README: how to install LLVM 23 on Linux distributions without apt.llvm.org
+  packages (the official release tarball in `/usr/lib/llvm-23`). *Why:* the
+  first Linux run was on CachyOS (Arch), where no package provides LLVM 23;
+  with the tarball the presets work unchanged and `check`, `tsan` and
+  `release` all pass.
+- POLICY.md 12: W2 and W3 note that libstdc++ (GCC 16) already provides time
+  zones and, with TBB, parallel algorithms. *Why:* found on the same run. The
+  items still wait on libc++ on macOS, and using the parallel algorithms on
+  Linux would first need TBB admitted as a dependency (section 1.1).
+
 ## 0.3.2 (2026-09-26)
 
 Fixes for Windows (`clang-cl`), found the first time the policy ran there:

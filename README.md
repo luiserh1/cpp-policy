@@ -79,6 +79,7 @@ machines no configuration is needed:
 | macOS (Apple Silicon) | `brew install llvm ninja` | `/opt/homebrew/opt/llvm/bin` |
 | macOS (Intel) | `brew install llvm ninja` | `/usr/local/opt/llvm/bin` |
 | Debian / Ubuntu | [apt.llvm.org](https://apt.llvm.org) packages for LLVM 23, plus `ninja-build` | `/usr/lib/llvm-23/bin` |
+| Other Linux (e.g. Arch, CachyOS) | The official LLVM 23 release tarball (`LLVM-23.x.y-Linux-X64.tar.xz` from GitHub; check its SHA-256), extracted with `--strip-components=1` into `/usr/lib/llvm-23`, plus Ninja | `/usr/lib/llvm-23/bin` |
 | Windows | Official LLVM installer (default path), Ninja, and Visual Studio or Build Tools with the "C++ AddressSanitizer" component (for the Windows SDK, the runtime and `stl_asan.lib`) | `C:\Program Files\LLVM\bin` |
 
 Things to know:
