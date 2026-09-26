@@ -3,6 +3,35 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.3.4 (2026-09-26)
+
+A fix for Windows, found when the git hooks first ran under Git for Windows.
+It only makes a broken hook work, so no passing code starts failing
+(POLICY.md 10).
+
+### Upgrading a project
+
+1. Pin the commit of `v0.3.4` and copy `tools/hooks/pre-commit` (the audit's
+   hook-copy check requires the two together).
+
+### Fixes
+
+- `pre-commit` selects its preset from `uname`, like `pre-push` already did:
+  `win-check` under Git for Windows (MINGW, MSYS, Cygwin), `check` elsewhere,
+  and it looks for the configure cache under `build/<preset>/`. *Why:* it
+  always ran `cmake --preset check`, and that preset is disabled on Windows,
+  so every commit there failed with "Cannot use disabled configure preset"
+  before any check ran.
+
+### Self-test
+
+- `tests/hooks/run.cmake` runs both hooks a second time with a stub `uname`
+  that reports `MINGW64_NT-…`, and requires the `win-check` preset. *Why:*
+  the test runs on macOS and Linux only (it drives the hooks through `sh`),
+  and this covers the Windows branch there. The real Git for Windows shell
+  was exercised by hand (a misformatted commit rejected, a clean commit with
+  an unstaged file warned and passed).
+
 ## 0.3.3 (2026-09-26)
 
 Findings from the first Linux run (CachyOS, LLVM 23.1.2, GCC 16's libstdc++,
