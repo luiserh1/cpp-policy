@@ -329,7 +329,7 @@ looser, is made in `cpp-policy` itself.
 | Preset | Purpose | Settings |
 |---|---|---|
 | `dev` | Daily work | Debug, warnings as errors, AddressSanitizer (with leak detection) + UndefinedBehaviorSanitizer, standard library hardening (debug level) |
-| `release` | Shipping | Optimized, warnings as errors, standard library hardening (fast level), `_FORTIFY_SOURCE=3`, `-fstack-protector-strong`, `-fcf-protection` where supported |
+| `release` | Shipping | Optimized, warnings as errors, standard library hardening (fast level), `_FORTIFY_SOURCE=3`, `-fstack-protector-strong`, `-fcf-protection` where supported; with `clang-cl`, Control Flow Guard (`/guard:cf`) on top of its default stack cookies (7.4) |
 | `check` | The gate | Full build + full clang-tidy + format check + tests under sanitizers + suppression audit |
 | `debug` | Step-through debugging | Debug, no sanitizers, standard library hardening (debug level) |
 | `tsan` | Data races | Debug, ThreadSanitizer, standard library hardening (debug level); macOS and Linux only |
@@ -388,6 +388,19 @@ What to know:
 - ASan does not work with the debug C runtime, so the Windows `dev` preset
   uses the release runtime (`/MD`) with debug info.
 - UBSan is not enabled on Windows.
+
+### 7.4 Hardening with `clang-cl`
+
+Every configuration but Debug gets Control Flow Guard: `/guard:cf` when
+compiling (indirect calls are checked against a table of valid targets) and
+when linking (the table and the PE flag; lld-link doesn't add them on its
+own). Stack cookies need no flag: `clang-cl` compiles with a strong stack
+protector by default (`-stack-protector 2`, the equivalent of
+`-fstack-protector-strong`). The audit rejects the options that turn either
+off, in both spellings (`/GS-`, `-guard:cf-`, `/sdl-`, ...). The self-test
+reads a program's PE header and requires `GUARD_CF` with a non-empty
+function table, plus lld-link's ASLR and no-execute defaults
+(`DYNAMIC_BASE`, `HIGH_ENTROPY_VA`, `NX_COMPAT`).
 
 ## 8. Enforcement layers
 

@@ -15,6 +15,20 @@ if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
     target_compile_options(policy_clang_cl_slash_options PRIVATE /DCPP_POLICY_SLASH_OPTION)
     cpp_policy_apply(policy_clang_cl_slash_options)
     add_test(NAME clang_cl/slash_options COMMAND policy_clang_cl_slash_options)
+
+    # Hardening (POLICY.md 7.4) is applied to every configuration but Debug: the program's
+    # PE header must show Control Flow Guard and lld-link's ASLR and no-execute defaults.
+    if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+        cmake_path(GET CMAKE_CXX_COMPILER PARENT_PATH llvm_bin)
+        find_program(CPP_POLICY_READOBJ_EXE NAMES llvm-readobj HINTS "${llvm_bin}" NO_DEFAULT_PATH)
+        if(NOT CPP_POLICY_READOBJ_EXE)
+            message(FATAL_ERROR "cpp-policy tests: llvm-readobj not found next to the compiler in ${llvm_bin}")
+        endif()
+        add_test(NAME hardening/pe_flags
+            COMMAND "${CMAKE_COMMAND}" "-DREADOBJ=${CPP_POLICY_READOBJ_EXE}"
+                    "-DBINARY=$<TARGET_FILE:policy_good_test>"
+                    -P "${CMAKE_CURRENT_SOURCE_DIR}/hardening/pe_flags.cmake")
+    endif()
 endif()
 
 # --- LeakSanitizer: a deliberate leak must be reported (ASan builds on macOS and Linux).

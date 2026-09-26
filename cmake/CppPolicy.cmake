@@ -187,7 +187,7 @@ function(cpp_policy_apply target)
         message(FATAL_ERROR "cpp-policy: unknown CPP_POLICY_HARDENING '${CPP_POLICY_HARDENING}'")
     endif()
 
-    # Low-cost security hardening for optimized builds (not available with clang-cl).
+    # Low-cost security hardening for optimized builds (POLICY.md 7, 7.4).
     if(NOT msvc_cli)
         target_compile_options(${target} PRIVATE
             $<$<NOT:$<CONFIG:Debug>>:-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=3>)
@@ -199,6 +199,15 @@ function(cpp_policy_apply target)
         if(CPP_POLICY_HAS_CF_PROTECTION)
             target_compile_options(${target} PRIVATE -fcf-protection)
         endif()
+    else()
+        # Control Flow Guard checks every indirect call against the table of valid targets.
+        # Compiling with the flag instruments the calls; linking with it writes the table and
+        # the PE flag, and lld-link, which CMake calls directly, won't do that on its own.
+        # Stack cookies need nothing here: clang-cl compiles with -stack-protector 2 (strong)
+        # by default, and the audit rejects /GS-. tests/hardening/pe_flags.cmake checks the
+        # result on every sanitized or release build.
+        target_compile_options(${target} PRIVATE $<$<NOT:$<CONFIG:Debug>>:/guard:cf>)
+        target_link_options(${target} PRIVATE $<$<NOT:$<CONFIG:Debug>>:/guard:cf>)
     endif()
 
     # Sanitizers. See POLICY.md 7.3 for the Windows limitations.
@@ -260,13 +269,16 @@ function(_cpp_policy_project_targets dir out)
     set(${out} ${targets} PARENT_SCOPE)
 endfunction()
 
-# Appends a problem to the list named by `out_list` for each option that turns warnings off.
+# Appends a problem to the list named by `out_list` for each option that turns warnings or
+# clang-cl's hardening off. clang-cl accepts either prefix, so both are checked.
 # (The parameter must not be called `problems`: it would shadow the caller's list.)
 function(_cpp_policy_check_options what options out_list)
     set(found ${${out_list}})
     foreach(option IN LISTS options)
         if(option MATCHES "-Wno-|/wd[0-9]" OR option MATCHES "^[-/]w$" OR option STREQUAL "/W0")
             list(APPEND found "${what} turns warnings off: ${option}")
+        elseif(option MATCHES "^[-/](GS|guard:cf|sdl)-$")
+            list(APPEND found "${what} turns hardening off: ${option}")
         endif()
     endforeach()
     set(${out_list} ${found} PARENT_SCOPE)

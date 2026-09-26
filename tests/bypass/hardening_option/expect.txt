@@ -1,0 +1,2 @@
+turns hardening off: /GS-
+  target 'app' \(COMPILE_OPTIONS\) turns hardening off: -guard:cf-

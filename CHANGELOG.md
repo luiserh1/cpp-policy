@@ -3,6 +3,46 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.4.0 (2026-09-26)
+
+Release hardening for Windows (`clang-cl`), the last build-flag gap found
+in the first Windows run. It adds flags and an audit rule, so it is a minor
+release (POLICY.md 10); the flags apply to every configuration but Debug.
+
+### Upgrading a project
+
+1. Pin the commit of `v0.4.0`.
+2. Nothing else: the flags come from `cpp_policy_apply`.
+
+### Rules
+
+- With `clang-cl`, every configuration but Debug is built and linked with
+  Control Flow Guard (`/guard:cf`). *Why:* `clang-cl` got none of the
+  release hardening the other platforms get (`_FORTIFY_SOURCE`,
+  `-fstack-protector-strong`, `-fcf-protection`), and the module's comment
+  claimed it wasn't available. CFG is the Windows counterpart of
+  `-fcf-protection`. Stack cookies need no flag: `clang-cl -###` shows
+  `-stack-protector 2` (strong) with no options at all, so they were already
+  on. `_FORTIFY_SOURCE` has no `clang-cl` equivalent; the MSVC STL hardening
+  macro (7.2) covers the standard library.
+- The audit rejects the options that turn hardening off, in both spellings
+  `clang-cl` accepts: `/GS-`, `-GS-`, `/guard:cf-`, `-guard:cf-`, `/sdl-`,
+  `-sdl-`. *Why:* the same rule already protects warnings (`-Wno-*`, `/wd`).
+- POLICY.md 7 lists the Windows flags in the `release` row and 7.4 explains
+  them.
+
+### Self-test
+
+- `tests/hardening/pe_flags.cmake` (only with `clang-cl`, configurations
+  other than Debug, so `win-dev`, `win-check` and `win-release`) reads
+  `policy_good_test.exe` with `llvm-readobj` and requires `GUARD_CF` with a
+  non-empty function table, plus lld-link's `DYNAMIC_BASE`,
+  `HIGH_ENTROPY_VA` and `NX_COMPAT`. *Why:* the load config's
+  `CF_INSTRUMENTED` flag is set by the MSVC runtime in every program, guarded
+  or not, so it can't be the criterion; the function table can.
+- `tests/bypass/hardening_option`: a target that passes `/GS- -guard:cf-`
+  (one of each spelling) must be rejected at configure time.
+
 ## 0.3.4 (2026-09-26)
 
 A fix for Windows, found when the git hooks first ran under Git for Windows.

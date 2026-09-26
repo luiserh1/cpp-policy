@@ -10,7 +10,7 @@ The rules are in [POLICY.md](POLICY.md).
 include(FetchContent)
 FetchContent_Declare(cpp_policy
     GIT_REPOSITORY https://github.com/luiserh1/cpp-policy.git
-    GIT_TAG        <commit>)   # v0.3.4, the latest release; see CHANGELOG.md
+    GIT_TAG        <commit>)   # v0.4.0, the latest release; see CHANGELOG.md
 FetchContent_MakeAvailable(cpp_policy)
 
 add_executable(app src/main.cpp)
@@ -24,7 +24,7 @@ and this repository's CMake code runs on every machine that configures the
 project (POLICY.md 10). The commit is the line ending in `^{}`:
 
 ```
-git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.3.4*'
+git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.4.0*'
 ```
 
 Don't add `GIT_SHALLOW`: it only works with branch and tag names.
