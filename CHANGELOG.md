@@ -3,10 +3,35 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
-## Unreleased
+## 0.3.3 (2026-09-26)
+
+Findings from the first Linux run (CachyOS, LLVM 23.1.2, GCC 16's libstdc++,
+glibc 2.44). One check is relaxed for a single type, so no passing code
+starts failing (POLICY.md 10).
+
+### Upgrading a project
+
+1. Pin the commit of `v0.3.3` and copy `.clang-tidy`.
+2. If the project runs the `tsan` workflow on Linux, read the ThreadSanitizer
+   note in POLICY.md 7 and check how its dependencies resolve names.
+
+### Fixes
+
+- `misc-const-correctness` no longer analyzes `std::stop_source`
+  (`AllowedTypes: '^std::stop_source$'`). *Why:* libstdc++ (GCC 16,
+  `<stop_token>`) declares `request_stop()` `const`, while libc++ and the
+  standard declare it non-const. So on Linux the check demanded a `const`
+  that the macOS build rejects, and no portable code satisfied both
+  (SimpleLocalServer's `check` failed on `tests/test_lowlevel.cpp`). POLICY.md
+  2.5 keeps the list of such types.
 
 ### Documentation
 
+- POLICY.md 7: under ThreadSanitizer on Linux, threads that glibc creates
+  internally (for example `getaddrinfo_a`'s helpers) crash the runtime on
+  their first allocation. *Why:* SimpleLocalServer's `tsan` test crashed in
+  cpp-httplib's non-blocking `getaddrinfo`; a program that only calls
+  `getaddrinfo_a` reproduces it, and plain `getaddrinfo` does not.
 - README: how to install LLVM 23 on Linux distributions without apt.llvm.org
   packages (the official release tarball in `/usr/lib/llvm-23`). *Why:* the
   first Linux run was on CachyOS (Arch), where no package provides LLVM 23;
@@ -16,6 +41,11 @@ Each entry says what changed and why. Projects read this before moving their
   zones and, with TBB, parallel algorithms. *Why:* found on the same run. The
   items still wait on libc++ on macOS, and using the parallel algorithms on
   Linux would first need TBB admitted as a dependency (section 1.1).
+
+### Self-test
+
+- The good sample uses a `std::stop_source` the standard way. *Why:* with
+  libstdc++ it fails clang-tidy as soon as the exemption above is removed.
 
 ## 0.3.2 (2026-09-26)
 
