@@ -122,6 +122,21 @@ Any editor that reads `CMakePresets.json` (Visual Studio, VS Code, CLion, Qt
 Creator) can pick the preset and launch its own debugger. Launch settings are
 editor-specific, so none are committed (POLICY.md 6.1).
 
+**Visual Studio (Windows):** open the project with *File > Open > Folder*,
+not with cmake-gui or a generated `.sln`. Without a preset, CMake picks MSVC's
+`cl.exe` and skips the vcpkg toolchain, so configuration fails. With Open
+Folder, Visual Studio reads the presets:
+- Choose "debug (Windows)" (`win-debug`) in the configuration dropdown. It
+  starts on `win-dev`, which is optimized.
+- Pick the program as the startup item. The Debug menu stays greyed out until
+  you do.
+- Program arguments go in `.vs/launch.vs.json` (`"args": [...]`). Right-click
+  `CMakeLists.txt` and choose the debug and launch settings to open it. It
+  stays uncommitted, since `.vs/` is ignored.
+- Ctrl+C in the program's console first stops in the debugger as exception
+  `0x40010005` (`DBG_CONTROL_C`). Choose Continue, and the program's own
+  handler runs.
+
 To stop in the debugger at a sanitizer error in a `dev` build, instead of
 getting a report after the program exits, run with `ASAN_OPTIONS=abort_on_error=1`.
 

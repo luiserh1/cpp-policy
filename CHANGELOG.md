@@ -3,6 +3,15 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## Unreleased
+
+### Documentation
+
+- README: debugging with Visual Studio on Windows (Open Folder, the
+  `win-debug` configuration, program arguments, Ctrl+C under the debugger).
+  *Why:* checked by hand on the first Windows run (SimpleLocalServer #33);
+  cmake-gui, the obvious entry point, fails without the presets.
+
 ## 0.4.0 (2026-09-26)
 
 Release hardening for Windows (`clang-cl`), the last build-flag gap found
