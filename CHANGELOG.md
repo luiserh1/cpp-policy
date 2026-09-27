@@ -3,7 +3,26 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
-## Unreleased
+## 0.4.1 (2026-09-27)
+
+A self-test fix from the Linux verification of 0.4.0. No rule, flag or check
+changes, so a patch release (POLICY.md 10).
+
+### Upgrading a project
+
+1. Pin the commit of `v0.4.1`. Nothing else.
+
+### Self-test
+
+- `leak/detected` leaks eight objects instead of one. *Why:* the test was
+  flaky on Linux (about 4 passes in 10): LeakSanitizer scans the stack
+  conservatively, and the single leaked pointer lingered in a dead stack
+  slot, so on runs where ASLR's stack offset put that slot inside the scanned
+  range the block counted as reachable. Disabling the stack scan gave 20/20
+  reports and disabling ASLR 0/20, which located the cause. With eight
+  leaks at most one pointer can linger; 40/40 with ASLR on and 10/10 with it
+  off. Not an LLVM 23 or 0.4.0 regression: the 0.3.3 program behaves the
+  same on the same machine.
 
 ### Documentation
 
