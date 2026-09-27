@@ -3,14 +3,14 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
-## Unreleased
+## 0.5.0 (2026-09-27)
 
 CI in GitHub Actions. It adds an audit rule, so it goes out as a minor
 release (POLICY.md 10).
 
 ### Upgrading a project
 
-1. Pin the new commit in `GIT_TAG`.
+1. Pin the commit of `v0.5.0` in `GIT_TAG`.
 2. Optional, recommended: add `.github/workflows/ci.yml` calling this
    repository's `gate.yml` at the same commit (README, "Continuous
    integration"), and add `.github/` to the files agents must not edit
