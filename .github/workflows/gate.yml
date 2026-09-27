@@ -117,7 +117,8 @@ jobs:
           if [ -z "$baseline" ]; then echo "vcpkg.json has no builtin-baseline commit"; exit 1; fi
           root=$VCPKG_INSTALLATION_ROOT
           git -C "$root" fetch --quiet origin
-          git -C "$root" -c advice.detachedHead=false checkout --quiet "$baseline"
+          # --force: the image may have changed files in its copy; the job owns it.
+          git -C "$root" -c advice.detachedHead=false checkout --quiet --force "$baseline"
           if [ "${{ matrix.system }}" = windows ]; then
             pwsh -NoProfile -Command "& '$root\bootstrap-vcpkg.bat' -disableMetrics"
           else
