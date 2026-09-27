@@ -3,6 +3,53 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## Unreleased
+
+CI in GitHub Actions. It adds an audit rule, so it goes out as a minor
+release (POLICY.md 10).
+
+### Upgrading a project
+
+1. Pin the new commit in `GIT_TAG`.
+2. Optional, recommended: add `.github/workflows/ci.yml` calling this
+   repository's `gate.yml` at the same commit (README, "Continuous
+   integration"), and add `.github/` to the files agents must not edit
+   (`AGENTS.md` and `.claude/settings.json`, POLICY.md 6).
+
+### Rules
+
+- CI workflows are policy files (POLICY.md 6): projects protect them like the
+  presets and the hooks. *Why:* CI is the check an agent can't skip locally;
+  an edited workflow would weaken it unnoticed.
+- The audit fails if a workflow calls `cpp-policy/.github/workflows/gate.yml`
+  at any ref other than the commit the build uses (a tag fails too).
+  *Why:* two pins that can drift apart would let CI run a different policy
+  than the local gate.
+
+### CI
+
+- `.github/workflows/gate.yml`: a reusable workflow that runs `check`, `tsan`
+  and `release` on Linux (Ubuntu 24.04, LLVM from apt.llvm.org), Windows
+  (Server 2025, the official LLVM archive) and macOS (15, Homebrew LLVM),
+  with no `tsan` on Windows. Inputs: `systems` and `vcpkg`. *Why:* the first
+  test on all three systems took a week of sessions relayed by hand; every
+  system now runs on every push. Every download is pinned (actions by commit,
+  the apt key by fingerprint, the Windows archive by SHA-256), and jobs only
+  get read access.
+- `.github/workflows/ci.yml` runs it for this repository on every push.
+
+### Fixes
+
+- The audit's check that skips the project-file comparisons in cpp-policy's
+  own tree never matched: `POLICY_ROOT` ends in a slash and `SOURCE_DIR`
+  doesn't. It was harmless for the copy checks (the policy's files equal
+  themselves) but not for the new CI pin check; both paths are now resolved
+  with `file(REAL_PATH)`.
+
+### Self-test
+
+- `tests/audit/ci_pin_matches`, `ci_pin_differs`, `ci_pin_tag`.
+
 ## 0.4.1 (2026-09-27)
 
 A self-test fix from the Linux verification of 0.4.0. No rule, flag or check
