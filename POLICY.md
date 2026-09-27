@@ -294,6 +294,7 @@ The following files define enforcement and must not be weakened in a project:
 - `CMakePresets.json` and any CMake code that sets compile flags
 - the git hooks in `tools/hooks/`, and any other `tools/` scripts
 - `AGENTS.md`, agent settings (`.claude/settings.json`)
+- CI workflows (`.github/workflows/`)
 
 Rules can't be switched off from CMake either. At the end of configuration
 the module checks that every target the project builds (fetched dependencies
@@ -410,7 +411,7 @@ function table, plus lld-link's ASLR and no-execute defaults
 | Agent hook (Claude Code), planned | After each file edit | clang-tidy on the edited file |
 | Git pre-commit | On commit | Suppression audit and format check; warns when files have unstaged changes, since it checks the working folder |
 | Git pre-push | On push | The full gate (below); refuses to run with uncommitted changes, so it tests exactly what is pushed |
-| CI, planned | On push / PR | The same gate on all three OSes |
+| CI (GitHub Actions) | On push | The same gate on Linux, Windows and macOS, through cpp-policy's reusable `gate.yml`, pinned to the same commit as the build (the audit checks it) |
 
 The git hooks come from cpp-policy (`tools/hooks/`); projects copy them
 unchanged and enable them once per clone with `git config core.hooksPath
@@ -462,7 +463,7 @@ as `#pragma once` and suppressions, have fixtures in `tests/audit/`.
   `sed -i` on a policy file, or `git -c core.hooksPath=…`). What an agent
   can't be stopped from doing is caught afterwards: the audit rejects edited
   copies of the policy files and hooks, configuration rejects weakened build
-  settings, and CI (planned) will run the gate again. Agent settings are a
+  settings, and CI runs the gate again on a clean machine. Agent settings are a
   guide, not a security boundary.
 
 ## 10. Versioning

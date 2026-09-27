@@ -394,6 +394,33 @@ function(_cpp_policy_check_dependencies)
 endfunction()
 
 # ---------------------------------------------------------------------------
+# The commit of cpp-policy in use, for the audit's CI pin check. Empty when cpp-policy isn't
+# the root of its own git checkout (then the check is skipped).
+# ---------------------------------------------------------------------------
+function(_cpp_policy_commit out)
+    set(${out} "" PARENT_SCOPE)
+    find_package(Git QUIET)
+    if(NOT Git_FOUND)
+        return()
+    endif()
+    execute_process(COMMAND "${GIT_EXECUTABLE}" rev-parse --show-toplevel HEAD
+        WORKING_DIRECTORY "${CPP_POLICY_ROOT}"
+        RESULT_VARIABLE failed OUTPUT_VARIABLE output
+        OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+    if(failed)
+        return()
+    endif()
+    string(REPLACE "\n" ";" output "${output}")
+    list(GET output 0 top)
+    list(GET output 1 commit)
+    file(REAL_PATH "${top}" top)
+    file(REAL_PATH "${CPP_POLICY_ROOT}" root)
+    if(top STREQUAL root)
+        set(${out} "${commit}" PARENT_SCOPE)
+    endif()
+endfunction()
+
+# ---------------------------------------------------------------------------
 # Project-wide checks: suppression audit and format check/fix
 # ---------------------------------------------------------------------------
 function(cpp_policy_add_checks)
@@ -410,10 +437,12 @@ function(cpp_policy_add_checks)
     configure_file("${CPP_POLICY_ROOT}/cmake/sanitizers/lsan.supp"
         "${CMAKE_BINARY_DIR}/cpp_policy_lsan.supp" COPYONLY)
 
+    _cpp_policy_commit(policy_commit)
     set(config "${CMAKE_BINARY_DIR}/cpp_policy_config.cmake")
     file(WRITE "${config}"
         "set(SOURCE_DIR [==[${CMAKE_SOURCE_DIR}]==])\n"
         "set(POLICY_ROOT [==[${CPP_POLICY_ROOT}]==])\n"
+        "set(POLICY_COMMIT [==[${policy_commit}]==])\n"
         "set(CONFINED_DIRS [==[${CPP_POLICY_CONFINED_DIRS}]==])\n"
         "set(EXCLUDED_DIRS [==[${CPP_POLICY_EXCLUDED_DIRS}]==])\n"
         "set(CLANG_FORMAT [==[${CPP_POLICY_CLANG_FORMAT_EXE}]==])\n")

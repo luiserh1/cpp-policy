@@ -1,0 +1,5 @@
+name: CI
+on: push
+jobs:
+  gate:
+    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@fedcba9876543210fedcba9876543210fedcba98 # v0.5.0

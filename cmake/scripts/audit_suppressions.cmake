@@ -14,6 +14,8 @@
 # With CHECK_PROJECT_FILES, also fails if the project's .clang-tidy, .clang-format or git hooks
 # (tools/hooks/) differ from the policy's, or its .gitignore / .gitattributes lack any line of
 # the policy's copies.
+# With POLICY_COMMIT set (the commit of cpp-policy the build uses), also fails if a GitHub
+# Actions workflow calls cpp-policy's gate at any other commit.
 
 cmake_minimum_required(VERSION 3.29)
 include("${CMAKE_CURRENT_LIST_DIR}/source_files.cmake")
@@ -102,8 +104,9 @@ endforeach()
 # The project's config files exist for editors (clangd); the build always uses the
 # policy's copies. A local edit would silently disagree with the build, so reject it.
 # The git hooks run the gate, so an edited hook would weaken it without anyone noticing.
-cmake_path(NORMAL_PATH SOURCE_DIR OUTPUT_VARIABLE source_norm)
-cmake_path(NORMAL_PATH POLICY_ROOT OUTPUT_VARIABLE policy_norm)
+# REAL_PATH, not NORMAL_PATH: POLICY_ROOT may end in a slash, SOURCE_DIR doesn't.
+file(REAL_PATH "${SOURCE_DIR}" source_norm)
+file(REAL_PATH "${POLICY_ROOT}" policy_norm)
 if(CHECK_PROJECT_FILES AND NOT source_norm STREQUAL policy_norm)
     foreach(name IN ITEMS .clang-tidy .clang-format tools/hooks/pre-commit tools/hooks/pre-push)
         if(NOT EXISTS "${SOURCE_DIR}/${name}")
@@ -133,6 +136,27 @@ if(CHECK_PROJECT_FILES)
             string(STRIP "${required}" required)
             if(NOT required IN_LIST project_lines)
                 report("${name}" 1 "missing required line '${required}' (see cpp-policy's ${name})")
+            endif()
+        endforeach()
+    endforeach()
+endif()
+
+# A project's CI must run the same policy as its build: the reusable gate it calls
+# (cpp-policy/.github/workflows/gate.yml@<ref>) must be pinned to the commit the build uses
+# (POLICY.md 8). A tag or branch name fails too: it can move.
+if(POLICY_COMMIT AND NOT source_norm STREQUAL policy_norm)
+    file(GLOB workflows RELATIVE "${SOURCE_DIR}"
+        "${SOURCE_DIR}/.github/workflows/*.yml" "${SOURCE_DIR}/.github/workflows/*.yaml")
+    foreach(workflow IN LISTS workflows)
+        cpp_policy_read_lines("${SOURCE_DIR}/${workflow}" lines)
+        set(number 0)
+        foreach(line IN LISTS lines)
+            math(EXPR number "${number} + 1")
+            if(line MATCHES "cpp-policy/\\.github/workflows/gate\\.ya?ml@([^ \t#]+)"
+               AND NOT CMAKE_MATCH_1 STREQUAL POLICY_COMMIT)
+                set(ref "${CMAKE_MATCH_1}")
+                report("${workflow}" ${number}
+                    "calls cpp-policy's gate at '${ref}', but the build uses ${POLICY_COMMIT}; pin both to the same commit")
             endif()
         endforeach()
     endforeach()

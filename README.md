@@ -50,6 +50,37 @@ full gate and refuses to start while there are uncommitted changes, so it
 tests exactly what is pushed. The audit fails if the hooks differ from these,
 and configuration warns while a clone hasn't enabled them.
 
+### Continuous integration (GitHub Actions)
+
+This repository's `gate.yml` runs the `check`, `tsan` and `release` workflows
+on Linux, Windows and macOS (no `tsan` on Windows), installing LLVM 23 on each
+runner. A project calls it from `.github/workflows/ci.yml`, pinned to the same
+commit as `GIT_TAG`:
+
+```yaml
+name: CI
+on:
+  push:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  gate:
+    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@<commit> # v0.5.0
+    with:
+      systems: '["linux", "windows", "macos"]'
+      vcpkg: true          # if the project has a vcpkg.json
+```
+
+The audit fails if the two pins differ, so CI always runs the policy the
+build uses. Move both in the same commit when upgrading.
+
+`systems` picks the runners. GitHub's runners are free for public
+repositories; private ones spend the account's Actions minutes, and macOS
+minutes count ten times as much as Linux ones (Windows twice). A private
+project whose developers work on a Mac, where the `pre-push` hook already runs
+the gate, can leave macOS out.
+
 ## Options (set by presets)
 
 | Option | Default | Meaning |
