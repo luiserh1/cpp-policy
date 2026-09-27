@@ -10,7 +10,7 @@ The rules are in [POLICY.md](POLICY.md).
 include(FetchContent)
 FetchContent_Declare(cpp_policy
     GIT_REPOSITORY https://github.com/luiserh1/cpp-policy.git
-    GIT_TAG        <commit>)   # v0.10.0, the latest release; see CHANGELOG.md
+    GIT_TAG        <commit>)   # v0.10.1, the latest release; see CHANGELOG.md
 FetchContent_MakeAvailable(cpp_policy)
 
 add_executable(app src/main.cpp)
@@ -28,7 +28,7 @@ and this repository's CMake code runs on every machine that configures the
 project (POLICY.md 10). The commit is the line ending in `^{}`:
 
 ```
-git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.10.0*'
+git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.10.1*'
 ```
 
 Don't add `GIT_SHALLOW`: it only works with branch and tag names.
@@ -38,11 +38,12 @@ Don't add `GIT_SHALLOW`: it only works with branch and tag names.
 From the project's root, with a clean working folder:
 
 ```
-sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.10.0
+sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.10.1
 ```
 
-Any copy of this repository's `tools/upgrade.sh` works; the release itself is
-fetched from the project's `GIT_REPOSITORY`. It moves the `GIT_TAG` pin and the
+Any copy of this repository's `tools/upgrade.sh` works (from v0.10.1 on): it
+fetches the release from the project's `GIT_REPOSITORY` and hands over to the
+release's own `upgrade.sh`, which knows what that release changed. It moves the `GIT_TAG` pin and the
 CI gate pins to the release's commit (with the tag in the comment), copies
 `.clang-tidy`, `.clang-format`, `CMakePresets.json` and `tools/hooks/`, checks
 every change, shows
@@ -94,7 +95,7 @@ permissions:
   contents: read
 jobs:
   gate:
-    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@<commit> # v0.10.0
+    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@<commit> # v0.10.1
     with:
       systems: '["linux", "windows", "macos"]'
       vcpkg: true          # if the project has a vcpkg.json

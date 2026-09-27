@@ -56,6 +56,11 @@ run("${policy}" ${git} rev-parse HEAD)
 string(STRIP "${out}" old)
 # Release 2.0.0 also adds a hook, like v0.8.0 added commit-msg.
 file(WRITE "${policy}/tools/hooks/commit-msg" "# commit-msg of 2.0.0\n")
+# And its own upgrade.sh, which the one under test must hand over to: this script plus one
+# line that says it ran.
+file(READ "${POLICY_ROOT}/tools/upgrade.sh" script)
+string(REPLACE "set -eu\n" "set -eu\necho \"upgrade.sh of 2.0.0 is running\"\n" script "${script}")
+file(WRITE "${policy}/tools/upgrade.sh" "${script}")
 release(2.0.0 "## 2.0.0 (2026-02-01)\n\nSecond: do the upgrade steps.\n\n## 1.0.0 (2026-01-01)\n\nFirst.\n")
 run("${policy}" ${git} rev-parse HEAD)
 string(STRIP "${out}" new)
@@ -134,6 +139,9 @@ expect("code;EQUAL;0" "the copied hooks must be executable")
 file(READ "${project}/tools/hooks/commit-msg" content)
 set(wanted "# commit-msg of 2.0.0\n")
 expect("content;STREQUAL;wanted" "a hook the release adds must be copied")
+string(FIND "${out}" "handing over to v2.0.0's own upgrade.sh" handed)
+string(FIND "${out}" "upgrade.sh of 2.0.0 is running" ran)
+expect("handed;GREATER;-1;AND;ran;GREATER;-1" "it must hand over to the release's own upgrade.sh")
 string(FIND "${out}" "?? tools/hooks/commit-msg" listed)
 expect("listed;GREATER;-1" "the changes shown must include a file the release adds")
 

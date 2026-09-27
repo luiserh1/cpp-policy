@@ -10,7 +10,8 @@
 #   - the GIT_TAG pin in CMakeLists.txt: the release's commit, with the tag in a comment;
 #   - the pins of cpp-policy's CI gate in .github/workflows/, if there are any;
 #   - the copies of .clang-tidy, .clang-format, CMakePresets.json and tools/hooks/.
-# It then shows the diff and the release's CHANGELOG entry and runs the gate. It commits
+# An older copy hands over to the release's own upgrade.sh, which knows what the release
+# changed. It then shows the diff and the release's CHANGELOG entry and runs the gate. It commits
 # nothing, and it refuses to start while the working folder has uncommitted changes, so the
 # diff afterwards is exactly the upgrade.
 set -eu
@@ -48,13 +49,28 @@ pin_line=$(awk -v start="$repo_line" 'NR >= start && /GIT_TAG/ { print NR; exit 
 sed -n "${pin_line}p" CMakeLists.txt | grep -q 'GIT_TAG[[:space:]]*[0-9a-f]\{40\}' ||
     fail "CMakeLists.txt line $pin_line must pin cpp-policy by commit (POLICY.md 10), not by tag"
 
-# The release, fetched into a temporary folder that is removed on exit.
-work=$(mktemp -d)
-trap 'rm -rf "$work"' EXIT
-git clone --quiet --depth 1 --branch "$tag" "$url" "$work/policy" 2>"$work/clone.log" ||
-    fail "can't fetch $tag from $url: $(cat "$work/clone.log")"
+# The release, fetched into a temporary folder that is removed on exit. When an older
+# upgrade.sh has handed over (below), the release is already fetched there.
+if [ -n "${CPP_POLICY_UPGRADE_FETCHED:-}" ]; then
+    work=$CPP_POLICY_UPGRADE_FETCHED
+    trap 'rm -rf "$work"' EXIT
+else
+    work=$(mktemp -d)
+    trap 'rm -rf "$work"' EXIT
+    git clone --quiet --depth 1 --branch "$tag" "$url" "$work/policy" 2>"$work/clone.log" ||
+        fail "can't fetch $tag from $url: $(cat "$work/clone.log")"
+fi
 commit=$(git -C "$work/policy" rev-parse HEAD)
 policy="$work/policy"
+
+# The release decides what an upgrade to it involves (a release can add policy files), so
+# this copy hands over to the release's own upgrade.sh when that one differs.
+if [ -z "${CPP_POLICY_UPGRADE_FETCHED:-}" ] && [ -f "$policy/tools/upgrade.sh" ] &&
+    ! cmp -s "$policy/tools/upgrade.sh" "$0"; then
+    echo "upgrade: handing over to $tag's own upgrade.sh"
+    trap - EXIT
+    CPP_POLICY_UPGRADE_FETCHED=$work exec sh "$policy/tools/upgrade.sh" "$@"
+fi
 
 # Rewrites a file through a temporary copy (sed -i differs between macOS and Linux); cat keeps
 # the file's permissions.

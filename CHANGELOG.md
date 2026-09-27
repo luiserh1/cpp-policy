@@ -3,6 +3,32 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.10.1 (2026-09-27)
+
+A fix to `tools/upgrade.sh`; nothing about the rules or the build changes,
+so a patch release (POLICY.md 10).
+
+### Upgrading a project
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.10.1`. If the
+   project is on v0.10.0 or older, its copy doesn't hand over yet (below), so
+   run this one release's copy instead:
+   `sh <a cpp-policy clone at v0.10.1>/tools/upgrade.sh v0.10.1`.
+
+### Tools
+
+- `upgrade.sh` hands over to the target release's own `upgrade.sh` once it
+  has fetched it, when the two differ. *Why:* upgrading SimpleLocalServer to
+  v0.10.0 with its fetched v0.9.0 copy left `CMakePresets.json` unchanged,
+  because v0.9.0 didn't know the presets had become a policy file. A release
+  now always decides what upgrading to it involves. The release is fetched
+  once and passed on.
+
+### Self-test
+
+- The upgrade test's fake v2.0.0 carries its own `upgrade.sh`, which must be
+  the one that runs; without the handover the test fails.
+
 ## 0.10.0 (2026-09-27)
 
 Projects' `CMakePresets.json` becomes an unchanged copy, checked by the
