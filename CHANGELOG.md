@@ -3,6 +3,24 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.8.1 (2026-09-27)
+
+A fix to `tools/upgrade.sh`'s report; nothing about the rules or the build
+changes, so a patch release (POLICY.md 10).
+
+### Upgrading a project
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.8.1`.
+
+### Tools
+
+- `upgrade.sh` lists changed and new files with `git status --short`.
+  *Why:* upgrading SimpleLocalServer to v0.8.0 copied the new `commit-msg`
+  hook correctly, but the list of changes left it out: `git diff --stat` only
+  shows tracked files, and a hook the release adds is untracked until it's
+  committed. The self-test's fake release now adds a hook, and fails with the
+  old listing.
+
 ## 0.8.0 (2026-09-27)
 
 A new hook that can refuse commits that went through before, so a minor

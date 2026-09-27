@@ -107,8 +107,9 @@ for hook in "$policy"/tools/hooks/*; do
 done
 
 # 4. What changed, and what the release asks of projects.
-echo "cpp-policy $tag is commit $commit. Changes:"
-git --no-pager diff --stat
+echo "cpp-policy $tag is commit $commit. Changed and new files:"
+# status, not diff --stat: a file the release adds (a new hook) is untracked until committed.
+git status --short
 git --no-pager diff -- CMakeLists.txt .github
 version=${tag#v}
 echo
