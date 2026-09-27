@@ -3,6 +3,28 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.5.1 (2026-09-27)
+
+A CI fix found by the first project to use the gate with vcpkg. It only makes
+failing CI jobs work, so a patch release (POLICY.md 10).
+
+### Upgrading a project
+
+1. Pin the commit of `v0.5.1` in `GIT_TAG` and in `.github/workflows/ci.yml`
+   (the audit requires both to match).
+
+### CI
+
+- With `vcpkg: true`, the gate now checks out the runner's vcpkg at the
+  manifest's `builtin-baseline` and rebuilds the tool. *Why:*
+  SimpleLocalServer's first CI run failed on every job with "no version
+  database entry for cpp-httplib at 0.58.0": the runner image's vcpkg is a
+  checkout from when the image was built, and vcpkg reads port versions from
+  the checked-out files, so fetching the newer history wasn't enough. The
+  checkout uses `--force` because the Ubuntu image has modified files in its
+  copy. The step was tried first on both runners with SimpleLocalServer's
+  manifest (a temporary probe workflow, now removed).
+
 ## 0.5.0 (2026-09-27)
 
 CI in GitHub Actions. It adds an audit rule, so it goes out as a minor
