@@ -492,7 +492,9 @@ function(cpp_policy_add_checks)
         "set(CONFINED_DIRS [==[${CPP_POLICY_CONFINED_DIRS}]==])\n"
         "set(EXCLUDED_DIRS [==[${CPP_POLICY_EXCLUDED_DIRS}]==])\n"
         "set(LAYERS [==[${layers}]==])\n"
-        "set(CLANG_FORMAT [==[${CPP_POLICY_CLANG_FORMAT_EXE}]==])\n")
+        "set(CLANG_FORMAT [==[${CPP_POLICY_CLANG_FORMAT_EXE}]==])\n"
+        "set(CLANG_TIDY [==[${CPP_POLICY_CLANG_TIDY_EXE}]==])\n"
+        "set(BUILD_DIR [==[${CMAKE_BINARY_DIR}]==])\n")
 
     set(scripts "${CPP_POLICY_ROOT}/cmake/scripts")
     add_custom_target(policy-audit
@@ -505,6 +507,6 @@ function(cpp_policy_add_checks)
         VERBATIM)
     add_custom_target(policy-format-fix
         COMMAND "${CMAKE_COMMAND}" -DCONFIG=${config} -DMODE=fix -P "${scripts}/format.cmake"
-        COMMENT "cpp-policy: formatting sources"
+        COMMENT "cpp-policy: formatting sources and fixing trailing commas"
         VERBATIM)
 endfunction()

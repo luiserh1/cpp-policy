@@ -3,6 +3,35 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.11.0 (2026-09-27)
+
+`policy-format-fix` also fixes trailing commas. A tooling improvement that
+makes no passing code fail, so a minor release (POLICY.md 10).
+
+### Upgrading a project
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.11.0`. Nothing
+   else to do.
+
+### Tools
+
+- `policy-format-fix` formats, runs clang-tidy with only
+  `readability-trailing-comma` and its fixes on the files the build compiles,
+  and formats again. *Why:* that check wants a comma after the last element
+  exactly when clang-format puts a list on several lines, so fixing one
+  undid the other: ToneMatcher needed three rounds of clang-tidy and
+  clang-format by hand. One run now leaves both right. It takes a few
+  seconds per ten files (about 30 s on ToneMatcher's 107).
+- Files the build doesn't compile (another platform's) are left alone: they
+  can't be parsed here, and this platform's gate doesn't check them either.
+
+### Self-test
+
+- `format/fix_trailing_commas`: a throwaway project with lists that need a
+  comma, one of them only after clang-format splits it; after one fix, the
+  format check and the comma check must both pass. Without the clang-tidy
+  step it fails.
+
 ## 0.10.2 (2026-09-27)
 
 Documentation and self-tests only; nothing that passes or fails changes, so a

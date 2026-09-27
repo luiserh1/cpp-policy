@@ -239,6 +239,10 @@ only `NOLINT` comments (which clang-format doesn't wrap, section 5) and text
 embedded in the code go past 100. 80 would rewrap about one line in nine;
 120 is too wide for side-by-side diffs and phone screens.
 
+`cmake --build --preset check --target policy-format-fix` formats every
+source and fixes trailing commas (section 2.10), which clang-tidy ties to the
+layout.
+
 ### 2.10 Idioms clang-tidy leads to
 
 Some checks accept only one way of writing common code, and a first
@@ -273,9 +277,10 @@ works. The forms below pass; `tests/good/idioms.cpp` has each one, and
 - **Trailing commas** (`readability-trailing-comma`). A braced list on
   several lines ends with a comma; one on a single line doesn't. clang-format
   decides which lists span several lines, and a trailing comma keeps a list
-  one element per line. So format first, run clang-tidy, fix the commas, and
-  format again. An array of structs is written `{ T{...}, T{...}, }` rather
-  than with double braces.
+  one element per line, so the commas depend on the formatting.
+  `policy-format-fix` settles both in one run: it formats, lets clang-tidy fix
+  the commas in the files this build compiles, and formats again. An array of
+  structs is written `{ T{...}, T{...}, }` rather than with double braces.
 - **Smaller ones:** `enum class E : std::uint8_t` for small enums
   (`performance-enum-size`); parentheses around a product added to something
   (`(y * width) + x`, `readability-math-missing-parentheses`); `reserve()`

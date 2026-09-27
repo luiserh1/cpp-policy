@@ -99,6 +99,13 @@ foreach(fixture IN LISTS format_fixtures)
                 "--style=file:${CPP_POLICY_ROOT}/.clang-format" "${fixture}")
 endforeach()
 
+# --- policy-format-fix: one run must leave formatting and trailing commas both right
+add_test(NAME format/fix_trailing_commas
+    COMMAND "${CMAKE_COMMAND}" "-DPOLICY_ROOT=${CPP_POLICY_ROOT}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/format_fix"
+            "-DCLANG_FORMAT=${CPP_POLICY_CLANG_FORMAT_EXE}" "-DCLANG_TIDY=${CPP_POLICY_CLANG_TIDY_EXE}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/format_fix/run.cmake")
+
 # --- Audit fixtures: each directory is a mini project.
 #   expect.txt    regex the audit output must match (include "file:line:" to pin the line)
 #   options.cmake optional; appended to the generated config to override its defaults
