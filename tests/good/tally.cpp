@@ -13,7 +13,7 @@ namespace {
 void add_catching(Tally& tally, int amount, std::exception_ptr& error) noexcept {
     try {
         tally.add(amount);
-    } catch (...) {
+    } catch (...) { // boundary: thread top
         error = std::current_exception();
     }
 }

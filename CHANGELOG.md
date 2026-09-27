@@ -3,7 +3,40 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
-## Unreleased
+## 0.7.0 (2026-09-27)
+
+Two review-only rules become audit checks, so code that passed before can
+fail: a minor release, which before 1.0 may break code (POLICY.md 10).
+
+### Upgrading a project
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.7.0`.
+2. On every `catch (...)` line, name the boundary: `// boundary: program`,
+   `// boundary: thread top`, and so on.
+3. On every `dynamic_cast` or `typeid` line, give the reason: `// rtti: ...`.
+
+### Rules
+
+- The audit fails on a `catch (...)` without `// boundary: which` on the same
+  line, and on `dynamic_cast` or `typeid` without `// rtti: reason`. Only the
+  code before any `//` is searched, so comments may mention them. *Why:*
+  POLICY.md 3 allowed catch-all handlers only at boundaries and discouraged
+  RTTI, but nothing checked either; stating the reason where the code is makes
+  review judge it, as NOLINT reasons do. The other half of the catch-all rule
+  (log or rethrow) was already partly enforced: clang-tidy's
+  `bugprone-empty-catch` rejects an empty handler.
+- `const char*` as a string type stays a review rule, and POLICY.md 8.1 now
+  says why: a pattern can't tell it from `argv`, pointers for
+  `std::from_chars` or C APIs.
+
+### Self-test
+
+- `tests/audit/catch_all_reason`, `catch_all_no_reason`, `rtti_reason`,
+  `rtti_no_reason`, including comments that mention the constructs and an
+  identifier containing `dynamic_cast`. Breaking the checks (either one off,
+  searching whole lines, accepting any comment as a reason) fails at least
+  one of them.
+- The samples' three `catch (...)` handlers name their boundaries.
 
 ### Documentation
 

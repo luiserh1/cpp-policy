@@ -1,0 +1,1 @@
+src/run.cpp:4: error: catch \(...\) is only for thread and program boundaries.*src/run.cpp:9: error: catch \(...\) is only for

@@ -241,11 +241,16 @@ embedded in the code go past 100. 80 would rewrap about one line in nine;
 - **Exceptions and RTTI are enabled** by default. A project may disable them
   through a `cpp-policy` option, for example for embedded targets.
 - `dynamic_cast` and `typeid` are discouraged. Prefer virtual functions or
-  `std::variant` + `std::visit`.
+  `std::variant` + `std::visit`. Where one is needed, give the reason on the
+  same line: `dynamic_cast<Plugin*>(p); // rtti: plugins come from outside`
+  (the audit checks it).
 - Never ignore a returned `std::expected` (enforced by clang-tidy). Mark
   functions that return it `[[nodiscard]]` so the compiler warns too.
 - `catch (...)` is only allowed at thread or program boundaries, and must log or
-  rethrow. Every thread function has such a boundary (section 2.8).
+  rethrow. Every thread function has such a boundary (section 2.8). Name the
+  boundary on the same line: `} catch (...) { // boundary: thread top` (the
+  audit checks it; clang-tidy's `bugprone-empty-catch` rejects an empty
+  handler).
 
 ## 4. Confined low-level areas
 
@@ -434,22 +439,26 @@ layer is a faster subset of it.
 ### 8.1 What is not checked by tools
 
 These rules rely on review (and on agents following `AGENTS.md`):
-- `const char*` used as a string type (section 2.2)
+- `const char*` used as a string type (section 2.2). A pattern can't tell a
+  string from the legitimate uses (`argv` at the program boundary, pointers
+  into a buffer for `std::from_chars`, C APIs in confined areas); that would
+  take a custom clang-tidy check
 - File names in `snake_case` (section 2.7)
 - Pointer + length parameters (section 2.2): no check flags the signature,
   but indexing the pointer is caught as pointer arithmetic
-- `catch (...)` only at boundaries (section 3); tools do enforce that
-  exceptions never escape `main` or `noexcept` functions
-- `dynamic_cast` / `typeid` being discouraged (section 3)
+- Whether a `catch (...)` really is at a boundary and whether an `// rtti:`
+  reason holds (section 3): the audit requires them to be stated, review
+  judges them. Tools do enforce that exceptions never escape `main` or
+  `noexcept` functions, and that no handler is empty
 - `[[nodiscard]]` on functions returning `std::expected` (section 3); ignoring
   the result is enforced, the attribute itself is not
 - The "why" comment at the top of confined source files (section 4)
 - Concurrency (section 2.8): `std::thread` and `detach()`, lock scope and
   order, and the catch at the top of every thread function; data races are
   found at run time by the `tsan` preset only where tests exercise them
-- Project structure (section 11): layer dependency direction and file size
-  limits are planned audit checks; the helper extraction rule and comment
-  accuracy will always rely on review
+- Project structure (section 11): the layer dependency direction is a
+  planned audit check (file size is checked); the helper extraction rule and
+  comment accuracy will always rely on review
 
 Every other rule in section 2, and the function size limits of section 11.3,
 has a sample in `tests/bad/` proving clang-tidy rejects it (one of them in a

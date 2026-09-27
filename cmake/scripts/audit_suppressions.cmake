@@ -12,6 +12,8 @@
 # Fails if any `clang-format off` has no reason: `// clang-format off: reason`.
 # Fails if a header (.h .hpp .hh .hxx) lacks `#pragma once` or uses an include guard.
 # Fails if a file has more than 350 lines (POLICY.md 11.3).
+# Fails if dynamic_cast or typeid lacks `// rtti: reason`, or catch (...) lacks
+# `// boundary: which`, on the same line (POLICY.md 3).
 # With CHECK_PROJECT_FILES, also fails if the project's .clang-tidy, .clang-format or git hooks
 # (tools/hooks/) differ from the policy's, or its .gitignore / .gitattributes lack any line of
 # the policy's copies.
@@ -85,6 +87,25 @@ foreach(file IN LISTS files)
             if(NOT CMAKE_MATCH_1 MATCHES "^:[ \t]*[^ \t*]")
                 report("${file}" ${number} "clang-format off must give a reason: // clang-format off: reason")
             endif()
+        endif()
+
+        # Constructs allowed only with a reason on the same line (POLICY.md 3). Only the code
+        # before any // is searched, so a comment that mentions them doesn't count.
+        string(FIND "${line}" "//" comment_at)
+        if(comment_at EQUAL -1)
+            set(code "${line}")
+            set(comment "")
+        else()
+            string(SUBSTRING "${line}" 0 ${comment_at} code)
+            string(SUBSTRING "${line}" ${comment_at} -1 comment)
+        endif()
+        if(code MATCHES "(^|[^A-Za-z0-9_])(dynamic_cast[ \t]*<|typeid[ \t]*\\()"
+           AND NOT comment MATCHES "^//[ \t]*rtti:[ \t]*[^ \t]")
+            report("${file}" ${number} "dynamic_cast and typeid need a reason on the same line: // rtti: reason")
+        endif()
+        if(code MATCHES "catch[ \t]*\\([ \t]*\\.\\.\\.[ \t]*\\)"
+           AND NOT comment MATCHES "^//[ \t]*boundary:[ \t]*[^ \t]")
+            report("${file}" ${number} "catch (...) is only for thread and program boundaries; name it on the same line: // boundary: which")
         endif()
     endforeach()
 

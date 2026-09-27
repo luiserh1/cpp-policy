@@ -1,0 +1,1 @@
+src/cast.cpp:3: error: dynamic_cast and typeid need a reason on the same line: // rtti: reason.*src/cast.cpp:4: error: dynamic_cast and typeid need a reason

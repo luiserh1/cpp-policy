@@ -66,7 +66,7 @@ int main() {
         std::fputs("unhandled exception: ", stderr);
         std::fputs(e.what(), stderr);
         std::fputs("\n", stderr);
-    } catch (...) {
+    } catch (...) { // boundary: program
         std::fputs("unhandled unknown exception\n", stderr);
     }
     return EXIT_FAILURE;

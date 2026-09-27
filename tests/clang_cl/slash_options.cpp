@@ -25,7 +25,7 @@ int main() {
         return EXIT_FAILURE; // not reached: non_negative must throw
     } catch (const std::invalid_argument&) {
         return EXIT_SUCCESS;
-    } catch (...) {
+    } catch (...) { // boundary: program
         return EXIT_FAILURE;
     }
 }
