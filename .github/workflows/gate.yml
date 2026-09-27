@@ -1,0 +1,121 @@
+# The policy gate in CI (POLICY.md 8): the check, tsan and release workflows on each system.
+# Reusable: cpp-policy's own CI calls it, and projects call it pinned to the same commit as
+# their FetchContent GIT_TAG:
+#
+#   jobs:
+#     gate:
+#       uses: luiserh1/cpp-policy/.github/workflows/gate.yml@<commit> # v<version>
+#       with:
+#         systems: '["linux", "windows"]'
+#         vcpkg: true
+#
+# Every download is pinned: actions by commit, the Linux apt key by fingerprint, the Windows
+# LLVM archive by SHA-256. Change LLVM_VERSION and the hash together.
+name: gate
+
+on:
+  workflow_call:
+    inputs:
+      systems:
+        description: 'JSON list of systems to run on: "linux", "windows", "macos"'
+        type: string
+        default: '["linux", "windows", "macos"]'
+      vcpkg:
+        description: The project uses vcpkg (sets VCPKG_ROOT to the runner's copy)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  LLVM_VERSION: 23.1.2
+  LLVM_MAJOR: 23
+  # clang+llvm-23.1.2-x86_64-pc-windows-msvc.tar.xz, from the release's asset digest.
+  LLVM_WINDOWS_SHA256: 8fb91cdc44fcbbdcf6b3ffd0a1f9859abd14a3c3aae4423c2b6d4a4f90bf0095
+  # apt.llvm.org signing key.
+  LLVM_APT_KEY_FINGERPRINT: 6084F3CF814B57C1CF12EFD515CF4D18AF4F7421
+
+jobs:
+  gate:
+    name: ${{ matrix.system }} ${{ matrix.workflow }}
+    strategy:
+      fail-fast: false
+      matrix:
+        system: ${{ fromJSON(inputs.systems) }}
+        workflow: [check, tsan, release]
+        exclude:
+          # ThreadSanitizer isn't available with clang-cl (POLICY.md 7.3).
+          - system: windows
+            workflow: tsan
+    runs-on: >-
+      ${{ matrix.system == 'linux' && 'ubuntu-24.04'
+       || matrix.system == 'windows' && 'windows-2025'
+       || 'macos-15' }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install LLVM (Linux)
+        if: matrix.system == 'linux'
+        run: |
+          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key -o llvm.asc
+          gpg --show-keys --with-colons llvm.asc | grep -q "fpr:::::::::${LLVM_APT_KEY_FINGERPRINT}:" \
+            || { echo "apt.llvm.org key fingerprint mismatch"; exit 1; }
+          sudo install -m 644 llvm.asc /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+          echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-${LLVM_MAJOR} main" \
+            | sudo tee /etc/apt/sources.list.d/llvm.list
+          sudo apt-get update -q
+          sudo apt-get install -y -q ninja-build "clang-${LLVM_MAJOR}" "clang-tidy-${LLVM_MAJOR}" \
+            "clang-format-${LLVM_MAJOR}" "libclang-rt-${LLVM_MAJOR}-dev"
+
+      - name: Install LLVM (Windows)
+        if: matrix.system == 'windows'
+        shell: pwsh
+        run: |
+          $name = "clang+llvm-$env:LLVM_VERSION-x86_64-pc-windows-msvc"
+          $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$env:LLVM_VERSION/$name.tar.xz"
+          Invoke-WebRequest $url -OutFile llvm.tar.xz
+          if ((Get-FileHash llvm.tar.xz -Algorithm SHA256).Hash -ne $env:LLVM_WINDOWS_SHA256) {
+            throw "LLVM archive SHA-256 mismatch"
+          }
+          # The image ships an older LLVM in the path the presets use; replace it.
+          $dir = "C:\Program Files\LLVM"
+          if (Test-Path $dir) { Remove-Item -Recurse -Force $dir }
+          New-Item -ItemType Directory $dir | Out-Null
+          tar -xf llvm.tar.xz -C $dir --strip-components=1
+          Remove-Item llvm.tar.xz
+          if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) { choco install ninja -y --no-progress }
+
+      - name: Install LLVM (macOS)
+        if: matrix.system == 'macos'
+        run: brew install llvm ninja
+
+      - name: Show the toolchain
+        run: |
+          case "${{ matrix.system }}" in
+            linux) bin=/usr/lib/llvm-${LLVM_MAJOR}/bin ;;
+            windows) bin="/c/Program Files/LLVM/bin" ;;
+            macos) bin=$(brew --prefix llvm)/bin ;;
+          esac
+          "$bin/clang-tidy" --version
+          cmake --version
+          ninja --version
+
+      - name: Use the runner's vcpkg
+        if: inputs.vcpkg
+        run: |
+          echo "VCPKG_ROOT=$VCPKG_INSTALLATION_ROOT" >> "$GITHUB_ENV"
+          # The manifest's builtin-baseline must be in vcpkg's history.
+          git -C "$VCPKG_INSTALLATION_ROOT" fetch --quiet origin
+
+      - name: Run the ${{ matrix.workflow }} workflow
+        run: |
+          preset=${{ matrix.workflow }}
+          if [ "${{ matrix.system }}" = windows ]; then preset=win-$preset; fi
+          cmake --workflow --preset "$preset"

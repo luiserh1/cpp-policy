@@ -1,0 +1,13 @@
+# cpp-policy's own CI: its self-test through the same reusable gate projects use.
+name: CI
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    uses: ./.github/workflows/gate.yml
