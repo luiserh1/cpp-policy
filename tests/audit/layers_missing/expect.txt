@@ -1,0 +1,1 @@
+CMakeLists.txt:1: error: src/ has 2 modules \(first, second\) but no layers; declare them

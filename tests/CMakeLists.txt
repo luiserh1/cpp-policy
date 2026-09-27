@@ -107,6 +107,9 @@ foreach(case IN LISTS audit_cases)
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${case}/expect.txt")
     file(READ "${case}/expect.txt" expect)
     string(STRIP "${expect}" expect)
+    # A pass regex is a list: ";" would split it into alternatives that pass on their own.
+    # "." still matches the semicolon.
+    string(REPLACE ";" "." expect "${expect}")
     set(config "${CMAKE_CURRENT_BINARY_DIR}/audit_${name}.cmake")
     file(WRITE "${config}"
         "set(SOURCE_DIR [==[${case}]==])\n"
@@ -133,6 +136,9 @@ foreach(case IN LISTS bypass_cases)
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${case}/expect.txt")
     file(READ "${case}/expect.txt" expect)
     string(STRIP "${expect}" expect)
+    # A pass regex is a list: ";" would split it into alternatives that pass on their own.
+    # "." still matches the semicolon.
+    string(REPLACE ";" "." expect "${expect}")
     add_test(NAME bypass/${name}
         COMMAND "${CMAKE_COMMAND}" --fresh -S "${case}" -B "${CMAKE_CURRENT_BINARY_DIR}/bypass_${name}"
                 -G Ninja "-DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}"
@@ -173,6 +179,9 @@ foreach(case IN LISTS deps_cases)
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${case}/expect.txt")
     file(READ "${case}/expect.txt" expect)
     string(STRIP "${expect}" expect)
+    # A pass regex is a list: ";" would split it into alternatives that pass on their own.
+    # "." still matches the semicolon.
+    string(REPLACE ";" "." expect "${expect}")
     file(GLOB installed LIST_DIRECTORIES true "${case}/installed/*")
     add_test(NAME deps/${name}
         COMMAND "${CMAKE_COMMAND}" "-DMANIFEST=${case}/vcpkg.json" "-DINSTALLED_DIRS=${installed}"

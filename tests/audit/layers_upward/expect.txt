@@ -1,0 +1,1 @@
+src/message/text.cpp:2: error: includes "server/server.hpp" from a higher layer: 'message' is layer 2, 'server' is layer 3

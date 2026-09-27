@@ -3,6 +3,54 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.9.0 (2026-09-27)
+
+The layer check, so code that passed before can fail: a minor release
+(POLICY.md 10).
+
+### Upgrading a project
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.9.0`.
+2. If `src/` has two or more modules, declare the layers before
+   `cpp_policy_add_checks()`, from the lowest up:
+   `cpp_policy_layers(LAYER lowlevel LAYER model LAYER ui)` (POLICY.md 11.1).
+3. Write every `#include "..."` under `src/` from the `src/` root
+   (`"model/item.hpp"`), and fix any that point to a higher layer.
+
+### Rules
+
+- The audit checks the dependency direction of POLICY.md 11.1 on every
+  `#include "..."` under `src/`: no include from a higher layer, no relative
+  path, no header named without its module, and nothing but its own headers
+  in a confined module. A module in no layer fails, and so does `src/` with
+  two or more modules and no layers. *Why:* 11.1 promised this check; until
+  now the direction was kept by review only.
+- New CMake function `cpp_policy_layers(LAYER <modules>... ...)`. It fails on
+  an empty layer, a name that isn't a directory name, a module in two layers,
+  or a call after `cpp_policy_add_checks()`.
+
+### Fixes
+
+- The include-guard rule (0.2.0) never fired: in
+  `if(first MATCHES "^ifndef (.+)$" AND second STREQUAL "define ${CMAKE_MATCH_1}")`
+  the `${CMAKE_MATCH_1}` is expanded before the `MATCHES` runs. The two
+  conditions are now separate. A header with a guard also lacks
+  `#pragma once`, which was always reported, so no passing code fails now.
+- The self-test hid that: a pass regex is a list, and a `;` in an
+  `expect.txt` split it into alternatives that pass on their own. The
+  include-guard fixture passed on "use #pragma once", part of the other
+  error. The harness now turns `;` into `.`; four fixtures that had one are
+  strict again (`hooks_missing`, `include_guard`, `repo_files_missing`,
+  `sync_missing`). Found because a break in the new layer check wasn't caught.
+
+### Self-test
+
+- Audit fixtures `layers_ok`, `layers_upward`, `layers_relative`,
+  `layers_confined`, `layers_missing`, `layers_unassigned`; bypass fixtures
+  `layers_late` and `layers_duplicate`. Breaking each rule (the direction
+  check, same-layer includes rejected, relative paths, confinement, missing
+  and unassigned layers) fails the matching fixture.
+
 ## 0.8.1 (2026-09-27)
 
 A fix to `tools/upgrade.sh`'s report; nothing about the rules or the build

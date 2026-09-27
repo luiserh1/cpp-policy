@@ -421,6 +421,51 @@ function(_cpp_policy_commit out)
 endfunction()
 
 # ---------------------------------------------------------------------------
+# Layers (POLICY.md 11.1): the project's modules under src/, from the lowest layer up.
+#   cpp_policy_layers(LAYER lowlevel LAYER message LAYER app server)
+# Call it before cpp_policy_add_checks(); the audit checks every #include against it.
+# ---------------------------------------------------------------------------
+function(cpp_policy_layers)
+    if(TARGET policy-audit)
+        message(FATAL_ERROR "cpp-policy: call cpp_policy_layers() before cpp_policy_add_checks()")
+    endif()
+    set(layers "")      # one entry per layer: its modules, comma-separated
+    set(current "")     # the layer being read
+    set(started FALSE)
+    set(all_modules "")
+    foreach(argument IN LISTS ARGN)
+        if(argument STREQUAL "LAYER")
+            if(started AND current STREQUAL "")
+                message(FATAL_ERROR "cpp-policy: cpp_policy_layers() has an empty LAYER")
+            endif()
+            if(started)
+                list(APPEND layers "${current}")
+            endif()
+            set(current "")
+            set(started TRUE)
+        elseif(NOT started)
+            message(FATAL_ERROR "cpp-policy: cpp_policy_layers() must start with LAYER")
+        elseif(NOT argument MATCHES "^[a-z0-9_]+$")
+            message(FATAL_ERROR "cpp-policy: '${argument}' isn't a module name (a directory under src/)")
+        elseif(argument IN_LIST all_modules)
+            message(FATAL_ERROR "cpp-policy: module '${argument}' is in more than one layer")
+        else()
+            list(APPEND all_modules "${argument}")
+            if(current STREQUAL "")
+                set(current "${argument}")
+            else()
+                string(APPEND current ",${argument}")
+            endif()
+        endif()
+    endforeach()
+    if(current STREQUAL "")
+        message(FATAL_ERROR "cpp-policy: cpp_policy_layers() needs LAYER followed by module names")
+    endif()
+    list(APPEND layers "${current}")
+    set_property(GLOBAL PROPERTY CPP_POLICY_LAYERS "${layers}")
+endfunction()
+
+# ---------------------------------------------------------------------------
 # Project-wide checks: suppression audit and format check/fix
 # ---------------------------------------------------------------------------
 function(cpp_policy_add_checks)
@@ -438,6 +483,7 @@ function(cpp_policy_add_checks)
         "${CMAKE_BINARY_DIR}/cpp_policy_lsan.supp" COPYONLY)
 
     _cpp_policy_commit(policy_commit)
+    get_property(layers GLOBAL PROPERTY CPP_POLICY_LAYERS)
     set(config "${CMAKE_BINARY_DIR}/cpp_policy_config.cmake")
     file(WRITE "${config}"
         "set(SOURCE_DIR [==[${CMAKE_SOURCE_DIR}]==])\n"
@@ -445,6 +491,7 @@ function(cpp_policy_add_checks)
         "set(POLICY_COMMIT [==[${policy_commit}]==])\n"
         "set(CONFINED_DIRS [==[${CPP_POLICY_CONFINED_DIRS}]==])\n"
         "set(EXCLUDED_DIRS [==[${CPP_POLICY_EXCLUDED_DIRS}]==])\n"
+        "set(LAYERS [==[${layers}]==])\n"
         "set(CLANG_FORMAT [==[${CPP_POLICY_CLANG_FORMAT_EXE}]==])\n")
 
     set(scripts "${CPP_POLICY_ROOT}/cmake/scripts")

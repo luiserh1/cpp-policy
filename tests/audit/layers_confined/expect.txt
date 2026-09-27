@@ -1,0 +1,1 @@
+src/lowlevel/clock.cpp:2: error: src/lowlevel is confined: it may include only its own headers, not "message/text.hpp"

@@ -12,6 +12,9 @@
 # Fails if any `clang-format off` has no reason: `// clang-format off: reason`.
 # Fails if a header (.h .hpp .hh .hxx) lacks `#pragma once` or uses an include guard.
 # Fails if a file has more than 350 lines (POLICY.md 11.3).
+# Fails if an #include in src/ points to a higher layer (LAYERS, from cpp_policy_layers()),
+# uses a relative path, or leaves a confined module; if src/ has two or more modules and
+# no layers; or if a module is in no layer (POLICY.md 11.1).
 # Fails if dynamic_cast or typeid lacks `// rtti: reason`, or catch (...) lacks
 # `// boundary: which`, on the same line (POLICY.md 3).
 # With CHECK_PROJECT_FILES, also fails if the project's .clang-tidy, .clang-format or git hooks
@@ -32,6 +35,40 @@ endmacro()
 
 cpp_policy_collect_sources("${SOURCE_DIR}" "${EXCLUDED_DIRS}" files)
 set(max_file_lines 350)
+
+# Layers (POLICY.md 11.1). LAYERS lists the layers from the lowest up; each is a
+# comma-separated list of modules (directories under src/). layer_of_<module> is its number.
+if(NOT DEFINED LAYERS)
+    set(LAYERS "")
+endif()
+set(modules "")
+foreach(file IN LISTS files)
+    if(file MATCHES "^src/([^/]+)/")
+        list(APPEND modules "${CMAKE_MATCH_1}")
+    endif()
+endforeach()
+list(REMOVE_DUPLICATES modules)
+set(layer_number 0)
+foreach(layer IN LISTS LAYERS)
+    math(EXPR layer_number "${layer_number} + 1")
+    string(REPLACE "," ";" layer_modules "${layer}")
+    foreach(module IN LISTS layer_modules)
+        set(layer_of_${module} ${layer_number})
+    endforeach()
+endforeach()
+list(LENGTH modules module_count)
+if(LAYERS STREQUAL "" AND module_count GREATER 1)
+    string(REPLACE ";" ", " module_names "${modules}")
+    report("CMakeLists.txt" 1
+        "src/ has ${module_count} modules (${module_names}) but no layers; declare them from the lowest up with cpp_policy_layers() (POLICY.md 11.1)")
+endif()
+if(NOT LAYERS STREQUAL "")
+    foreach(module IN LISTS modules)
+        if(NOT DEFINED layer_of_${module})
+            report("src/${module}" 1 "module '${module}' is in no layer; add it to cpp_policy_layers() (POLICY.md 11.1)")
+        endif()
+    endforeach()
+endif()
 
 foreach(file IN LISTS files)
     cpp_policy_in_dirs("${file}" "${CONFINED_DIRS}" confined)
@@ -89,6 +126,37 @@ foreach(file IN LISTS files)
             endif()
         endif()
 
+        # Includes in src/ are written from the src/ root and never point to a higher layer;
+        # a confined module includes only itself (POLICY.md 11.1).
+        if(file MATCHES "^src/" AND line MATCHES "^[ \t]*#[ \t]*include[ \t]*\"([^\"]+)\"")
+            set(included "${CMAKE_MATCH_1}")
+            set(own "")
+            if(file MATCHES "^src/([^/]+)/")
+                set(own "${CMAKE_MATCH_1}")
+            endif()
+            set(target "")
+            if(included MATCHES "^([^/]+)/")
+                set(target "${CMAKE_MATCH_1}")
+            endif()
+            if(included MATCHES "^\\.\\.?/" OR included MATCHES "/\\.\\./")
+                report("${file}" ${number}
+                    "includes \"${included}\" by a relative path; write it from the src/ root: \"module/header\"")
+            elseif(NOT included MATCHES "/" AND NOT own STREQUAL "")
+                report("${file}" ${number}
+                    "includes \"${included}\" without its module; write it from the src/ root: \"${own}/${included}\"")
+            elseif(NOT own STREQUAL "" AND target IN_LIST modules AND NOT target STREQUAL own)
+                cpp_policy_in_dirs("${file}" "${CONFINED_DIRS}" own_confined)
+                if(own_confined)
+                    report("${file}" ${number}
+                        "src/${own} is confined: it may include only its own headers, not \"${included}\"")
+                elseif(DEFINED layer_of_${own} AND DEFINED layer_of_${target}
+                       AND layer_of_${target} GREATER layer_of_${own})
+                    report("${file}" ${number}
+                        "includes \"${included}\" from a higher layer: '${own}' is layer ${layer_of_${own}}, '${target}' is layer ${layer_of_${target}} (POLICY.md 11.1)")
+                endif()
+            endif()
+        endif()
+
         # Constructs allowed only with a reason on the same line (POLICY.md 3). Only the code
         # before any // is searched, so a comment that mentions them doesn't count.
         string(FIND "${line}" "//" comment_at)
@@ -131,8 +199,11 @@ foreach(file IN LISTS files)
         if(directive_count EQUAL 2)
             list(GET directives 0 first)
             list(GET directives 1 second)
-            if(first MATCHES "^ifndef (.+)$" AND second STREQUAL "define ${CMAKE_MATCH_1}")
-                report("${file}" 1 "include guards are not allowed; use #pragma once")
+            # Two ifs: in one, ${CMAKE_MATCH_1} would be expanded before the MATCHES runs.
+            if(first MATCHES "^ifndef (.+)$")
+                if(second STREQUAL "define ${CMAKE_MATCH_1}")
+                    report("${file}" 1 "include guards are not allowed; use #pragma once")
+                endif()
             endif()
         endif()
     endif()

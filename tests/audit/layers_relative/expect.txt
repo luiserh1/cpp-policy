@@ -1,0 +1,1 @@
+src/server/server.cpp:2: error: includes "../message/text.hpp" by a relative path.*src/server/server.cpp:3: error: includes "server.hpp" without its module; write it from the src/ root: "server/server.hpp"

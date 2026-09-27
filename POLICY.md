@@ -482,9 +482,8 @@ These rules rely on review (and on agents following `AGENTS.md`):
 - Concurrency (section 2.8): `std::thread` and `detach()`, lock scope and
   order, and the catch at the top of every thread function; data races are
   found at run time by the `tsan` preset only where tests exercise them
-- Project structure (section 11): the layer dependency direction is a
-  planned audit check (file size is checked); the helper extraction rule and
-  comment accuracy will always rely on review
+- Project structure (section 11): layers and file size are checked; the
+  helper extraction rule and comment accuracy will always rely on review
 
 Every other rule in section 2, and the function size limits of section 11.3,
 has a sample in `tests/bad/` proving clang-tidy rejects it (one of them in a
@@ -550,8 +549,21 @@ make many small changes. Adapted from the Carreritas project.
   never with relative paths (`"../server/..."`), so the direction of every
   dependency is visible in the include line.
 
-*Enforcement:* planned. The audit will read the layer list from CMake and
-reject includes that point upward.
+*Enforcement:* the project declares its layers in CMake, from the lowest up,
+before `cpp_policy_add_checks()`:
+
+```cmake
+cpp_policy_layers(
+    LAYER lowlevel
+    LAYER message
+    LAYER app server)
+```
+
+The audit then rejects, for every `#include "..."` under `src/`: an include
+from a higher layer, a relative path, a header named without its module, and
+any other module's header in a confined module. It also fails if a module is
+in no layer, and if `src/` has two or more modules but no layers are
+declared. Files directly in `src/` (`main.cpp`) are the top.
 
 ### 11.2 No catch-all utility modules
 
