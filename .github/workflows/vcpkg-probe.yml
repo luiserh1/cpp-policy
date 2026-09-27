@@ -1,0 +1,53 @@
+# TEMPORARY: checks gate.yml's vcpkg step on the runners with SimpleLocalServer's manifest.
+# Deleted before this branch is merged.
+name: vcpkg probe
+
+on:
+  push:
+    branches: [fix/ci-vcpkg-baseline]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        system: [linux, windows]
+    runs-on: ${{ matrix.system == 'linux' && 'ubuntu-24.04' || 'windows-2025' }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Write the manifest
+        run: |
+          cat > vcpkg.json <<'EOF'
+          {
+            "name": "simple-local-server",
+            "dependencies": [
+              { "name": "cpp-httplib", "default-features": false }
+            ],
+            "builtin-baseline": "dc1232a6e05dcc49703091e83743e3b4df9b9b7c"
+          }
+          EOF
+
+      # Same step as gate.yml.
+      - name: Use the runner's vcpkg at the manifest's baseline
+        run: |
+          baseline=$(sed -n 's/.*"builtin-baseline"[^"]*"\([0-9a-f]\{40\}\)".*/\1/p' vcpkg.json)
+          if [ -z "$baseline" ]; then echo "vcpkg.json has no builtin-baseline commit"; exit 1; fi
+          root=$VCPKG_INSTALLATION_ROOT
+          git -C "$root" fetch --quiet origin
+          git -C "$root" -c advice.detachedHead=false checkout --quiet "$baseline"
+          if [ "${{ matrix.system }}" = windows ]; then
+            pwsh -NoProfile -Command "& '$root\bootstrap-vcpkg.bat' -disableMetrics"
+          else
+            "$root/bootstrap-vcpkg.sh" -disableMetrics
+          fi
+          echo "VCPKG_ROOT=$root" >> "$GITHUB_ENV"
+
+      - name: Install the manifest's dependencies
+        run: |
+          "$VCPKG_ROOT/vcpkg" version
+          "$VCPKG_ROOT/vcpkg" install

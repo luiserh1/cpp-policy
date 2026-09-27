@@ -107,12 +107,23 @@ jobs:
           cmake --version
           ninja --version
 
-      - name: Use the runner's vcpkg
+      # The runner image's vcpkg is a checkout from when the image was built. Move it to the
+      # manifest's builtin-baseline, as on a developer's machine: vcpkg reads port versions
+      # from the checked-out files, so fetching alone leaves newer versions unknown.
+      - name: Use the runner's vcpkg at the manifest's baseline
         if: inputs.vcpkg
         run: |
-          echo "VCPKG_ROOT=$VCPKG_INSTALLATION_ROOT" >> "$GITHUB_ENV"
-          # The manifest's builtin-baseline must be in vcpkg's history.
-          git -C "$VCPKG_INSTALLATION_ROOT" fetch --quiet origin
+          baseline=$(sed -n 's/.*"builtin-baseline"[^"]*"\([0-9a-f]\{40\}\)".*/\1/p' vcpkg.json)
+          if [ -z "$baseline" ]; then echo "vcpkg.json has no builtin-baseline commit"; exit 1; fi
+          root=$VCPKG_INSTALLATION_ROOT
+          git -C "$root" fetch --quiet origin
+          git -C "$root" -c advice.detachedHead=false checkout --quiet "$baseline"
+          if [ "${{ matrix.system }}" = windows ]; then
+            pwsh -NoProfile -Command "& '$root\bootstrap-vcpkg.bat' -disableMetrics"
+          else
+            "$root/bootstrap-vcpkg.sh" -disableMetrics
+          fi
+          echo "VCPKG_ROOT=$root" >> "$GITHUB_ENV"
 
       - name: Run the ${{ matrix.workflow }} workflow
         run: |
