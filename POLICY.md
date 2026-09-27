@@ -424,6 +424,7 @@ function table, plus lld-link's ASLR and no-execute defaults
 | Editor (clangd) | While typing | clang-tidy diagnostics, formatting |
 | Agent hook (Claude Code), planned | After each file edit | clang-tidy on the edited file |
 | Git pre-commit | On commit | Suppression audit and format check; warns when files have unstaged changes, since it checks the working folder |
+| Git commit-msg | On commit | The message follows section 8.2 |
 | Git pre-push | On push | The full gate (below); refuses to run with uncommitted changes, so it tests exactly what is pushed |
 | CI (GitHub Actions) | On push | The same gate on Linux, Windows and macOS, through cpp-policy's reusable `gate.yml`, pinned to the same commit as the build (the audit checks it) |
 
@@ -435,6 +436,31 @@ The gate is `cmake --workflow --preset check` (`win-check` on Windows):
 configure, build with clang-tidy, audit, format check, and tests under
 sanitizers. It is the only definition of "passes the policy". Every other
 layer is a faster subset of it.
+
+### 8.2 Commit messages
+
+Commits follow [Conventional Commits](https://www.conventionalcommits.org) and
+say why:
+
+```
+fix(hooks): pick the win-check preset under Git for Windows
+
+pre-commit always used the check preset, which is disabled on Windows, so
+every commit there failed before any check ran.
+```
+
+- The subject is `type(scope): summary`, at most 72 characters. Types:
+  `feat`, `fix`, `perf`, `refactor`, `test`, `docs`, `build`, `ci`, `chore`,
+  `revert`. The scope is optional, lower case (`hooks`, `audit`, `server`). A
+  `!` before the colon marks a breaking change.
+- A blank line, then a body that says why the change was made. Trailers such
+  as `Co-Authored-By:` don't count as the body.
+- Release commits are `chore(release): <version>`.
+- Messages git writes itself pass unchecked: merges, reverts, `fixup!`,
+  `squash!` and `amend!`.
+
+The `commit-msg` hook checks all of this. History from before the hook is
+left as it is.
 
 ### 8.1 What is not checked by tools
 

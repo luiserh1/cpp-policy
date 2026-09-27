@@ -3,6 +3,42 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.8.0 (2026-09-27)
+
+A new hook that can refuse commits that went through before, so a minor
+release (POLICY.md 10).
+
+### Upgrading a project
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.8.0`. It copies
+   the new `tools/hooks/commit-msg`; the audit requires it.
+2. From then on, commit messages follow POLICY.md 8.2. Existing history
+   stays as it is.
+
+### Rules
+
+- Commit messages follow Conventional Commits: a subject
+  `type(scope): summary` of at most 72 characters (types `feat`, `fix`,
+  `perf`, `refactor`, `test`, `docs`, `build`, `ci`, `chore`, `revert`), a
+  blank line, and a body that says why. Release commits are
+  `chore(release): <version>`. *Why:* a history whose subjects say what kind
+  of change each commit is can be scanned and turned into release notes, and
+  the body keeps the reason every commit here has carried so far. Trailers
+  don't count as the body; merges, reverts and fixup/squash/amend commits
+  pass unchecked.
+
+### Hooks
+
+- `tools/hooks/commit-msg` checks the message. It drops comment lines and
+  everything below git's scissors line first, as git does.
+
+### Self-test
+
+- `hooks/behavior` runs the hook on 17 messages, one or two per rule,
+  including the 72/73-character boundary and trailer-only bodies. Breaking
+  the hook (no length limit, no body check, trailers counted as a body, merges
+  not exempt, comments kept) fails the test each time.
+
 ## 0.7.0 (2026-09-27)
 
 Two review-only rules become audit checks, so code that passed before can

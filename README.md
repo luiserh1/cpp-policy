@@ -10,7 +10,7 @@ The rules are in [POLICY.md](POLICY.md).
 include(FetchContent)
 FetchContent_Declare(cpp_policy
     GIT_REPOSITORY https://github.com/luiserh1/cpp-policy.git
-    GIT_TAG        <commit>)   # v0.7.0, the latest release; see CHANGELOG.md
+    GIT_TAG        <commit>)   # v0.8.0, the latest release; see CHANGELOG.md
 FetchContent_MakeAvailable(cpp_policy)
 
 add_executable(app src/main.cpp)
@@ -24,7 +24,7 @@ and this repository's CMake code runs on every machine that configures the
 project (POLICY.md 10). The commit is the line ending in `^{}`:
 
 ```
-git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.7.0*'
+git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.8.0*'
 ```
 
 Don't add `GIT_SHALLOW`: it only works with branch and tag names.
@@ -34,7 +34,7 @@ Don't add `GIT_SHALLOW`: it only works with branch and tag names.
 From the project's root, with a clean working folder:
 
 ```
-sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.7.0
+sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.8.0
 ```
 
 Any copy of this repository's `tools/upgrade.sh` works; the release itself is
@@ -62,9 +62,10 @@ Copy `tools/hooks/` unchanged as well, and enable the hooks once per clone:
 git config core.hooksPath tools/hooks
 ```
 
-`pre-commit` runs the suppression audit and format check; `pre-push` runs the
-full gate and refuses to start while there are uncommitted changes, so it
-tests exactly what is pushed. The audit fails if the hooks differ from these,
+`pre-commit` runs the suppression audit and format check; `commit-msg` checks
+the message (Conventional Commits with a body that says why, POLICY.md 8.2);
+`pre-push` runs the full gate and refuses to start while there are
+uncommitted changes, so it tests exactly what is pushed. The audit fails if the hooks differ from these,
 and configuration warns while a clone hasn't enabled them.
 
 ### Continuous integration (GitHub Actions)
@@ -83,7 +84,7 @@ permissions:
   contents: read
 jobs:
   gate:
-    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@<commit> # v0.7.0
+    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@<commit> # v0.8.0
     with:
       systems: '["linux", "windows", "macos"]'
       vcpkg: true          # if the project has a vcpkg.json

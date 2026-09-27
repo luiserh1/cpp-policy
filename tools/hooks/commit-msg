@@ -1,0 +1,45 @@
+#!/bin/sh
+# cpp-policy commit-msg hook: Conventional Commits with a reason (POLICY.md 8.2).
+# Copy unchanged into the project's tools/hooks/ and enable once per clone with:
+#   git config core.hooksPath tools/hooks
+#
+#   type(scope): summary          at most 72 characters; the scope is optional
+#                                 a blank line
+#   Why the change was made.      at least one line besides trailers
+#
+# Types: feat fix perf refactor test docs build ci chore revert; "!" after the type or
+# scope marks a breaking change. Messages git writes itself (merges, reverts, fixup!,
+# squash! and amend!) pass unchecked.
+set -e
+
+# The message as git will keep it: comment lines and everything below the scissors
+# line are dropped.
+message=$(sed -e '/^# -\{24\} >8 -\{24\}$/,$d' -e '/^#/d' "$1")
+subject=$(printf '%s\n' "$message" | sed -n '1p')
+
+case $subject in
+    "Merge "* | "Revert \""* | "fixup! "* | "squash! "* | "amend! "*) exit 0 ;;
+esac
+
+fail() {
+    echo "commit-msg: $1" >&2
+    echo "  expected:  type(scope): summary   (types: feat fix perf refactor test docs build" >&2
+    echo "             ci chore revert), a blank line, then why the change was made." >&2
+    echo "  example:   fix(hooks): pick the win-check preset under Git for Windows" >&2
+    echo "  message kept in $1" >&2
+    exit 1
+}
+
+types='feat|fix|perf|refactor|test|docs|build|ci|chore|revert'
+printf '%s\n' "$subject" | grep -Eq "^($types)(\([a-z0-9][a-z0-9._/-]*\))?!?: [^ ]" ||
+    fail "the subject isn't 'type(scope): summary': $subject"
+
+length=$(printf '%s' "$subject" | awk '{ print length($0) }')
+[ "$length" -le 72 ] || fail "the subject has $length characters; the limit is 72"
+
+[ -z "$(printf '%s\n' "$message" | sed -n '2p')" ] || fail "the second line must be blank"
+
+# The body: the lines after the blank one, without trailers such as Co-Authored-By.
+reason=$(printf '%s\n' "$message" | sed '1,2d' | grep -Ev '^[A-Za-z]+(-[A-Za-z]+)+: ' |
+    grep -Ev '^[[:space:]]*$' || true)
+[ -n "$reason" ] || fail "the message has no body; say why the change was made"
