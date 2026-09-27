@@ -17,8 +17,8 @@
 # no layers; or if a module is in no layer (POLICY.md 11.1).
 # Fails if dynamic_cast or typeid lacks `// rtti: reason`, or catch (...) lacks
 # `// boundary: which`, on the same line (POLICY.md 3).
-# With CHECK_PROJECT_FILES, also fails if the project's .clang-tidy, .clang-format or git hooks
-# (tools/hooks/) differ from the policy's, or its .gitignore / .gitattributes lack any line of
+# With CHECK_PROJECT_FILES, also fails if the project's .clang-tidy, .clang-format,
+# CMakePresets.json or git hooks (tools/hooks/) differ from the policy's, or its .gitignore / .gitattributes lack any line of
 # the policy's copies.
 # With POLICY_COMMIT set (the commit of cpp-policy the build uses), also fails if a GitHub
 # Actions workflow calls cpp-policy's gate at any other commit.
@@ -216,8 +216,8 @@ endforeach()
 file(REAL_PATH "${SOURCE_DIR}" source_norm)
 file(REAL_PATH "${POLICY_ROOT}" policy_norm)
 if(CHECK_PROJECT_FILES AND NOT source_norm STREQUAL policy_norm)
-    foreach(name IN ITEMS .clang-tidy .clang-format tools/hooks/pre-commit tools/hooks/pre-push
-                          tools/hooks/commit-msg)
+    foreach(name IN ITEMS .clang-tidy .clang-format CMakePresets.json tools/hooks/pre-commit
+                          tools/hooks/pre-push tools/hooks/commit-msg)
         if(NOT EXISTS "${SOURCE_DIR}/${name}")
             report("${name}" 1 "missing; copy it from cpp-policy (${POLICY_ROOT}/${name})")
         else()

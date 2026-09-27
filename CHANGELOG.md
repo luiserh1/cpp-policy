@@ -3,6 +3,40 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.10.0 (2026-09-27)
+
+Projects' `CMakePresets.json` becomes an unchanged copy, checked by the
+audit, so a project that passed before can fail: a minor release
+(POLICY.md 10).
+
+### Upgrading a project
+
+1. If the project uses vcpkg, first add the toolchain line after the
+   `VCPKG_ROOT` check, before `project()` (POLICY.md 1.1):
+   `set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE FILEPATH "...")`.
+   Without it, the new presets load no vcpkg and `find_package` fails.
+2. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.10.0`: it
+   replaces `CMakePresets.json` with the policy's copy.
+3. Presets a project added of its own go into `CMakeUserPresets.json`
+   (personal, not committed), or are proposed to cpp-policy.
+
+### Rules
+
+- `CMakePresets.json` joins `.clang-tidy`, `.clang-format` and the hooks: the
+  audit fails unless it is byte-identical to the policy's, and `upgrade.sh`
+  copies it. *Why:* each project carried the policy's presets plus one line
+  (vcpkg's `toolchainFile`), and nothing checked the rest, so presets could
+  drift between releases unnoticed. With the toolchain in `CMakeLists.txt`,
+  there's nothing left to differ.
+- POLICY.md 1.1's `VCPKG_ROOT` snippet sets `CMAKE_TOOLCHAIN_FILE` too, as a
+  cache default, so a toolchain given on the command line still wins.
+
+### Self-test
+
+- `tests/audit/presets_differs`; the upgrade test's fake releases carry
+  presets. Taking the presets out of the audit's list, or out of
+  `upgrade.sh`'s copy, fails a test.
+
 ## 0.9.0 (2026-09-27)
 
 The layer check, so code that passed before can fail: a minor release

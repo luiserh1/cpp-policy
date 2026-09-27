@@ -1,0 +1,4 @@
+{
+  "version": 6,
+  "configurePresets": [ { "name": "mine", "toolchainFile": "somewhere/vcpkg.cmake" } ]
+}

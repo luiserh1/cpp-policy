@@ -39,7 +39,8 @@ endfunction()
 
 # Writes one release of the fake policy: every copied file says which release it is.
 function(release version changelog)
-    foreach(name IN ITEMS .clang-tidy .clang-format tools/hooks/pre-commit tools/hooks/pre-push)
+    foreach(name IN ITEMS .clang-tidy .clang-format CMakePresets.json tools/hooks/pre-commit
+                     tools/hooks/pre-push)
         file(WRITE "${policy}/${name}" "# ${name} of ${version}\n")
     endforeach()
     file(WRITE "${policy}/CHANGELOG.md" "# Changelog\n\n${changelog}")
@@ -76,7 +77,8 @@ file(WRITE "${project}/.github/workflows/ci.yml"
     "      vcpkg: true\n")
 # Release 1.0.0's files, as the project copied them.
 run("${policy}" ${git} checkout --quiet v1.0.0 -- .)
-foreach(name IN ITEMS .clang-tidy .clang-format tools/hooks/pre-commit tools/hooks/pre-push)
+foreach(name IN ITEMS .clang-tidy .clang-format CMakePresets.json tools/hooks/pre-commit
+                     tools/hooks/pre-push)
     file(COPY_FILE "${policy}/${name}" "${project}/${name}")
 endforeach()
 run("${policy}" ${git} checkout --quiet main -- .)
@@ -121,7 +123,8 @@ string(FIND "${ci}" "gate.yml@${new} # v2.0.0\n" pinned)
 string(FIND "${ci}" "      vcpkg: true\n" untouched)
 expect("pinned;GREATER;-1;AND;untouched;GREATER;-1" "the CI gate must be pinned to v2.0.0's commit")
 
-foreach(name IN ITEMS .clang-tidy .clang-format tools/hooks/pre-commit tools/hooks/pre-push)
+foreach(name IN ITEMS .clang-tidy .clang-format CMakePresets.json tools/hooks/pre-commit
+                     tools/hooks/pre-push)
     file(READ "${project}/${name}" content)
     set(wanted "# ${name} of 2.0.0\n")
     expect("content;STREQUAL;wanted" "${name} must be v2.0.0's copy")

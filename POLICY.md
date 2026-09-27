@@ -69,18 +69,24 @@ package (dependencies of dependencies included) declares a license outside
 the list, or none. Licenses come from the SPDX files vcpkg writes for every
 package. Being lightweight and alive is review.
 
-**`VCPKG_ROOT`:** the presets load vcpkg's toolchain from `$env{VCPKG_ROOT}`.
-When the variable is missing (a new machine, CI, a git app that doesn't load
-the shell profile), CMake's error only shows a path starting with `/scripts/`.
-The policy module can't check it, since it is loaded after `project()`, which
-is where the error happens. Projects that use vcpkg put this first in their
-`CMakeLists.txt`:
+**vcpkg's toolchain:** projects that use vcpkg load its toolchain in their
+`CMakeLists.txt`, before `project()`, so their `CMakePresets.json` stays an
+unchanged copy of the policy's (section 6). When `VCPKG_ROOT` is missing (a
+new machine, CI, a git app that doesn't load the shell profile), CMake's own
+error only shows a path starting with `/scripts/`, so the same lines say
+which variable is missing. The policy module can't do either, since it is
+loaded after `project()`:
 
 ```cmake
 if(NOT DEFINED ENV{VCPKG_ROOT})
     message(FATAL_ERROR "VCPKG_ROOT is not set: set it to the vcpkg directory (README: Building).")
 endif()
+set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE FILEPATH
+    "vcpkg's toolchain (the presets are cpp-policy's unchanged copy)")
 ```
+
+A `-DCMAKE_TOOLCHAIN_FILE` given on the command line still wins, because the
+`set` only fills an empty cache entry.
 
 ## 2. Language subset
 
@@ -318,8 +324,9 @@ targets, source files or `CMAKE_CXX_FLAGS`, no `SKIP_LINTING`, and no changes
 to `CXX_CLANG_TIDY`. Configuration fails otherwise.
 
 Projects can't change the rules locally: their `.clang-tidy`,
-`.clang-format` and git hooks (`tools/hooks/pre-commit`, `pre-push`) must
-match the policy's (the audit compares them byte for byte), and the build
+`.clang-format`, `CMakePresets.json` and git hooks (`tools/hooks/`) must
+match the policy's (the audit compares them byte for byte, and
+`tools/upgrade.sh` copies them), and the build
 always uses the policy's copies of the configuration files. A project may only tighten what the module's options allow
 (for example `CPP_POLICY_EXCEPTIONS OFF`). Any other change, stricter or
 looser, is made in `cpp-policy` itself.

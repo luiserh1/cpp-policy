@@ -10,7 +10,7 @@ The rules are in [POLICY.md](POLICY.md).
 include(FetchContent)
 FetchContent_Declare(cpp_policy
     GIT_REPOSITORY https://github.com/luiserh1/cpp-policy.git
-    GIT_TAG        <commit>)   # v0.9.0, the latest release; see CHANGELOG.md
+    GIT_TAG        <commit>)   # v0.10.0, the latest release; see CHANGELOG.md
 FetchContent_MakeAvailable(cpp_policy)
 
 add_executable(app src/main.cpp)
@@ -28,7 +28,7 @@ and this repository's CMake code runs on every machine that configures the
 project (POLICY.md 10). The commit is the line ending in `^{}`:
 
 ```
-git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.9.0*'
+git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.10.0*'
 ```
 
 Don't add `GIT_SHALLOW`: it only works with branch and tag names.
@@ -38,13 +38,14 @@ Don't add `GIT_SHALLOW`: it only works with branch and tag names.
 From the project's root, with a clean working folder:
 
 ```
-sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.9.0
+sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.10.0
 ```
 
 Any copy of this repository's `tools/upgrade.sh` works; the release itself is
 fetched from the project's `GIT_REPOSITORY`. It moves the `GIT_TAG` pin and the
 CI gate pins to the release's commit (with the tag in the comment), copies
-`.clang-tidy`, `.clang-format` and `tools/hooks/`, checks every change, shows
+`.clang-tidy`, `.clang-format`, `CMakePresets.json` and `tools/hooks/`, checks
+every change, shows
 the diff and the release's CHANGELOG entry (follow its "Upgrading a project"
 steps), and runs the gate. It commits nothing. `--no-gate` skips the gate.
 These are policy files, so in a project that follows `AGENTS.md` the owner
@@ -55,6 +56,11 @@ copies are for editors: clangd and IDEs look for these files next to the
 sources, so they show the same warnings and formatting while you type. The
 build never reads them; it always uses this repository's copies. The audit
 fails if the copies differ, so the editor and the build can't disagree.
+
+Copy `CMakePresets.json` unchanged too; it defines the presets and workflows
+the gate and CI run. A project that uses vcpkg loads vcpkg's toolchain in its
+`CMakeLists.txt` instead of in the presets (POLICY.md 1.1). The audit fails if
+the presets differ from this repository's.
 
 Start the project's `.gitignore` and `.gitattributes` from this repository's
 copies. Projects may add lines, but the audit fails if any of these are
@@ -88,7 +94,7 @@ permissions:
   contents: read
 jobs:
   gate:
-    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@<commit> # v0.9.0
+    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@<commit> # v0.10.0
     with:
       systems: '["linux", "windows", "macos"]'
       vcpkg: true          # if the project has a vcpkg.json

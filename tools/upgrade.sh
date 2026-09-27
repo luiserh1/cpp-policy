@@ -9,7 +9,7 @@
 # GIT_REPOSITORY. The script changes only what a release defines, and checks every change:
 #   - the GIT_TAG pin in CMakeLists.txt: the release's commit, with the tag in a comment;
 #   - the pins of cpp-policy's CI gate in .github/workflows/, if there are any;
-#   - the copies of .clang-tidy, .clang-format and tools/hooks/.
+#   - the copies of .clang-tidy, .clang-format, CMakePresets.json and tools/hooks/.
 # It then shows the diff and the release's CHANGELOG entry and runs the gate. It commits
 # nothing, and it refuses to start while the working folder has uncommitted changes, so the
 # diff afterwards is exactly the upgrade.
@@ -90,7 +90,7 @@ for workflow in .github/workflows/*.yml .github/workflows/*.yaml; do
 done
 
 # 3. The files projects copy unchanged. The hooks must stay executable.
-for name in .clang-tidy .clang-format; do
+for name in .clang-tidy .clang-format CMakePresets.json; do
     cp "$policy/$name" "$name"
 done
 mkdir -p tools/hooks
@@ -98,7 +98,7 @@ for hook in "$policy"/tools/hooks/*; do
     cp "$hook" "tools/hooks/$(basename "$hook")"
     chmod 755 "tools/hooks/$(basename "$hook")"
 done
-for name in .clang-tidy .clang-format; do
+for name in .clang-tidy .clang-format CMakePresets.json; do
     cmp -s "$policy/$name" "$name" || fail "$name doesn't match $tag's copy after copying"
 done
 for hook in "$policy"/tools/hooks/*; do
