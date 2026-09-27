@@ -152,6 +152,13 @@ if(NOT WIN32)
     # the build folder), and the test must still act only on its throwaway repository.
     set_tests_properties(hooks/behavior PROPERTIES
         ENVIRONMENT "GIT_DIR=${CMAKE_CURRENT_BINARY_DIR}/hooks_decoy.git")
+
+    # tools/upgrade.sh against a fake cpp-policy with two releases (same GIT_DIR decoy).
+    add_test(NAME upgrade/behavior
+        COMMAND "${CMAKE_COMMAND}" "-DPOLICY_ROOT=${CPP_POLICY_ROOT}"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/upgrade" -P "${CMAKE_CURRENT_SOURCE_DIR}/upgrade/run.cmake")
+    set_tests_properties(upgrade/behavior PROPERTIES
+        ENVIRONMENT "GIT_DIR=${CMAKE_CURRENT_BINARY_DIR}/upgrade_decoy.git")
 endif()
 
 # --- Dependency fixtures: each directory has a vcpkg.json, optionally a fake vcpkg install

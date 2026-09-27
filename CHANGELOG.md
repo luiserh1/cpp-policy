@@ -3,6 +3,39 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.6.1 (2026-09-27)
+
+A new tool; nothing about the rules or the build changes, so a patch release
+(POLICY.md 10).
+
+### Upgrading a project
+
+1. Pin the commit of `v0.6.1` in `GIT_TAG` and in `.github/workflows/ci.yml`,
+   for example with the new script:
+   `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.6.1`.
+
+### Tools
+
+- `tools/upgrade.sh <tag>`: upgrades a project to a release. It moves the
+  `GIT_TAG` pin and every CI gate pin to the release's commit, copies
+  `.clang-tidy`, `.clang-format` and the hooks, fails unless each change is
+  really there, shows the diff and the release's CHANGELOG entry, and runs
+  the gate. It refuses a working folder with uncommitted changes and commits
+  nothing. *Why:* every upgrade so far needed a script written by hand, and
+  one of them passed the gate without changing anything. Checked by replaying
+  two real SimpleLocalServer upgrades (v0.3.3 to v0.4.0, with a hook change,
+  and v0.5.1 to v0.6.0, with CI): the results match the commits made by hand
+  byte for byte.
+
+### Self-test
+
+- `upgrade/behavior` (not on Windows, like the hooks test): a fake cpp-policy
+  with two releases and a project on the first. The upgrade must move both
+  pins, copy the files (hooks executable), show only the new CHANGELOG entry,
+  and refuse a dirty folder or an unknown tag without changing anything.
+  Breaking the script (no dirty check, CI pins skipped, tag comment left,
+  hooks not executable, whole CHANGELOG shown) fails the test each time.
+
 ## 0.6.0 (2026-09-27)
 
 A new audit rule, so a minor release (POLICY.md 10): code that passed before

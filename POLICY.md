@@ -473,6 +473,8 @@ as `#pragma once` and suppressions, have fixtures in `tests/audit/`.
   (`GIT_TAG <commit>   # v0.3.0`). A tag can be moved to other code later; a
   commit can't. That matters because cpp-policy's CMake code runs on every
   machine that configures a project.
+- Projects upgrade with `tools/upgrade.sh <tag>` (README, "Upgrading"): it
+  moves both pins and the copied policy files together and checks the result.
 - The version is defined once, in `project(cpp_policy VERSION ...)` in
   `CMakeLists.txt`. A release commit sets it, adds the release to
   `CHANGELOG.md` (each change with its reason), updates the tag in the
