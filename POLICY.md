@@ -534,7 +534,8 @@ reject includes that point upward.
   parameters and 4 levels of nesting (`readability-function-size`), and a
   cognitive complexity of 25 (`readability-function-cognitive-complexity`).
 
-*Enforcement:* planned. The audit will report files over the review threshold.
+*Enforcement:* the audit fails on any source file over 350 lines (the review
+threshold), outside excluded directories. The target of 250 is left to review.
 
 ### 11.4 Comment accuracy
 

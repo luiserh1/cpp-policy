@@ -11,6 +11,7 @@
 #   - has no reason in a trailing comment: `#pragma ... ignored "-Wx" // reason`.
 # Fails if any `clang-format off` has no reason: `// clang-format off: reason`.
 # Fails if a header (.h .hpp .hh .hxx) lacks `#pragma once` or uses an include guard.
+# Fails if a file has more than 350 lines (POLICY.md 11.3).
 # With CHECK_PROJECT_FILES, also fails if the project's .clang-tidy, .clang-format or git hooks
 # (tools/hooks/) differ from the policy's, or its .gitignore / .gitattributes lack any line of
 # the policy's copies.
@@ -28,6 +29,7 @@ macro(report file line message)
 endmacro()
 
 cpp_policy_collect_sources("${SOURCE_DIR}" "${EXCLUDED_DIRS}" files)
+set(max_file_lines 350)
 
 foreach(file IN LISTS files)
     cpp_policy_in_dirs("${file}" "${CONFINED_DIRS}" confined)
@@ -85,6 +87,20 @@ foreach(file IN LISTS files)
             endif()
         endif()
     endforeach()
+
+    # File size (POLICY.md 11.3). The last element is empty when the file ends in a newline.
+    list(LENGTH lines line_count)
+    if(line_count GREATER 0)
+        list(GET lines -1 last_line)
+        if(last_line STREQUAL "")
+            math(EXPR line_count "${line_count} - 1")
+        endif()
+    endif()
+    if(line_count GREATER max_file_lines)
+        math(EXPR first_over "${max_file_lines} + 1")
+        report("${file}" ${first_over}
+            "${line_count} lines, over the limit of ${max_file_lines}; split the file by responsibility (POLICY.md 11.3)")
+    endif()
 
     if(file MATCHES "\\.(h|hpp|hh|hxx)$")
         if(NOT has_pragma_once)

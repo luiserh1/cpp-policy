@@ -3,6 +3,31 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.6.0 (2026-09-27)
+
+A new audit rule, so a minor release (POLICY.md 10): code that passed before
+can fail.
+
+### Upgrading a project
+
+1. Pin the commit of `v0.6.0` in `GIT_TAG` and in `.github/workflows/ci.yml`.
+2. Split any source file over 350 lines by responsibility (POLICY.md 11.3),
+   or move generated or third-party code to an excluded directory.
+
+### Rules
+
+- The audit fails on a source file over 350 lines, reporting it at line 351.
+  *Why:* POLICY.md 11.3 set the threshold ("split by responsibility before
+  adding more") without a check, and a rule nothing checks tends to be skipped,
+  by agents especially. The 250-line target stays a review matter. A final
+  newline doesn't count as a line.
+
+### Self-test
+
+- `tests/audit/file_at_limit` (350 lines, passes) and `file_too_long` (351,
+  fails). Checked by breaking the rule: an off-by-one limit, counting the final
+  newline and disabling the rule each fail at least one of them.
+
 ## 0.5.1 (2026-09-27)
 
 A CI fix found by the first project to use the gate with vcpkg. It only makes
