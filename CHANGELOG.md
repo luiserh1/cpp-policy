@@ -3,6 +3,15 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## Unreleased
+
+### Documentation
+
+- POLICY.md 2.9: formatting, and why the limit stays at 100 columns. *Why:*
+  the limit was accepted provisionally and reviewed after real use (1,785
+  lines across cpp-policy and SimpleLocalServer): 80 would rewrap about 11% of
+  them, and nothing past 100 is code clang-format could wrap.
+
 ## 0.6.1 (2026-09-27)
 
 A new tool; nothing about the rules or the build changes, so a patch release

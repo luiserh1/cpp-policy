@@ -220,6 +220,15 @@ Data races are found at run time by ThreadSanitizer, in the `tsan` preset
 is review (section 8.1). Parallel computation (parallel algorithms, thread
 pools) is not covered yet (W3, section 12).
 
+### 2.9 Formatting
+
+Formatting is clang-format's job (`.clang-format`, checked by the gate): LLVM
+style with 4-space indents and a limit of **100 columns**. The limit was
+reviewed after the first real use: about 5% of lines go past 90 columns, and
+only `NOLINT` comments (which clang-format doesn't wrap, section 5) and text
+embedded in the code go past 100. 80 would rewrap about one line in nine;
+120 is too wide for side-by-side diffs and phone screens.
+
 ## 3. Error handling
 
 | Situation | Mechanism |
