@@ -1,10 +1,13 @@
+#include "idioms.hpp"
 #include "lowlevel/byte_view.hpp"
+#include "lowlevel/c_library.hpp"
 #include "numbers.hpp"
 #include "shapes.hpp"
 #include "tally.hpp"
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <exception>
@@ -41,6 +44,15 @@ bool run_all() {
 
     constexpr std::array text{std::byte{'o'}, std::byte{'k'}};
     ok &= check(as_text(text) == "ok", "as_text");
+
+    constexpr std::array<std::uint8_t, 3> small{1, 2, 3};
+    ok &= check(checksum(small) == 6, "checksum");
+
+    ok &= check(parse_whole("42") == 42, "parse_whole valid");
+    ok &= check(!parse_whole("42x") && !parse_whole(""), "parse_whole invalid");
+    const Size size{.width = 4, .height = 2};
+    ok &= check(Grid{size}.index(1, 1) == 5, "Grid");
+    ok &= check(palette_color(2).r == 255 && palette_color(2).g == 0, "palette_color");
 
     Tally tally;
     add_concurrently(tally, 8, 5);

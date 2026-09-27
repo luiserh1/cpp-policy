@@ -3,6 +3,46 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.10.2 (2026-09-27)
+
+Documentation and self-tests only; nothing that passes or fails changes, so a
+patch release (POLICY.md 10). They come from porting ToneMatcher (about
+10,800 lines) under the policy, where the first clang-tidy run reported 492
+findings and an in-tree C library looked impossible to use.
+
+### Upgrading a project
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.10.2`. Nothing
+   else to do.
+
+### Rules
+
+- POLICY.md 2.10, "Idioms clang-tidy leads to": the accepted forms for
+  building structs (designated initializers, or a constructor on small value
+  types), for members that refer to another object, for `std::from_chars`
+  and for trailing commas, plus the smaller checks new code meets first.
+  *Why:* each project was finding these by trial and error, and ToneMatcher
+  and SimpleLocalServer ended up with different `from_chars` code.
+- POLICY.md 2.1: a pointer member set from a reference in the constructor
+  and commented `// never null` is the one non-owning pointer that isn't
+  "may be null". *Why:* reference members are rejected by clang-tidy, so
+  the pointer is the replacement, and 2.1 contradicted it.
+- POLICY.md 5, "Third-party code": the static analyzer reports findings
+  inside an excluded header against the project line that calls into it,
+  and a `NOLINT` there, in a confined area, removes them. *Why:* ToneMatcher
+  concluded stb_image couldn't be used and wrote its own PNG codec; the
+  suppression was allowed all along.
+
+### Self-test
+
+- `tests/good/idioms.cpp` uses each idiom of 2.10;
+  `tests/good/lowlevel/c_library.cpp` calls a stand-in C library
+  (`tests/good/third_party/sample_c.h`) whose leak the analyzer finds, with
+  the `NOLINT` on the calling line. Without it the build fails.
+- New bad samples: `reference_member`, `positional_init`, and
+  `third_party_call` (the analyzer finding reaches the project through an
+  excluded header).
+
 ## 0.10.1 (2026-09-27)
 
 A fix to `tools/upgrade.sh`; nothing about the rules or the build changes,

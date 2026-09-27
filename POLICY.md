@@ -102,6 +102,10 @@ normal code and what to use instead.
 | Raw pointer parameters for arguments that must always be present | References (`T&`, `const T&`) |
 | Non-owning raw pointers | Allowed, meaning "optional, non-owning, may be null" |
 
+A non-owning raw pointer means "optional, may be null", with one exception: a
+data member set from a reference in the constructor and commented
+`// never null` (section 2.10). References can't be data members.
+
 ### 2.2 Arrays, buffers and strings
 
 | Banned | Use instead |
@@ -235,6 +239,55 @@ only `NOLINT` comments (which clang-format doesn't wrap, section 5) and text
 embedded in the code go past 100. 80 would rewrap about one line in nine;
 120 is too wide for side-by-side diffs and phone screens.
 
+### 2.10 Idioms clang-tidy leads to
+
+Some checks accept only one way of writing common code, and a first
+clang-tidy run on code written without them reports hundreds of findings.
+Build the `check` preset after each piece of work, not once the program
+works. The forms below pass; `tests/good/idioms.cpp` has each one, and
+`tests/bad/` shows what the checks reject.
+
+- **Initializing structs** (`modernize-use-designated-initializers`). A
+  struct is built with designated initializers:
+  `Options{.width = 4, .height = 2}`. A small type that is just a value (a
+  color, a point, a size), written positionally in loops and tests, gets a
+  `constexpr` constructor instead, so `Rgb{255, 0, 0}` stays short. A
+  constructor makes the type a non-aggregate, which the check ignores.
+- **Members that refer to another object**
+  (`cppcoreguidelines-avoid-const-or-ref-data-members`). Reference members
+  are rejected: they break assignment. The constructor takes a reference and
+  stores its address, and the member says it is never null:
+  ```cpp
+  explicit Grid(const Size& size) : size_{&size} {}
+  const Size* size_; // never null: set from a reference
+  ```
+  `std::reference_wrapper` works too but needs `.get()` on every use.
+- **Numbers from text with `std::from_chars`.** `data() + size()` is pointer
+  arithmetic, and `data()` on a `std::string_view` trips
+  `bugprone-suspicious-stringview-data-usage`. `std::to_address` gives both
+  ends without either:
+  ```cpp
+  const char* const end = std::to_address(text.end());
+  const auto [last, error] = std::from_chars(std::to_address(text.begin()), end, value);
+  ```
+- **Trailing commas** (`readability-trailing-comma`). A braced list on
+  several lines ends with a comma; one on a single line doesn't. clang-format
+  decides which lists span several lines, and a trailing comma keeps a list
+  one element per line. So format first, run clang-tidy, fix the commas, and
+  format again. An array of structs is written `{ T{...}, T{...}, }` rather
+  than with double braces.
+- **Smaller ones:** `enum class E : std::uint8_t` for small enums
+  (`performance-enum-size`); parentheses around a product added to something
+  (`(y * width) + x`, `readability-math-missing-parentheses`); `reserve()`
+  before a loop of `push_back`s (`performance-inefficient-vector-operation`);
+  the same parameter names in a declaration and its definition.
+- **Checks that don't follow the code:**
+  `bugprone-unchecked-optional-access` doesn't see `emplace()` or a check made
+  by the caller; check and dereference in the same function.
+  `misc-const-correctness` asks for `const` on a local passed to a template
+  parameter's call operator. Rewrite the code in both cases: suppressions
+  outside confined areas aren't allowed (section 5).
+
 ## 3. Error handling
 
 | Situation | Mechanism |
@@ -301,6 +354,16 @@ Rules, enforced by the suppression audit (the `policy-audit` target,
    system or the sanitizer runtime, never project or library code, and says
    how it was shown to be false; the self-test reproduces it. Projects can't
    add their own.
+
+**Third-party code.** clang-tidy ignores headers under `/_deps/`,
+`/vcpkg_installed/`, `/third_party/` and `/external/`, except for one kind of
+finding: the static analyzer follows calls into a header, and reports what it
+finds there when the path starts in the project. A single-header C library
+such as stb_image, compiled into the project, gets findings located in its
+header but reported against the project's calling line. That call belongs in
+a confined area anyway (it passes pointers and lengths), so it takes a
+`NOLINT` there, naming the analyzer check, on the calling line
+(`tests/good/lowlevel/c_library.cpp`). The library itself is never edited.
 
 If code outside a confined area cannot satisfy a rule, either the code
 moves into a confined area behind a safe interface, or the rule is

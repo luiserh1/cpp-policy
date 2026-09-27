@@ -1,6 +1,10 @@
 # --- Good code: must build with every check enabled and pass its tests -------
-add_library(policy_good good/numbers.cpp good/shapes.cpp good/tally.cpp good/lowlevel/byte_view.cpp)
+add_library(policy_good good/numbers.cpp good/shapes.cpp good/tally.cpp good/idioms.cpp
+    good/lowlevel/byte_view.cpp good/lowlevel/c_library.cpp)
 target_include_directories(policy_good PUBLIC good)
+# A C library, included the way vcpkg's are: a system directory, excluded from clang-tidy's
+# header filter by its /third_party/ path.
+target_include_directories(policy_good SYSTEM PRIVATE good/third_party)
 cpp_policy_apply(policy_good)
 
 add_executable(policy_good_test good/main.cpp)
@@ -68,6 +72,7 @@ add_library(policy_bad_samples OBJECT EXCLUDE_FROM_ALL ${bad_samples})
 # Never built (EXCLUDE_FROM_ALL): the target only puts the samples in compile_commands.json,
 # so the tests below can run clang-tidy on them with the policy's flags.
 cpp_policy_apply(policy_bad_samples)
+target_include_directories(policy_bad_samples SYSTEM PRIVATE good/third_party)
 
 foreach(sample IN LISTS bad_samples)
     cmake_path(GET sample STEM name)
