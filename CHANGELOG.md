@@ -30,7 +30,8 @@ release (POLICY.md 10).
 ### Hooks
 
 - `tools/hooks/commit-msg` checks the message. It drops comment lines and
-  everything below git's scissors line first, as git does.
+  everything below git's scissors line first, as git does. On a
+  rejection it says where git kept the message, to reuse it.
 
 ### Self-test
 

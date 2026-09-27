@@ -14,7 +14,8 @@ set -e
 
 # The message as git will keep it: comment lines and everything below the scissors
 # line are dropped.
-message=$(sed -e '/^# -\{24\} >8 -\{24\}$/,$d' -e '/^#/d' "$1")
+file=$1
+message=$(sed -e '/^# -\{24\} >8 -\{24\}$/,$d' -e '/^#/d' "$file")
 subject=$(printf '%s\n' "$message" | sed -n '1p')
 
 case $subject in
@@ -26,7 +27,7 @@ fail() {
     echo "  expected:  type(scope): summary   (types: feat fix perf refactor test docs build" >&2
     echo "             ci chore revert), a blank line, then why the change was made." >&2
     echo "  example:   fix(hooks): pick the win-check preset under Git for Windows" >&2
-    echo "  message kept in $1" >&2
+    echo "  the message is kept in $file" >&2
     exit 1
 }
 
