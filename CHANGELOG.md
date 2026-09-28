@@ -30,9 +30,10 @@ owner's Mac. Nothing that passes can fail, so a patch release (POLICY.md 10).
 ### Self-test
 
 - `leak/nano_zone_off` queues 1,000 empty work items and must pass with the
-  presets' setting; without it, it failed. `leak/nano_zone_on` runs the
-  same program with the nano zone on and must see the reports, so it fails
-  the day macOS no longer needs the setting.
+  presets' setting; without it, it failed on the owner's Mac (macOS 27).
+  GitHub's macos-15 runners don't report the cache even with the nano zone
+  on, so a test requiring the reports couldn't be kept: on those runners
+  the test proves nothing, only that the setting does no harm.
 
 ## 0.12.1 (2026-09-28)
 

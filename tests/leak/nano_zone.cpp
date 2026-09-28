@@ -1,4 +1,4 @@
-// Allocates nothing itself, yet LeakSanitizer on macOS reports up to 7,168 leaks unless the
+// Allocates nothing itself, yet LeakSanitizer on macOS 27 reports up to 7,168 leaks unless the
 // test presets turn off the nano malloc zone (MallocNanoZone=0, POLICY.md 7). libdispatch keeps
 // up to 112 freed work items per worker thread for reuse, on at most 64 threads; with the nano
 // zone on, the pointers to that cache sit where LeakSanitizer doesn't look. The count stops

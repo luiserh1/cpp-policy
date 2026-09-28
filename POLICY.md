@@ -471,7 +471,8 @@ Test presets:
   the pointers to it sit where LeakSanitizer doesn't look. Whether a
   terminal has the variable depends on the app that opened it; a
   self-hosted runner's service doesn't, so the presets set it
-  (`tests/leak/nano_zone.cpp`).
+  (`tests/leak/nano_zone.cpp`). Seen on macOS 27; GitHub's macOS 15 runners
+  don't report the cache either way.
 
 ThreadSanitizer on Linux: threads that glibc creates internally, without
 `pthread_create` (for example the helper threads of `getaddrinfo_a`), are

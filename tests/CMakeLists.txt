@@ -53,16 +53,12 @@ if(CPP_POLICY_SANITIZERS AND NOT CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "M
         cpp_policy_apply(policy_leak_os_false_positive)
         add_test(NAME leak/os_false_positive COMMAND policy_leak_os_false_positive)
         # libdispatch's reuse cache: must pass only because the presets turn off the nano
-        # malloc zone. The second test runs it with the zone on and must see the reports, so
-        # it fails the day macOS stops needing the setting.
+        # malloc zone, on the Macs where the zone hides it (macOS 27 on Apple silicon; GitHub's
+        # macos-15 runners don't report it either way, so there is no test that the zone on
+        # reproduces it).
         add_executable(policy_leak_nano_zone leak/nano_zone.cpp)
         cpp_policy_apply(policy_leak_nano_zone)
         add_test(NAME leak/nano_zone_off COMMAND policy_leak_nano_zone)
-        add_test(NAME leak/nano_zone_on COMMAND policy_leak_nano_zone)
-        set_tests_properties(leak/nano_zone_on PROPERTIES
-            PASS_REGULAR_EXPRESSION "LeakSanitizer: detected memory leaks"
-            ENVIRONMENT "MallocNanoZone=1"
-            ENVIRONMENT_MODIFICATION "ASAN_OPTIONS=string_append::abort_on_error=0")
     endif()
 endif()
 
