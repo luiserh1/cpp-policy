@@ -61,7 +61,9 @@ if(CMAKE_HOST_WIN32 AND VCPKG_C_FLAGS MATCHES "/fsanitize=address")
                 "AddressSanitizer runtime file ${_cpp_policy_file}; the LLVM installation is "
                 "incomplete.")
         endif()
-        cmake_path(NATIVE_PATH _cpp_policy_path _cpp_policy_path)
+        # Forward slashes, which lld-link accepts: backslashes don't survive the linker flags
+        # (C:\Program Files\... arrived as C:Program Files...).
+        cmake_path(SET _cpp_policy_path "${_cpp_policy_path}")
         if(_cpp_policy_name STREQUAL "asan_dynamic")
             string(APPEND _cpp_policy_asan_options " \"${_cpp_policy_path}\"")
         else()
