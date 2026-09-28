@@ -12,10 +12,19 @@ fail, so a patch release (POLICY.md 10).
 ### Upgrading a project
 
 1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.12.1`: it copies
-   the new `.clang-tidy` and `CMakePresets.json`.
-2. Rebuild from a clean folder (`rm -rf build/check`) once: the build
-   doesn't notice a changed `.clang-tidy`, so files it already built keep
-   their old results until they change.
+   the new `.clang-tidy` and `CMakePresets.json`. The first build afterwards
+   re-checks every file (below).
+
+### Build
+
+- A changed `.clang-tidy` re-checks every file, not only the ones that
+  changed. *Why:* the build didn't know objects depend on the file clang-tidy
+  reads, so after an upgrade to a release with other rules, files already
+  built kept their old results and the local gate could pass where CI, which
+  builds from scratch, would fail. clang-tidy now reads a copy in the build
+  folder named after a hash of its contents: CMake re-runs when the policy's
+  file changes, the new name changes every clang-tidy command, and Ninja
+  rebuilds whatever command changed.
 
 ### Presets
 
@@ -42,6 +51,10 @@ fail, so a patch release (POLICY.md 10).
 
 ### Self-test
 
+- `tidy/rebuild_on_config_change`: a throwaway project builds clean, its
+  copy of the policy's `.clang-tidy` loses an option, and the next build,
+  with no source changed, must report the finding. It failed before the
+  fix.
 - `presets/keep_going`: a throwaway project with three broken files, built
   with the check presets' options one file at a time, must report all
   three. With Ninja's default it fails.

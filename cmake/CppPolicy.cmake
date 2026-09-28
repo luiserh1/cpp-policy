@@ -239,9 +239,29 @@ function(cpp_policy_apply target)
 
     # clang-tidy always uses the policy's configuration, whatever .clang-tidy the project has.
     if(CPP_POLICY_CLANG_TIDY)
+        _cpp_policy_tidy_config(config)
         set_target_properties(${target} PROPERTIES CXX_CLANG_TIDY
-            "${CPP_POLICY_CLANG_TIDY_EXE};--config-file=${CPP_POLICY_ROOT}/.clang-tidy")
+            "${CPP_POLICY_CLANG_TIDY_EXE};--config-file=${config}")
     endif()
+endfunction()
+
+# The policy's .clang-tidy as clang-tidy reads it: a copy in the build folder, named after a
+# hash of its contents. The build doesn't know objects depend on that file, so after a change
+# (an upgrade to a release with other rules) files already built would keep their old results.
+# configure_file re-runs CMake when the original changes; the copy's new name changes every
+# clang-tidy command; and the generator rebuilds whatever command changed.
+function(_cpp_policy_tidy_config out)
+    set(source "${CPP_POLICY_ROOT}/.clang-tidy")
+    file(SHA256 "${source}" hash)
+    string(SUBSTRING "${hash}" 0 16 hash)
+    set(dir "${CMAKE_BINARY_DIR}/cpp_policy_tidy")
+    configure_file("${source}" "${dir}/${hash}.clang-tidy" COPYONLY)
+    file(GLOB copies "${dir}/*.clang-tidy")
+    list(REMOVE_ITEM copies "${dir}/${hash}.clang-tidy")
+    if(copies)
+        file(REMOVE ${copies})
+    endif()
+    set(${out} "${dir}/${hash}.clang-tidy" PARENT_SCOPE)
 endfunction()
 
 # ---------------------------------------------------------------------------
@@ -312,7 +332,8 @@ function(_cpp_policy_verify_targets)
         endforeach()
         if(CPP_POLICY_CLANG_TIDY)
             get_target_property(tidy ${target} CXX_CLANG_TIDY)
-            if(NOT tidy STREQUAL "${CPP_POLICY_CLANG_TIDY_EXE};--config-file=${CPP_POLICY_ROOT}/.clang-tidy")
+            _cpp_policy_tidy_config(config)
+            if(NOT tidy STREQUAL "${CPP_POLICY_CLANG_TIDY_EXE};--config-file=${config}")
                 list(APPEND problems "target '${target}' changes CXX_CLANG_TIDY")
             endif()
         endif()
