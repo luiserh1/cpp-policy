@@ -10,7 +10,7 @@ The rules are in [POLICY.md](POLICY.md).
 include(FetchContent)
 FetchContent_Declare(cpp_policy
     GIT_REPOSITORY https://github.com/luiserh1/cpp-policy.git
-    GIT_TAG        <commit>)   # v0.11.0, the latest release; see CHANGELOG.md
+    GIT_TAG        <commit>)   # v0.12.0, the latest release; see CHANGELOG.md
 FetchContent_MakeAvailable(cpp_policy)
 
 add_executable(app src/main.cpp)
@@ -28,7 +28,7 @@ and this repository's CMake code runs on every machine that configures the
 project (POLICY.md 10). The commit is the line ending in `^{}`:
 
 ```
-git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.11.0*'
+git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.12.0*'
 ```
 
 Don't add `GIT_SHALLOW`: it only works with branch and tag names.
@@ -38,7 +38,7 @@ Don't add `GIT_SHALLOW`: it only works with branch and tag names.
 From the project's root, with a clean working folder:
 
 ```
-sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.11.0
+sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.12.0
 ```
 
 Any copy of this repository's `tools/upgrade.sh` works (from v0.10.1 on): it
@@ -95,7 +95,7 @@ permissions:
   contents: read
 jobs:
   gate:
-    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@<commit> # v0.11.0
+    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@<commit> # v0.12.0
     with:
       systems: '["linux", "windows", "macos"]'
       vcpkg: true          # if the project has a vcpkg.json
@@ -104,11 +104,38 @@ jobs:
 The audit fails if the two pins differ, so CI always runs the policy the
 build uses. Move both in the same commit when upgrading.
 
-`systems` picks the runners. GitHub's runners are free for public
-repositories; private ones spend the account's Actions minutes, and macOS
-minutes count ten times as much as Linux ones (Windows twice). A private
-project whose developers work on a Mac, where the `pre-push` hook already runs
-the gate, can leave macOS out.
+`systems` picks the systems. GitHub's runners are free for public
+repositories; private ones spend the account's Actions minutes, and a macOS
+minute costs about ten Linux ones (Windows about two).
+
+### Your own machine as a runner
+
+`self_hosted: '["macos"]'` runs the macOS jobs on your own Mac instead
+(`"linux"` and `"windows"` work the same way). Its minutes are free. While
+the machine is off or asleep, its jobs wait; GitHub fails a job that waits
+more than 24 hours (re-run it from the Actions page). The gate installs and
+resets nothing there: it uses the machine's LLVM 23, CMake and Ninja, and
+keeps a vcpkg copy of its own in the runner's folder.
+
+Only for private repositories that only you push to: in a public one, a
+pull request from anyone could run code on your machine. (Public ones get
+GitHub's runners free anyway.)
+
+Setting up a Mac, once per repository (a personal account's runner serves
+one repository):
+
+1. On GitHub: the repository, Settings, Actions, Runners, **New self-hosted
+   runner**, macOS, ARM64. It shows the commands to download the runner and
+   configure it with a one-time token.
+2. Run them in a folder of its own, such as
+   `~/actions-runners/<repository>`, from a terminal where `clang++ --version`
+   shows LLVM 23 and `cmake` and `ninja` work: the runner keeps that
+   terminal's `PATH`. Accept the default name and labels.
+3. Instead of `./run.sh`, install it as a background service that starts at
+   login: `./svc.sh install` and `./svc.sh start`.
+
+The repository's Settings, Actions, Runners then shows it as Idle. To remove
+it: `./svc.sh uninstall`, then `./config.sh remove` with the token GitHub shows.
 
 ## Options (set by presets)
 

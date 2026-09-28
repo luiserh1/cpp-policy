@@ -3,6 +3,34 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.12.0 (2026-09-28)
+
+CI can run a system's jobs on the owner's own machine. A new optional
+feature, so a minor release (POLICY.md 10).
+
+### Upgrading a project
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.12.0`.
+2. Optional: to run a system on your own machine, set up a runner (README,
+   "Your own machine as a runner"), then add that system to both `systems`
+   and `self_hosted` in `.github/workflows/ci.yml`, e.g.
+   `self_hosted: '["macos"]'`.
+
+### CI
+
+- `gate.yml` takes `self_hosted`, a list of systems whose jobs go to a
+  repository runner of the owner's (labels `self-hosted` and `macOS`,
+  `Linux` or `Windows`) instead of GitHub's. *Why:* on a private repository
+  a macOS minute costs about ten Linux ones, so SimpleLocalServer left macOS
+  out of CI, which is a gap once the owner works from Linux or Windows
+  machines too. The owner's Mac runs them for free; while it is off the jobs
+  wait (up to GitHub's 24 hours).
+- On such a machine the gate installs and resets nothing: it uses the
+  machine's LLVM, CMake and Ninja, and a vcpkg clone of its own in the
+  runner's tool folder, never the owner's `VCPKG_ROOT`. The toolchain step
+  now shows the LLVM found through the presets' `PATH`, which on a
+  self-hosted Linux machine may be the system's.
+
 ## 0.11.0 (2026-09-27)
 
 `policy-format-fix` also fixes trailing commas. A tooling improvement that

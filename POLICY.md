@@ -501,7 +501,7 @@ function table, plus lld-link's ASLR and no-execute defaults
 | Git pre-commit | On commit | Suppression audit and format check; warns when files have unstaged changes, since it checks the working folder |
 | Git commit-msg | On commit | The message follows section 8.2 |
 | Git pre-push | On push | The full gate (below); refuses to run with uncommitted changes, so it tests exactly what is pushed |
-| CI (GitHub Actions) | On push | The same gate on Linux, Windows and macOS, through cpp-policy's reusable `gate.yml`, pinned to the same commit as the build (the audit checks it) |
+| CI (GitHub Actions) | On push | The same gate on Linux, Windows and macOS, through cpp-policy's reusable `gate.yml`, pinned to the same commit as the build (the audit checks it); on GitHub's machines or the owner's own (README) |
 
 The git hooks come from cpp-policy (`tools/hooks/`); projects copy them
 unchanged and enable them once per clone with `git config core.hooksPath
