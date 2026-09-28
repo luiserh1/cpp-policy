@@ -247,8 +247,8 @@ layout.
 
 Some checks accept only one way of writing common code, and a first
 clang-tidy run on code written without them reports hundreds of findings.
-Build the `check` preset after each piece of work, not once the program
-works. The forms below pass; `tests/good/idioms.cpp` has each one, and
+Check each C++ file right after editing it with `sh tools/hooks/tidy-files
+<file>...` (section 8), not once the program works. The forms below pass; `tests/good/idioms.cpp` has each one, and
 `tests/bad/` shows what the checks reject.
 
 - **Initializing structs** (`modernize-use-designated-initializers`). A
@@ -531,8 +531,8 @@ function table, plus lld-link's ASLR and no-execute defaults
 | Layer | When | What |
 |---|---|---|
 | Editor (clangd) | While typing | clang-tidy diagnostics, formatting |
-| Agent hook (Claude Code), planned | After each file edit | clang-tidy on the edited file |
-| Git pre-commit | On commit | Suppression audit and format check; warns when files have unstaged changes, since it checks the working folder |
+| `tools/hooks/tidy-files` | After editing C++ files, run by whoever edited them (agent or person) | clang-tidy on those files, a few seconds each |
+| Git pre-commit | On commit | Suppression audit, format check, and clang-tidy on the staged C++ files (`tidy-files`); warns when files have unstaged changes, since it checks the working folder |
 | Git commit-msg | On commit | The message follows section 8.2 |
 | Git pre-push | On push | The full gate (below); refuses to run with uncommitted changes, so it tests exactly what is pushed |
 | CI (GitHub Actions) | On push | The same gate on Linux, Windows and macOS, through cpp-policy's reusable `gate.yml`, pinned to the same commit as the build (the audit checks it); on GitHub's machines or the owner's own (README) |
@@ -540,6 +540,11 @@ function table, plus lld-link's ASLR and no-execute defaults
 The git hooks come from cpp-policy (`tools/hooks/`); projects copy them
 unchanged and enable them once per clone with `git config core.hooksPath
 tools/hooks`. Configuration warns while a clone hasn't done so.
+
+Every layer works the same for any agent and for people: they are commands
+and git hooks, and `AGENTS.md` says when to run them. An agent with a hook
+system of its own may call `tidy-files` from it after each edit, but the
+policy relies on nothing agent-specific.
 
 The gate is `cmake --workflow --preset check` (`win-check` on Windows):
 configure, build with clang-tidy, audit, format check, and tests under
@@ -614,8 +619,9 @@ as `#pragma once` and suppressions, have fixtures in `tests/audit/`.
   Claude Code (v2.1.277 or later) reads `AGENTS.md` directly, but only when no
   `CLAUDE.md` exists, so adding one would hide `AGENTS.md` from it. Agent
   settings deny creating `CLAUDE.md`.
-- Agents must run the gate (`cmake --workflow --preset check`, section 8)
-  before declaring work complete.
+- Agents check each C++ file they edit with `sh tools/hooks/tidy-files
+  <file>...`, and must run the gate (`cmake --workflow --preset check`,
+  section 8) before declaring work complete.
 - Agents must not add suppressions, edit policy files (section 6), or bypass
   git hooks (`--no-verify`).
 - Where the agent supports permission rules, they back these rules up, but

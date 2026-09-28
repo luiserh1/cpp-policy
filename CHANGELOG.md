@@ -3,6 +3,52 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.13.0 (2026-09-28)
+
+clang-tidy on single files: a command for right after an edit, and in
+pre-commit for the staged files. pre-commit can now fail where it passed, so
+a minor release (POLICY.md 10).
+
+### Upgrading a project
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.13.0`: it copies
+   the new `tools/hooks/tidy-files` and `pre-commit`.
+2. Add to the project's `AGENTS.md` (the owner, since agents can't edit it)
+   that C++ files are checked right after editing them:
+   `sh tools/hooks/tidy-files <file>...`.
+
+### Tools
+
+- `tools/hooks/tidy-files <file>...` runs clang-tidy, with the policy's
+  configuration, on just those files: a few seconds each instead of the
+  whole gate. It skips files that aren't C++, are in excluded directories
+  or are third-party code (what `.clang-tidy`'s `ExcludeHeaderFilterRegex`
+  matches, at any depth), and sources this build doesn't compile (another
+  platform's, which CI checks). Headers are checked on their own. *Why:* porting
+  ToneMatcher, the first clang-tidy run came after the code worked and
+  reported 492 findings. Checking each file as it's edited finds them one
+  file at a time.
+- `pre-commit` runs it on the staged files, after the audit and format
+  check. Every agent and person commits through git, so findings turn up at
+  each commit even when nobody ran the command.
+- POLICY.md 8 and 9: the planned "agent hook (Claude Code)" is replaced by
+  this command. *Why:* a hook for one agent would have made the others
+  second-class; the policy relies only on commands and git hooks, which
+  work the same for any agent and for people, and `AGENTS.md` says when to
+  run them. An agent's own hook system may call `tidy-files`, as an extra.
+- The audit requires `tools/hooks/tidy-files` to be an unchanged copy, like
+  the git hooks.
+
+### Self-test
+
+- `hooks/tidy_files`: a throwaway project copying the policy's files and
+  configured through its presets. `tidy-files` configures it, passes clean
+  files and skips a text file; fails on a C-style cast in a header and
+  names it; skips the same header under a nested `third_party/`, and a
+  source the build doesn't compile. `pre-commit` fails
+  while the header is staged and passes once it isn't; without its
+  `tidy-files` step, the test fails.
+
 ## 0.12.2 (2026-09-28)
 
 A false positive on macOS, found by SimpleLocalServer's first CI run on the

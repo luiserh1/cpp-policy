@@ -127,6 +127,12 @@ add_test(NAME tidy/rebuild_on_config_change
             "-DMAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tidy_rebuild/run.cmake")
 
+# --- tidy-files and pre-commit's clang-tidy step, in a project configured through the presets
+add_test(NAME hooks/tidy_files
+    COMMAND "${CMAKE_COMMAND}" "-DPOLICY_ROOT=${CPP_POLICY_ROOT}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/tidy_files"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tidy_files/run.cmake")
+
 # --- Audit fixtures: each directory is a mini project.
 #   expect.txt    regex the audit output must match (include "file:line:" to pin the line)
 #   options.cmake optional; appended to the generated config to override its defaults

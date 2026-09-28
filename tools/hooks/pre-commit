@@ -1,5 +1,6 @@
 #!/bin/sh
-# cpp-policy pre-commit hook: suppression audit and format check (POLICY.md 8).
+# cpp-policy pre-commit hook: suppression audit, format check and clang-tidy on the staged C++
+# files (POLICY.md 8).
 # Copy unchanged into the project's tools/hooks/ and enable once per clone with:
 #   git config core.hooksPath tools/hooks
 set -e
@@ -22,3 +23,11 @@ if [ ! -f "build/$preset/CMakeCache.txt" ]; then
     cmake --preset "$preset" >/dev/null
 fi
 cmake --build --preset "$preset" --target policy-audit policy-format-check
+
+# clang-tidy on the staged files (tidy-files skips those that aren't C++), so findings turn up
+# at each commit rather than all at once at the gate. Deleted files aren't listed.
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+if [ -n "$staged" ]; then
+    # Split on whitespace on purpose: file names are snake_case (POLICY.md 2.7), without spaces.
+    sh tools/hooks/tidy-files $staged
+fi

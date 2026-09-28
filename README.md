@@ -10,7 +10,7 @@ The rules are in [POLICY.md](POLICY.md).
 include(FetchContent)
 FetchContent_Declare(cpp_policy
     GIT_REPOSITORY https://github.com/luiserh1/cpp-policy.git
-    GIT_TAG        <commit>)   # v0.12.2, the latest release; see CHANGELOG.md
+    GIT_TAG        <commit>)   # v0.13.0, the latest release; see CHANGELOG.md
 FetchContent_MakeAvailable(cpp_policy)
 
 add_executable(app src/main.cpp)
@@ -28,7 +28,7 @@ and this repository's CMake code runs on every machine that configures the
 project (POLICY.md 10). The commit is the line ending in `^{}`:
 
 ```
-git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.12.2*'
+git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.13.0*'
 ```
 
 Don't add `GIT_SHALLOW`: it only works with branch and tag names.
@@ -38,7 +38,7 @@ Don't add `GIT_SHALLOW`: it only works with branch and tag names.
 From the project's root, with a clean working folder:
 
 ```
-sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.12.2
+sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.13.0
 ```
 
 Any copy of this repository's `tools/upgrade.sh` works (from v0.10.1 on): it
@@ -73,11 +73,17 @@ Copy `tools/hooks/` unchanged as well, and enable the hooks once per clone:
 git config core.hooksPath tools/hooks
 ```
 
-`pre-commit` runs the suppression audit and format check; `commit-msg` checks
+`pre-commit` runs the suppression audit, the format check and clang-tidy on the
+staged C++ files; `commit-msg` checks
 the message (Conventional Commits with a body that says why, POLICY.md 8.2);
 `pre-push` runs the full gate and refuses to start while there are
 uncommitted changes, so it tests exactly what is pushed. The audit fails if the hooks differ from these,
 and configuration warns while a clone hasn't enabled them.
+
+`tools/hooks/tidy-files` isn't a git hook but a command: `sh
+tools/hooks/tidy-files <file>...` runs clang-tidy on just those files, a few
+seconds each. Agents and people run it after editing C++ files (say so in
+`AGENTS.md`); `pre-commit` runs it on the staged ones.
 
 ### Continuous integration (GitHub Actions)
 
@@ -95,7 +101,7 @@ permissions:
   contents: read
 jobs:
   gate:
-    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@<commit> # v0.12.2
+    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@<commit> # v0.13.0
     with:
       systems: '["linux", "windows", "macos"]'
       vcpkg: true          # if the project has a vcpkg.json

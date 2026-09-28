@@ -1,0 +1,31 @@
+#!/bin/sh
+# cpp-policy tidy-files: clang-tidy on the given files, with the policy's configuration
+# (POLICY.md 8). Run it from the project's root after editing C++ files, whoever edits them:
+#
+#   sh tools/hooks/tidy-files src/server/local_server.cpp src/server/local_server.hpp
+#
+# A few seconds per file, instead of the whole gate. pre-commit runs it on the staged files.
+# Copy unchanged into the project's tools/hooks/ (git runs only files named after its hooks).
+set -e
+
+if [ $# -eq 0 ]; then
+    echo "usage: sh tools/hooks/tidy-files <file>..." >&2
+    exit 2
+fi
+
+# The check presets are per platform, as in the other hooks.
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*) preset=win-check ;;
+    *) preset=check ;;
+esac
+config=build/$preset/cpp_policy_config.cmake
+if [ ! -f "$config" ]; then
+    cmake --preset "$preset" >/dev/null
+fi
+# The policy's copy that the build fetched; its scripts do the work.
+policy=$(sed -n 's/^set(POLICY_ROOT \[==\[\(.*\)\]==\])$/\1/p' "$config")
+[ -n "$policy" ] || { echo "tidy-files: $config names no POLICY_ROOT" >&2; exit 1; }
+
+# CMake lists are separated by ";".
+files=$(printf '%s;' "$@")
+cmake "-DCONFIG=$config" "-DFILES=${files%;}" -P "$policy/cmake/scripts/tidy_files.cmake"

@@ -217,7 +217,7 @@ file(REAL_PATH "${SOURCE_DIR}" source_norm)
 file(REAL_PATH "${POLICY_ROOT}" policy_norm)
 if(CHECK_PROJECT_FILES AND NOT source_norm STREQUAL policy_norm)
     foreach(name IN ITEMS .clang-tidy .clang-format CMakePresets.json tools/hooks/pre-commit
-                          tools/hooks/pre-push tools/hooks/commit-msg)
+                          tools/hooks/pre-push tools/hooks/commit-msg tools/hooks/tidy-files)
         if(NOT EXISTS "${SOURCE_DIR}/${name}")
             report("${name}" 1 "missing; copy it from cpp-policy (${POLICY_ROOT}/${name})")
         else()
