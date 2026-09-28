@@ -9,7 +9,7 @@ The rules are in [POLICY.md](POLICY.md).
 From a clone of cpp-policy checked out at the release you want:
 
 ```
-git -C cpp-policy checkout v0.15.1
+git -C cpp-policy checkout v0.16.0
 sh cpp-policy/tools/new-project.sh ~/code/MyTool MyTool            # add --vcpkg for dependencies
 cd ~/code/MyTool && cmake --workflow --preset check
 git add --all && git commit
@@ -19,7 +19,8 @@ The project is pinned to that release, in `CMakeLists.txt` and its CI
 workflow, and has the release's policy files, `AGENTS.md`, agent settings and
 git hooks (enabled), with a small program that shows the layers: `main.cpp`,
 an `app` module returning `std::expected`, a confined `lowlevel` module, and a
-test. It passes the gate as generated; replace the program with your own. The
+test. `ROADMAP.md` and `CHANGELOG.md` are ready for its first version
+(POLICY.md 11.5). It passes the gate as generated; replace the program with your own. The
 steps below say what each part is, for adding the policy to an existing
 project by hand.
 
@@ -37,7 +38,7 @@ can't ship a template that fails its own policy.
 include(FetchContent)
 FetchContent_Declare(cpp_policy
     GIT_REPOSITORY https://github.com/luiserh1/cpp-policy.git
-    GIT_TAG        <commit>)   # v0.15.1, the latest release; see CHANGELOG.md
+    GIT_TAG        <commit>)   # v0.16.0, the latest release; see CHANGELOG.md
 FetchContent_MakeAvailable(cpp_policy)
 
 add_executable(app src/main.cpp)
@@ -55,7 +56,7 @@ and this repository's CMake code runs on every machine that configures the
 project (POLICY.md 10). The commit is the line ending in `^{}`:
 
 ```
-git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.15.1*'
+git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.16.0*'
 ```
 
 Don't add `GIT_SHALLOW`: it only works with branch and tag names.
@@ -65,7 +66,7 @@ Don't add `GIT_SHALLOW`: it only works with branch and tag names.
 From the project's root, with a clean working folder:
 
 ```
-sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.15.1
+sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.16.0
 ```
 
 Any copy of this repository's `tools/upgrade.sh` works (from v0.10.1 on): it
@@ -138,7 +139,7 @@ permissions:
   contents: read
 jobs:
   gate:
-    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@<commit> # v0.15.1
+    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@<commit> # v0.16.0
     with:
       systems: '["linux", "windows", "macos"]'
       vcpkg: true          # if the project has a vcpkg.json

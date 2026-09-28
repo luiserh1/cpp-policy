@@ -663,7 +663,8 @@ These rules rely on review (and on agents following `AGENTS.md`):
   order, and the catch at the top of every thread function; data races are
   found at run time by the `tsan` preset only where tests exercise them
 - Project structure (section 11): layers and file size are checked; the
-  helper extraction rule and comment accuracy will always rely on review
+  helper extraction rule, comment accuracy and the roadmap's layout will
+  always rely on review
 
 Every other rule in section 2, and the function size limits of section 11.3,
 has a sample in `tests/bad/` proving clang-tidy rejects it (one of them in a
@@ -791,6 +792,79 @@ threshold), outside excluded directories. The target of 250 is left to review.
 - Don't comment what the code already says clearly; comment why.
 
 *Enforcement:* review.
+
+### 11.5 Roadmap and changelog
+
+Two files record a project's work, each with one job:
+
+- **`ROADMAP.md`:** the open work: what comes next, and why.
+- **`CHANGELOG.md`:** the finished work, per release, each change with its
+  reason.
+
+The commit that finishes a piece of work also records it in `CHANGELOG.md`
+(under "Unreleased" until the release). `ROADMAP.md` has up to three parts,
+in this order:
+
+```markdown
+# Roadmap
+
+## 0.4.0 (in progress)
+
+**Goal:** the server can be used outside a trusted home network.
+
+### Scope
+
+- [x] The server prints a pairing code at startup.
+- [ ] A device must send the code before it can post messages.
+
+### Out of scope
+
+- HTTPS: devices would need certificates they trust.
+
+### Validation
+
+- [ ] The gate passes in CI on every system.
+- [ ] Pairing works from a phone and from another computer.
+
+## Later
+
+- [ ] A QR code for the address and the pairing code.
+
+## Not planned
+
+- Access from outside the local network: the server is for one home.
+```
+
+- **A version section** exists while that version is being worked on: a
+  one-sentence goal and three lists.
+  - **Scope** says what the version delivers, stated as behavior, and each
+    item is ticked when it's done. It's a checklist, not a work log:
+    "branch created" or "tests added" aren't scope items.
+  - **Out of scope** lists what the version deliberately leaves out, each
+    with its reason. Agents and contributors don't add these things
+    without asking.
+  - **Validation** says what shows that the version works: CI, and any
+    manual checks, naming what is checked and where. An item is ticked
+    with its evidence: a link to the CI run, or who checked it, on which
+    machine.
+- **On release,** the release commit deletes the version's section. The
+  version's `CHANGELOG.md` entry now says what it delivered and why, and
+  the section can still be read at the release tag. Out-of-scope items that
+  still matter move to "Later" or "Not planned".
+- **"Later"** holds the other open items, grouped as the project likes.
+  An item is removed in the commit that resolves it.
+- **"Not planned"** lists accepted limitations with their reasons, so that
+  nobody proposes them again without new information.
+- **Intent and status only.** No listings of files, modules or tests, no
+  test or line counts, no "last updated" dates. The repository and git
+  already record these, and hand-kept copies go stale. Carreritas'
+  scope document grew to 500 lines that way: every version's scope stayed
+  in the file, with a file tree that had to be edited on every refactor.
+
+A project created with `tools/new-project.sh` starts with both files.
+Its `AGENTS.md` tells agents to read `ROADMAP.md` before they start work.
+
+*Enforcement:* review. The audit doesn't read prose.
 
 ## 12. Waiting on the toolchain
 

@@ -1,0 +1,26 @@
+# Roadmap
+
+Open work on @PROJECT_NAME@: what comes next, and why. Finished work goes to
+`CHANGELOG.md`, with its reason, in the commit that finishes it. The layout
+follows cpp-policy's POLICY.md, section 11.5.
+
+## 0.1.0 (in progress)
+
+**Goal:** *what the first version is for, in one sentence.*
+
+### Scope
+
+- [ ] *What this version does, stated as behavior.*
+
+### Out of scope
+
+- *What it deliberately leaves out, and why.*
+
+### Validation
+
+- [ ] The gate passes in CI on every system in `.github/workflows/ci.yml`.
+- [ ] *Manual checks: what is checked, and on which machine.*
+
+## Later
+
+## Not planned

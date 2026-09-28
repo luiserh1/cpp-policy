@@ -39,6 +39,13 @@ a lower one, never a higher one, and always from the `src/` root
 A new module goes in `cpp_policy_layers()` in `CMakeLists.txt` and in this
 table; the owner edits this file.
 
+## Planned work
+
+`ROADMAP.md` says what comes next. Read it before you start. Ask before doing
+anything it lists under "Out of scope" or "Not planned". In the commit that
+finishes an item, tick it (or remove it from "Later"), and add the change,
+with its reason, to `CHANGELOG.md` under "Unreleased".
+
 ## Before you say you are done
 
 After editing C++ files, check them right away (a few seconds per file; pre-commit

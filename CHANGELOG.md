@@ -3,6 +3,64 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.16.0 (2026-09-28)
+
+How a project records its open and finished work. New guidance and a new
+template file that change nothing for existing projects, so a minor release
+(POLICY.md 10).
+
+### Upgrading a project
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.16.0`. Nothing
+   else is required.
+2. Optional, to adopt the layout: rewrite the project's open-work file as
+   `ROADMAP.md` in the layout of POLICY.md 11.5 (`template/ROADMAP.md.in`
+   is a starting point), and have the owner add the "Planned work" section
+   of `template/AGENTS.md.in` to `AGENTS.md`.
+
+### Project structure (POLICY.md 11.5)
+
+- New section "Roadmap and changelog". `ROADMAP.md` holds the open work,
+  and `CHANGELOG.md` the finished work with its reasons. The roadmap has up
+  to three parts:
+  - a section for the version in progress: a one-sentence goal, the scope
+    as behavior (ticked when done), what is out of scope and why, and how
+    the version is validated;
+  - "Later", for the other open items;
+  - "Not planned", for accepted limitations with their reasons.
+
+  The release commit deletes the version's section, since the CHANGELOG
+  entry now says what the version delivered, and the tag keeps the section.
+  No listings of files or tests, no counts, no dates. *Why:* the roadmap
+  item taken from Carreritas' `docs/scope.md`. Its per-version goal, scope,
+  out-of-scope list and validation status were useful, especially the
+  out-of-scope list, which stops agents from adding what was deliberately
+  left out. But the file grew to about 500 lines: every released version
+  stayed in it, next to a file tree and progress logs that were edited by
+  hand and went stale. Each part of it now lives where it doesn't
+  duplicate anything:
+  - the open work in the roadmap;
+  - what was done, with its reasons, in the CHANGELOG;
+  - the released scope at its tag;
+  - the file listings nowhere, since git has them.
+
+  The owner chose the name (`ROADMAP.md`, as in cpp-policy), deletion on
+  release, and template-plus-guidance with no audit check (2026-09-28).
+- Review only (POLICY.md 8.1): the audit doesn't read prose.
+
+### Tools
+
+- `tools/new-project.sh` creates `ROADMAP.md` with the first version's
+  section (0.1.0, matching `project()`) to fill in. The generated
+  `AGENTS.md` has a "Planned work" section: read the roadmap before
+  starting, ask before doing anything it lists under "Out of scope" or "Not
+  planned", and record finished work in the CHANGELOG in the same commit.
+
+### cpp-policy
+
+- `ROADMAP.md` follows the layout: no version is in progress, so its items
+  are under "Later". The scope-document item is resolved by this release.
+
 ## 0.15.1 (2026-09-28)
 
 A fix to v0.15.0: build folders that change triplet configure again without

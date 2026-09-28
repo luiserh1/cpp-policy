@@ -49,5 +49,6 @@ echo
 echo "Next, in $dest:"
 echo "  cmake --workflow --preset check     (win-check on Windows)"
 echo "  git add --all && git commit         (the hooks check the first commit too)"
-echo "Then describe the project in README.md, and publish it (a private repository needs"
-echo "a decision about macOS in CI: .github/workflows/ci.yml says what)."
+echo "Then describe the project in README.md and its first version in ROADMAP.md, and"
+echo "publish it (a private repository needs a decision about macOS in CI:"
+echo ".github/workflows/ci.yml says what)."
