@@ -3,6 +3,98 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.15.0 (2026-09-28)
+
+vcpkg builds dependencies like the project: same LLVM, same sanitizer,
+the policy's hardening. The audit fails for a project with a `vcpkg.json`
+until it has `tools/vcpkg/`, so a minor release (POLICY.md 10).
+
+### Upgrading a project
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.15.0`. In a
+   project with a `vcpkg.json` it also copies `tools/vcpkg/` and replaces
+   the eight lines that loaded vcpkg before `project()` with
+   `include("${CMAKE_CURRENT_SOURCE_DIR}/tools/vcpkg/setup.cmake")`. If
+   `CMakeLists.txt` loads vcpkg some other way, it stops before changing
+   anything and prints the line to use instead.
+2. The first configuration of each preset builds the dependencies again,
+   now with LLVM: once per triplet (`asan`, `tsan`, `nosan`), then from
+   vcpkg's cache. Header-only dependencies are unaffected.
+
+### Dependencies (POLICY.md 1.1)
+
+- vcpkg builds dependencies with cpp-policy's triplets in `tools/vcpkg/`
+  instead of its own. `setup.cmake` picks one from the preset's sanitizer
+  options: `cpp-policy-asan` (dev, check, win-check), `cpp-policy-tsan`
+  (tsan) or `cpp-policy-nosan` (the rest). All three compile with the
+  same LLVM as the project, found where the presets look and required to
+  be the same major version, and add `-fstack-protector-strong`,
+  `-fcf-protection` on x64, `_FORTIFY_SOURCE=3` in optimized builds, or
+  Control Flow Guard on Windows, and standard library hardening. *Why:*
+  vcpkg's default triplets use the system's compiler with none of the
+  policy's settings. Measured on macOS: Apple Clang compiled the
+  dependency against Apple's libc++ 22 while the project used LLVM's
+  libc++ 23, with basic stack protection and no AddressSanitizer, and a
+  sanitized program that passed it a 16-byte buffer with a size of 17
+  ran to the end. ToneMatcher's zlib was built that way, and its PNG
+  codec hands zlib buffers and sizes.
+- *Why sanitizers match the preset:* each one fails with code it didn't
+  instrument. AddressSanitizer misses errors inside it, libc++ reports
+  false container overflows when it resizes a container, and
+  ThreadSanitizer misses races and reports false ones there.
+- *Why not UndefinedBehaviorSanitizer:* it would stop the program on a
+  dependency's own undefined behavior, which the project can't fix.
+  AddressSanitizer catches what the project controls: the sizes and
+  buffers it hands the library.
+- *Why the security hardening too:* dependencies often parse untrusted
+  input (zlib decompresses whatever a file holds), so they get the same
+  protection as the project's code. The owner chose this on 2026-09-28.
+- The files include nothing: vcpkg keys its binary cache on the hashes of
+  the triplet, `llvm.cmake` and the compiler, so a change to either file
+  or a new LLVM rebuilds the dependencies, but a change to an included
+  file would go unnoticed. The three triplets therefore repeat the same
+  code and differ only in the line naming their sanitizer.
+- Projects load vcpkg with one `include` of `tools/vcpkg/setup.cmake`
+  before `project()`, which also keeps the `VCPKG_ROOT` check. Future
+  changes to how vcpkg is loaded then reach projects through upgrades
+  alone.
+
+### Audit
+
+- A project with a `vcpkg.json` must have the five `tools/vcpkg/` files,
+  unchanged. *Why:* an edited triplet would build the dependencies
+  differently from the project without anyone noticing.
+
+### Tools
+
+- `upgrade.sh` copies `tools/vcpkg/` and replaces the old vcpkg lines
+  (above). `new-project.sh --vcpkg` gives new projects both.
+
+### CI
+
+- `gate.yml`'s `vcpkg` input works without a `vcpkg.json`: the runner's
+  vcpkg stays at its commit. cpp-policy's own CI now sets it, so the
+  self-test's vcpkg tests, and the template's `--vcpkg` variant, run on
+  every system.
+
+### Self-test
+
+- `vcpkg/dependencies_built_like_project` configures a small project with
+  the build's own compiler and options; vcpkg builds its dependency, a
+  local port that reports how it was compiled. The C and C++ files must
+  report LLVM's major version, the preset's sanitizer, strong stack
+  protection and, in Release, `_FORTIFY_SOURCE=3` (Linux and macOS), the
+  C++ file the project's standard library and the expected hardening mode.
+  With AddressSanitizer, a one-byte overread inside the dependency must
+  stop the program. It runs in the check, tsan and release workflows, so
+  each triplet is tested on each system. With vcpkg's default triplet it
+  fails (Apple Clang, libc++ 22, no sanitizer); with the asan triplet's
+  sanitizer removed, too.
+- `vcpkg/triplet_files`: the triplets differ only in their sanitizer line,
+  and `llvm.cmake` asks for the LLVM version `CppPolicy.cmake` requires.
+- `audit/vcpkg_missing`, `audit/vcpkg_differs`; `upgrade/behavior` covers
+  the vcpkg lines being replaced, and refused when they're unknown.
+
 ## 0.14.0 (2026-09-28)
 
 New projects are generated from the policy. A new feature that changes

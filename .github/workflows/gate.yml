@@ -130,12 +130,17 @@ jobs:
 
       # The runner image's vcpkg is a checkout from when the image was built. Move it to the
       # manifest's builtin-baseline, as on a developer's machine: vcpkg reads port versions
-      # from the checked-out files, so fetching alone leaves newer versions unknown.
+      # from the checked-out files, so fetching alone leaves newer versions unknown. Without a
+      # vcpkg.json (cpp-policy's own self-test, whose vcpkg project only uses a local port and
+      # vcpkg's build helpers) the copy stays at its commit.
       - name: Use the runner's vcpkg at the manifest's baseline
         if: inputs.vcpkg
         run: |
-          baseline=$(sed -n 's/.*"builtin-baseline"[^"]*"\([0-9a-f]\{40\}\)".*/\1/p' vcpkg.json)
-          if [ -z "$baseline" ]; then echo "vcpkg.json has no builtin-baseline commit"; exit 1; fi
+          baseline=""
+          if [ -f vcpkg.json ]; then
+            baseline=$(sed -n 's/.*"builtin-baseline"[^"]*"\([0-9a-f]\{40\}\)".*/\1/p' vcpkg.json)
+            if [ -z "$baseline" ]; then echo "vcpkg.json has no builtin-baseline commit"; exit 1; fi
+          fi
           if [ "$SELF_HOSTED" = true ]; then
             # A copy of the runner's own, kept between jobs: the owner's vcpkg is left alone.
             root=$RUNNER_TOOL_CACHE/cpp-policy-vcpkg
@@ -145,9 +150,11 @@ jobs:
           else
             root=$VCPKG_INSTALLATION_ROOT
           fi
-          git -C "$root" fetch --quiet origin
-          # --force: the image may have changed files in its copy; the job owns it.
-          git -C "$root" -c advice.detachedHead=false checkout --quiet --force "$baseline"
+          if [ -n "$baseline" ]; then
+            git -C "$root" fetch --quiet origin
+            # --force: the image may have changed files in its copy; the job owns it.
+            git -C "$root" -c advice.detachedHead=false checkout --quiet --force "$baseline"
+          fi
           if [ "${{ matrix.system }}" = windows ]; then
             pwsh -NoProfile -Command "& '$root\bootstrap-vcpkg.bat' -disableMetrics"
           else

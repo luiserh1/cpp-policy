@@ -9,7 +9,9 @@
 # GIT_REPOSITORY. The script changes only what a release defines, and checks every change:
 #   - the GIT_TAG pin in CMakeLists.txt: the release's commit, with the tag in a comment;
 #   - the pins of cpp-policy's CI gate in .github/workflows/, if there are any;
-#   - the copies of .clang-tidy, .clang-format, CMakePresets.json and tools/hooks/.
+#   - the copies of .clang-tidy, .clang-format, CMakePresets.json and tools/hooks/;
+#   - with a vcpkg.json, the copies of tools/vcpkg/, and the lines in CMakeLists.txt that load
+#     vcpkg (the ones releases before v0.15.0 gave become an include of tools/vcpkg/setup.cmake).
 # An older copy hands over to the release's own upgrade.sh, which knows what the release
 # changed. It then shows the diff and the release's CHANGELOG entry and runs the gate. It commits
 # nothing, and it refuses to start while the working folder has uncommitted changes, so the
@@ -81,6 +83,55 @@ rewrite() {
     cat "$work/rewrite" >"$file"
 }
 
+# vcpkg is loaded through the policy's tools/vcpkg/setup.cmake (POLICY.md 1.1). Projects from
+# before v0.15.0 load it with these lines instead; they are replaced in step 4. Checked before
+# anything changes, so a project that loads vcpkg some other way is left as it was.
+vcpkg_include='include("${CMAKE_CURRENT_SOURCE_DIR}/tools/vcpkg/setup.cmake")'
+cat >"$work/vcpkg-old" <<'EOF'
+# vcpkg's toolchain is loaded here, before project(), so CMakePresets.json stays cpp-policy's
+# unchanged copy. Without VCPKG_ROOT its path would be broken, and CMake's own error doesn't say
+# why (cpp-policy POLICY.md 1.1).
+if(NOT DEFINED ENV{VCPKG_ROOT})
+    message(FATAL_ERROR "VCPKG_ROOT is not set: set it to the vcpkg directory (README: Building).")
+endif()
+set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE FILEPATH
+    "vcpkg's toolchain (the presets are cpp-policy's unchanged copy)")
+EOF
+cat >"$work/vcpkg-new" <<'EOF'
+# vcpkg is loaded before project(), where it installs the dependencies, through cpp-policy's
+# files in tools/vcpkg/: they build the dependencies like the project (cpp-policy POLICY.md 1.1).
+include("${CMAKE_CURRENT_SOURCE_DIR}/tools/vcpkg/setup.cmake")
+EOF
+# Writes CMakeLists.txt with the old lines replaced to $work/CMakeLists.txt, or fails unless
+# they appear exactly once.
+replace_vcpkg_lines() {
+    awk 'FILENAME == ARGV[1] { old[++n] = $0; next }
+         FILENAME == ARGV[2] { new[++m] = $0; next }
+         { line[++count] = $0 }
+         END {
+             found = 0
+             for (i = 1; i <= count - n + 1; i++) {
+                 same = 1
+                 for (j = 1; j <= n && same; j++) same = (line[i + j - 1] == old[j])
+                 if (same) { found++; at = i }
+             }
+             if (found != 1) exit 1
+             for (i = 1; i <= count; i++) {
+                 if (i == at) { for (j = 1; j <= m; j++) print new[j]; i += n - 1; continue }
+                 print line[i]
+             }
+         }' "$work/vcpkg-old" "$work/vcpkg-new" CMakeLists.txt >"$work/CMakeLists.txt"
+}
+vcpkg_lines=no
+if [ -f vcpkg.json ] && ! grep -qF "$vcpkg_include" CMakeLists.txt; then
+    replace_vcpkg_lines ||
+        fail "CMakeLists.txt doesn't load vcpkg with the lines releases before v0.15.0 gave, so it
+can't be changed automatically. Load vcpkg before project() with this line instead, then run
+the upgrade again:
+  $vcpkg_include"
+    vcpkg_lines=yes
+fi
+
 # 1. The GIT_TAG pin, and its "# <tag>" comment (added if missing).
 rewrite CMakeLists.txt -e "${pin_line}s/[0-9a-f]\{40\}/$commit/"
 if sed -n "${pin_line}p" CMakeLists.txt | grep -q '#[[:space:]]*v[0-9]'; then
@@ -122,7 +173,26 @@ for hook in "$policy"/tools/hooks/*; do
     cmp -s "$hook" "$name" || fail "$name doesn't match $tag's copy after copying"
 done
 
-# 4. What changed, and what the release asks of projects.
+# 4. A project with dependencies loads vcpkg through the release's tools/vcpkg/ (POLICY.md 1.1).
+if [ -f vcpkg.json ]; then
+    vcpkg_files="setup.cmake llvm.cmake triplets/cpp-policy-asan.cmake
+        triplets/cpp-policy-tsan.cmake triplets/cpp-policy-nosan.cmake"
+    mkdir -p tools/vcpkg/triplets
+    for name in $vcpkg_files; do
+        cp "$policy/tools/vcpkg/$name" "tools/vcpkg/$name"
+        cmp -s "$policy/tools/vcpkg/$name" "tools/vcpkg/$name" ||
+            fail "tools/vcpkg/$name doesn't match $tag's copy after copying"
+    done
+    if [ "$vcpkg_lines" = yes ]; then
+        # Again, on the file as step 1 left it (the pin isn't in the replaced lines).
+        replace_vcpkg_lines || fail "the lines that load vcpkg changed during the upgrade"
+        cat "$work/CMakeLists.txt" >CMakeLists.txt
+        grep -qF "$vcpkg_include" CMakeLists.txt ||
+            fail "CMakeLists.txt doesn't include tools/vcpkg/setup.cmake after the change"
+    fi
+fi
+
+# 5. What changed, and what the release asks of projects.
 echo "cpp-policy $tag is commit $commit. Changed and new files:"
 # status, not diff --stat: a file the release adds (a new hook) is untracked until committed.
 git status --short
@@ -136,7 +206,7 @@ awk -v heading="## $version " 'index($0, heading) == 1 { show = 1; print; next }
 echo "---"
 echo "The .gitignore and .gitattributes lines the release requires are checked by the audit."
 
-# 5. The gate, with the preset for this system (as the git hooks choose it).
+# 6. The gate, with the preset for this system (as the git hooks choose it).
 if [ "$gate" = yes ]; then
     case "$(uname -s)" in
         MINGW* | MSYS* | CYGWIN*) preset=win-check ;;

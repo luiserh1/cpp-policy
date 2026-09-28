@@ -1,0 +1,15 @@
+{
+  "name": "policy-probe-project",
+  "dependencies": [
+    {
+      "name": "policy-probe",
+      "default-features": false,
+      "$reason": "Reports how vcpkg compiled it (cpp-policy self-test)"
+    }
+  ],
+  "vcpkg-configuration": {
+    "overlay-ports": [
+      "ports"
+    ]
+  }
+}

@@ -11,3 +11,7 @@ permissions:
 jobs:
   gate:
     uses: ./.github/workflows/gate.yml
+    with:
+      # The self-test builds a small vcpkg project (tests/vcpkg_triplets) and the template's
+      # --vcpkg variant.
+      vcpkg: true

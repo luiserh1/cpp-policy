@@ -149,6 +149,32 @@ if(CPP_POLICY_SANITIZERS)
     set_tests_properties(template/new_project PROPERTIES TIMEOUT 900)
 endif()
 
+# --- cpp-policy's triplets (tools/vcpkg/): vcpkg builds dependencies like the project. The
+# files test needs nothing. The build test configures a small project with this build's
+# compiler and options, so the check, tsan and release workflows each test their own triplet;
+# it needs vcpkg, which CI always has.
+add_test(NAME vcpkg/triplet_files
+    COMMAND "${CMAKE_COMMAND}" "-DPOLICY_ROOT=${CPP_POLICY_ROOT}"
+            "-DLLVM_MAJOR=${CPP_POLICY_LLVM_MAJOR}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg_triplets/files.cmake")
+if(DEFINED ENV{VCPKG_ROOT})
+    add_test(NAME vcpkg/dependencies_built_like_project
+        COMMAND "${CMAKE_COMMAND}" "-DPOLICY_ROOT=${CPP_POLICY_ROOT}"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/vcpkg_triplets"
+                "-DLLVM_MAJOR=${CPP_POLICY_LLVM_MAJOR}" "-DCXX_COMPILER=${CMAKE_CXX_COMPILER}"
+                "-DBUILD_TYPE=${CMAKE_BUILD_TYPE}" "-DSANITIZERS=${CPP_POLICY_SANITIZERS}"
+                "-DTHREAD_SANITIZER=${CPP_POLICY_THREAD_SANITIZER}"
+                "-DHARDENING=${CPP_POLICY_HARDENING}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg_triplets/run.cmake")
+    set_tests_properties(vcpkg/dependencies_built_like_project PROPERTIES TIMEOUT 900)
+elseif(DEFINED ENV{CI})
+    message(FATAL_ERROR "cpp-policy self-test: CI must set VCPKG_ROOT (gate.yml's vcpkg input), "
+        "or vcpkg/dependencies_built_like_project doesn't run")
+else()
+    message(STATUS "cpp-policy self-test: VCPKG_ROOT isn't set; "
+        "vcpkg/dependencies_built_like_project doesn't run")
+endif()
+
 # --- Audit fixtures: each directory is a mini project.
 #   expect.txt    regex the audit output must match (include "file:line:" to pin the line)
 #   options.cmake optional; appended to the generated config to override its defaults

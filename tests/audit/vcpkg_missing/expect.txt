@@ -1,0 +1,1 @@
+tools/vcpkg/setup\.cmake:1: error: missing; copy it from cpp-policy

@@ -69,24 +69,71 @@ package (dependencies of dependencies included) declares a license outside
 the list, or none. Licenses come from the SPDX files vcpkg writes for every
 package. Being lightweight and alive is review.
 
-**vcpkg's toolchain:** projects that use vcpkg load its toolchain in their
-`CMakeLists.txt`, before `project()`, so their `CMakePresets.json` stays an
-unchanged copy of the policy's (section 6). When `VCPKG_ROOT` is missing (a
-new machine, CI, a git app that doesn't load the shell profile), CMake's own
-error only shows a path starting with `/scripts/`, so the same lines say
-which variable is missing. The policy module can't do either, since it is
-loaded after `project()`:
+**Dependencies are built like the project.** vcpkg's own triplets build
+each dependency with the system's compiler and none of the policy's settings.
+Measured on macOS with a small C and C++ library: Apple Clang compiled it,
+against Apple's libc++ 22 while the project used LLVM's libc++ 23 (two
+versions of the standard library in one program), with basic stack
+protection, and no AddressSanitizer. A program built with AddressSanitizer
+that handed it a 16-byte buffer with a size of 17 ran to the end. On Windows
+the compiler would be MSVC's `cl.exe`.
+
+So vcpkg builds dependencies with cpp-policy's triplets, which `tools/vcpkg/`
+holds:
+
+| Triplet | Presets | Dependencies get |
+|---|---|---|
+| `cpp-policy-asan` | `dev`, `check`, `win-check` | AddressSanitizer, standard library hardening `debug` |
+| `cpp-policy-tsan` | `tsan` | ThreadSanitizer, standard library hardening `debug` |
+| `cpp-policy-nosan` | `release`, `debug`, `win-release`, `win-debug` | No sanitizer, standard library hardening `fast` |
+
+All three compile with the same LLVM as the project (`llvm.cmake` looks where
+the presets do and fails on any other major version), and add the policy's
+security hardening: `-fstack-protector-strong`, `-fcf-protection` on x64 and
+`_FORTIFY_SOURCE=3` in optimized builds on Linux and macOS, Control Flow
+Guard in optimized builds on Windows. Dependencies often parse untrusted
+input (zlib decompresses whatever a file contains), so they get the same
+protection as the project's code.
+
+- **Sanitizers match the preset** because each one fails with code it didn't
+  instrument: AddressSanitizer misses an overread inside the dependency
+  (above), libc++ reports false container overflows when uninstrumented code
+  resizes a container, and ThreadSanitizer misses races and reports false
+  ones.
+- **UndefinedBehaviorSanitizer stays out of dependencies.** It would stop the
+  program on a dependency's own undefined behavior, which the project can't
+  fix. AddressSanitizer is what catches the project's mistakes at the
+  boundary: a wrong size or a freed buffer handed to the library.
+- **The triplets build for the machine they run on** (x64 or arm64, Linux,
+  macOS or Windows); the policy doesn't cross-compile. On Windows the `asan`
+  triplet builds only the release configuration, the one `win-check` uses.
+- **Upgrades rebuild them.** vcpkg keys its binary cache on the hashes of the
+  triplet, `llvm.cmake` and the compiler, so a release that changes how
+  dependencies are built, or a new LLVM, rebuilds them. For the same reason
+  the files include nothing else: vcpkg wouldn't notice a change to an
+  included file, so the three triplets repeat the same code and differ only
+  in the line that names their sanitizer.
+
+**Loading vcpkg:** vcpkg installs the dependencies in `project()`, before the
+policy module is fetched, so projects keep `tools/vcpkg/` as an unchanged
+copy (section 6) and load it in their `CMakeLists.txt`, before `project()`:
 
 ```cmake
-if(NOT DEFINED ENV{VCPKG_ROOT})
-    message(FATAL_ERROR "VCPKG_ROOT is not set: set it to the vcpkg directory (README: Building).")
-endif()
-set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE FILEPATH
-    "vcpkg's toolchain (the presets are cpp-policy's unchanged copy)")
+include("${CMAKE_CURRENT_SOURCE_DIR}/tools/vcpkg/setup.cmake")
 ```
 
-A `-DCMAKE_TOOLCHAIN_FILE` given on the command line still wins, because the
-`set` only fills an empty cache entry.
+`setup.cmake` picks the triplet from the preset's sanitizer options, and
+fails with a clear message when `VCPKG_ROOT` is missing (a new machine, CI, a
+git app that doesn't load the shell profile), where CMake's own error only
+shows a path starting with `/scripts/`. A `-DCMAKE_TOOLCHAIN_FILE` given on
+the command line still wins; the triplet doesn't, since dependencies built
+differently from the project are what this section prevents.
+
+*Enforcement:* the audit fails when a project with a `vcpkg.json` lacks
+`tools/vcpkg/` or has edited it. The self-test builds a small vcpkg project
+in each of the check, tsan and release workflows, on each system, and checks
+how its dependency was compiled and that AddressSanitizer catches the
+overread above.
 
 ## 2. Language subset
 
@@ -406,6 +453,7 @@ The following files define enforcement and must not be weakened in a project:
 - `.clang-tidy`, `.clang-format`
 - `CMakePresets.json` and any CMake code that sets compile flags
 - the git hooks in `tools/hooks/`, and any other `tools/` scripts
+- with dependencies, `tools/vcpkg/` (how vcpkg builds them, section 1.1)
 - `AGENTS.md`, agent settings (`.claude/settings.json`)
 - CI workflows (`.github/workflows/`)
 
@@ -417,8 +465,9 @@ targets, source files or `CMAKE_CXX_FLAGS`, no `SKIP_LINTING`, and no changes
 to `CXX_CLANG_TIDY`. Configuration fails otherwise.
 
 Projects can't change the rules locally: their `.clang-tidy`,
-`.clang-format`, `CMakePresets.json` and git hooks (`tools/hooks/`) must
-match the policy's (the audit compares them byte for byte, and
+`.clang-format`, `CMakePresets.json`, git hooks (`tools/hooks/`) and, with a
+`vcpkg.json`, vcpkg files (`tools/vcpkg/`) must match the policy's (the audit
+compares them byte for byte, and
 `tools/upgrade.sh` copies them), and the build
 always uses the policy's copies of the configuration files. A project may only tighten what the module's options allow
 (for example `CPP_POLICY_EXCEPTIONS OFF`). Any other change, stricter or

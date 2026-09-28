@@ -7,7 +7,8 @@
 # The project gets the release's policy files unchanged (.clang-tidy, .clang-format,
 # CMakePresets.json, .gitignore, .gitattributes, tools/hooks/), agent settings, a CI workflow
 # pinned to the same commit as CMakeLists.txt, and a small program that shows each layer.
-# VCPKG_BASELINE set means the project uses vcpkg: it gets vcpkg.json with that baseline.
+# VCPKG_BASELINE set means the project uses vcpkg: it gets vcpkg.json with that baseline, and
+# tools/vcpkg/, through which its CMakeLists.txt loads vcpkg.
 
 cmake_minimum_required(VERSION 3.29)
 
@@ -80,6 +81,8 @@ configure_file("${template}/CHANGELOG.md.in" "${DEST}/CHANGELOG.md" @ONLY)
 configure_file("${template}/ci.yml.in" "${DEST}/.github/workflows/ci.yml" @ONLY)
 if(VCPKG_CI)
     configure_file("${template}/vcpkg.json.in" "${DEST}/vcpkg.json" @ONLY)
+    # CMakeLists.txt loads vcpkg through these, unchanged like the hooks (POLICY.md 1.1).
+    file(COPY "${POLICY_ROOT}/tools/vcpkg" DESTINATION "${DEST}/tools")
 endif()
 
 # Every placeholder must have been filled in.

@@ -4,7 +4,10 @@
 #
 # - it moves the GIT_TAG pin and the CI gate pin to the new release's commit and tag, copies
 #   the policy files (hooks executable), leaves other lines alone and shows the CHANGELOG entry;
-# - it refuses a working folder with uncommitted changes, and an unknown tag, changing nothing.
+# - with a vcpkg.json, it copies tools/vcpkg/ and replaces the lines that loaded vcpkg before
+#   v0.15.0 with an include of tools/vcpkg/setup.cmake;
+# - it refuses a working folder with uncommitted changes, an unknown tag, and vcpkg lines it
+#   doesn't know, changing nothing.
 # The gate isn't run (--no-gate): that needs a real project.
 
 cmake_minimum_required(VERSION 3.29)
@@ -54,8 +57,15 @@ run("${policy}" ${git} init --quiet)
 release(1.0.0 "## 1.0.0 (2026-01-01)\n\nFirst.\n")
 run("${policy}" ${git} rev-parse HEAD)
 string(STRIP "${out}" old)
-# Release 2.0.0 also adds a hook, like v0.8.0 added commit-msg.
+# Release 2.0.0 also adds a hook, like v0.8.0 added commit-msg, and the vcpkg files, like
+# v0.15.0.
 file(WRITE "${policy}/tools/hooks/commit-msg" "# commit-msg of 2.0.0\n")
+set(vcpkg_files tools/vcpkg/setup.cmake tools/vcpkg/llvm.cmake
+    tools/vcpkg/triplets/cpp-policy-asan.cmake tools/vcpkg/triplets/cpp-policy-tsan.cmake
+    tools/vcpkg/triplets/cpp-policy-nosan.cmake)
+foreach(name IN LISTS vcpkg_files)
+    file(WRITE "${policy}/${name}" "# ${name} of 2.0.0\n")
+endforeach()
 # And its own upgrade.sh, which the one under test must hand over to: this script plus one
 # line that says it ran.
 file(READ "${POLICY_ROOT}/tools/upgrade.sh" script)
@@ -65,9 +75,23 @@ release(2.0.0 "## 2.0.0 (2026-02-01)\n\nSecond: do the upgrade steps.\n\n## 1.0.
 run("${policy}" ${git} rev-parse HEAD)
 string(STRIP "${out}" new)
 
-# The project, on release 1.0.0.
+# The project, on release 1.0.0, with dependencies loaded the way releases before v0.15.0 did.
+set(old_vcpkg_lines
+    "# vcpkg's toolchain is loaded here, before project(), so CMakePresets.json stays cpp-policy's\n"
+    "# unchanged copy. Without VCPKG_ROOT its path would be broken, and CMake's own error doesn't say\n"
+    "# why (cpp-policy POLICY.md 1.1).\n"
+    "if(NOT DEFINED ENV{VCPKG_ROOT})\n"
+    "    message(FATAL_ERROR \"VCPKG_ROOT is not set: set it to the vcpkg directory (README: Building).\")\n"
+    "endif()\n"
+    "set(CMAKE_TOOLCHAIN_FILE \"\$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake\" CACHE FILEPATH\n"
+    "    \"vcpkg's toolchain (the presets are cpp-policy's unchanged copy)\")\n")
+string(JOIN "" old_vcpkg_lines ${old_vcpkg_lines})
+file(WRITE "${project}/vcpkg.json" "{ \"name\": \"fixture\", \"dependencies\": [] }\n")
 file(WRITE "${project}/CMakeLists.txt"
     "cmake_minimum_required(VERSION 3.29)\n"
+    "\n"
+    "${old_vcpkg_lines}"
+    "\n"
     "project(fixture LANGUAGES CXX)\n"
     "include(FetchContent)\n"
     "FetchContent_Declare(cpp_policy\n"
@@ -109,6 +133,18 @@ run("${project}" ${git} status --porcelain)
 set(nothing "")
 expect("out;STREQUAL;nothing" "an unknown tag must leave the project unchanged")
 
+# Refused: vcpkg loaded with other lines than the old releases gave. Nothing may change.
+file(READ "${project}/CMakeLists.txt" cmake)
+string(REPLACE "(README: Building)" "(see our wiki)" edited "${cmake}")
+file(WRITE "${project}/CMakeLists.txt" "${edited}")
+run("${project}" ${git} commit --quiet -am "our own vcpkg lines")
+run("${project}" ${upgrade} v2.0.0 --no-gate)
+string(FIND "${out}" "doesn't load vcpkg with the lines" found)
+expect("NOT;code;EQUAL;0;AND;found;GREATER;-1" "it must refuse vcpkg lines it doesn't know")
+run("${project}" ${git} status --porcelain)
+expect("out;STREQUAL;nothing" "unknown vcpkg lines must leave the project unchanged")
+run("${project}" ${git} reset --quiet --hard HEAD~1)
+
 # The upgrade.
 run("${project}" ${upgrade} v2.0.0 --no-gate)
 expect("code;EQUAL;0" "the upgrade to v2.0.0 must succeed")
@@ -144,5 +180,20 @@ string(FIND "${out}" "upgrade.sh of 2.0.0 is running" ran)
 expect("handed;GREATER;-1;AND;ran;GREATER;-1" "it must hand over to the release's own upgrade.sh")
 string(FIND "${out}" "?? tools/hooks/commit-msg" listed)
 expect("listed;GREATER;-1" "the changes shown must include a file the release adds")
+
+# A project with a vcpkg.json gets the release's tools/vcpkg/, loaded by one include in place
+# of the old lines, with the rest of CMakeLists.txt as it was.
+foreach(name IN LISTS vcpkg_files)
+    file(READ "${project}/${name}" content)
+    set(wanted "# ${name} of 2.0.0\n")
+    expect("content;STREQUAL;wanted" "${name} must be v2.0.0's copy")
+endforeach()
+string(FIND "${cmake}" "${old_vcpkg_lines}" stale)
+string(FIND "${cmake}" "cmake_minimum_required(VERSION 3.29)\n\n# vcpkg is loaded before project()"
+    replaced)
+string(FIND "${cmake}"
+    "include(\"\${CMAKE_CURRENT_SOURCE_DIR}/tools/vcpkg/setup.cmake\")\n\nproject(fixture" included)
+expect("stale;EQUAL;-1;AND;replaced;GREATER;-1;AND;included;GREATER;-1"
+    "the old vcpkg lines must become the include of tools/vcpkg/setup.cmake, in their place:\n${cmake}")
 
 message("upgrade: OK")

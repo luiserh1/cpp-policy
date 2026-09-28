@@ -1,9 +1,4 @@
 
-# vcpkg's toolchain is loaded here, before project(), so CMakePresets.json stays cpp-policy's
-# unchanged copy. Without VCPKG_ROOT its path would be broken, and CMake's own error doesn't say
-# why (cpp-policy POLICY.md 1.1).
-if(NOT DEFINED ENV{VCPKG_ROOT})
-    message(FATAL_ERROR "VCPKG_ROOT is not set: set it to the vcpkg directory (README: Building).")
-endif()
-set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE FILEPATH
-    "vcpkg's toolchain (the presets are cpp-policy's unchanged copy)")
+# vcpkg is loaded before project(), where it installs the dependencies, through cpp-policy's
+# files in tools/vcpkg/: they build the dependencies like the project (cpp-policy POLICY.md 1.1).
+include("${CMAKE_CURRENT_SOURCE_DIR}/tools/vcpkg/setup.cmake")
