@@ -107,6 +107,14 @@ protection as the project's code.
 - **The triplets build for the machine they run on** (x64 or arm64, Linux,
   macOS or Windows); the policy doesn't cross-compile. On Windows the `asan`
   triplet builds only the release configuration, the one `win-check` uses.
+  vcpkg's *host* triplet, for tools that run during a build (such as
+  `vcpkg-cmake`), stays vcpkg's default with the system's compiler: nothing
+  built with it goes into the program.
+- **A build folder can change triplet** (other sanitizer options, or an
+  upgrade from before v0.15.0). vcpkg then replaces the dependencies, and
+  `setup.cmake` clears the cached paths that `find_path`, `find_library` and
+  find modules such as `FindZLIB` kept into the old ones, so no `--fresh` is
+  needed.
 - **Upgrades rebuild them.** vcpkg keys its binary cache on the hashes of the
   triplet, `llvm.cmake` and the compiler, so a release that changes how
   dependencies are built, or a new LLVM, rebuilds them. For the same reason

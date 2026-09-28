@@ -118,4 +118,26 @@ if(SANITIZERS)
     endif()
     message("vcpkg_triplets: AddressSanitizer caught the overread inside the dependency")
 endif()
+
+# --- The same folder reconfigured with other sanitizer options: the triplet changes and vcpkg
+# replaces the dependency, so nothing may keep pointing at the old one (find_path and
+# find_library cache their results, like find modules such as FindZLIB).
+if(sanitizer STREQUAL "none")
+    set(switch -DCPP_POLICY_SANITIZERS=ON)
+    set(switched address)
+else()
+    set(switch -DCPP_POLICY_SANITIZERS=OFF -DCPP_POLICY_THREAD_SANITIZER=OFF)
+    set(switched none)
+endif()
+step("reconfiguring the folder with other sanitizer options"
+    "${CMAKE_COMMAND}" -S "${CMAKE_CURRENT_LIST_DIR}/project" -B "${build}" ${switch})
+step("building it again" "${CMAKE_COMMAND}" --build "${build}")
+program_path(build_info program)
+step("running build_info again" "${program}")
+string(FIND "${out}" "sanitizer=${switched} " found)
+if(found EQUAL -1)
+    message(FATAL_ERROR "vcpkg_triplets: after reconfiguring, the dependency should report "
+        "sanitizer=${switched}:\n${out}")
+endif()
+message("vcpkg_triplets: reconfiguring with other sanitizer options switched the dependency")
 message("vcpkg_triplets: OK")

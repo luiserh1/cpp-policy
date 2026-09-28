@@ -3,6 +3,45 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.15.1 (2026-09-28)
+
+A fix to v0.15.0: build folders that change triplet configure again without
+`--fresh`. Nothing can fail that passed, so a patch release (POLICY.md 10).
+
+### Upgrading a project
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.15.1`, from
+   v0.15.0 or from an older release. Build folders configured before the
+   upgrade need nothing more.
+
+### Dependencies (POLICY.md 1.1)
+
+- `tools/vcpkg/setup.cmake` clears cached paths into the old triplet's
+  folder when a build folder's triplet changes, so they are found again
+  under the new one. *Why:* ToneMatcher's upgrade to v0.15.0 (its report
+  of 2026-09-28) found that every build folder configured before the
+  upgrade failed to generate: `FindZLIB` had cached zlib's paths under
+  `vcpkg_installed/arm64-osx/`, which vcpkg removed when it installed the
+  `cpp-policy-asan` triplet. The same happened without an upgrade when a
+  folder was reconfigured with other sanitizer options, the case the
+  `FORCE` on `VCPKG_TARGET_TRIPLET` was meant to handle. The self-test and
+  the trial upgrade only configured empty folders, so they didn't see it.
+  Of the report's two fixes, clearing the entries was chosen over
+  stopping with "configure with --fresh": it covers both cases with
+  nothing to remember, and only clears paths inside the old triplet's
+  folder, which vcpkg has just removed. Configuration names what it
+  cleared.
+- POLICY.md 1.1 now says that vcpkg's host triplet (tools that run during
+  the build, such as `vcpkg-cmake`) keeps the system's compiler: nothing
+  built with it goes into the program. Also from ToneMatcher's report.
+
+### Self-test
+
+- `vcpkg/dependencies_built_like_project` reconfigures its folder with the
+  other sanitizer setting, builds again and checks that the dependency
+  switched. Without the fix it fails: the build still wants the old
+  triplet's `libpolicy_probe.a`.
+
 ## 0.15.0 (2026-09-28)
 
 vcpkg builds dependencies like the project: same LLVM, same sanitizer,
