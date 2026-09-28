@@ -464,6 +464,14 @@ Test presets:
   detection (`ASAN_OPTIONS=detect_leaks=1`) and apply the policy's
   suppression list for false positives in the OS (section 5). Detection is on
   by default on Linux and off on macOS; `clang-cl` doesn't provide it.
+- On macOS the same presets turn off the nano malloc zone
+  (`MallocNanoZone=0`), as Xcode does whenever AddressSanitizer is on. With
+  it on, libdispatch's cache of reusable work items (up to 112 per worker
+  thread, on at most 64 threads) is reported as up to 7,168 leaks, because
+  the pointers to it sit where LeakSanitizer doesn't look. Whether a
+  terminal has the variable depends on the app that opened it; a
+  self-hosted runner's service doesn't, so the presets set it
+  (`tests/leak/nano_zone.cpp`).
 
 ThreadSanitizer on Linux: threads that glibc creates internally, without
 `pthread_create` (for example the helper threads of `getaddrinfo_a`), are

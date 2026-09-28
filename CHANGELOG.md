@@ -3,6 +3,37 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.12.2 (2026-09-28)
+
+A false positive on macOS, found by SimpleLocalServer's first CI run on the
+owner's Mac. Nothing that passes can fail, so a patch release (POLICY.md 10).
+
+### Upgrading a project
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.12.2`: it copies
+   the new `CMakePresets.json`.
+
+### Presets
+
+- The `dev` and `check` test presets set `MallocNanoZone=0`. *Why:*
+  SimpleLocalServer's `macos check` failed on the self-hosted runner with 26
+  leaks inside libdispatch, from cpp-httplib's address lookup, while the
+  same binary passed from a terminal. The difference was the environment:
+  the Claude app's terminals set `MallocNanoZone=0`, the runner's launchd
+  service doesn't, and with the nano malloc zone on, libdispatch's cache of
+  reusable work items is invisible to LeakSanitizer. It isn't a leak: the
+  count stops growing at 7,168 (112 cached items on each of at most 64
+  worker threads) however much work is queued, shown with up to 300,000
+  items. Xcode sets the same variable whenever AddressSanitizer is on. A
+  plain Terminal window without it would have failed the gate too.
+
+### Self-test
+
+- `leak/nano_zone_off` queues 1,000 empty work items and must pass with the
+  presets' setting; without it, it failed. `leak/nano_zone_on` runs the
+  same program with the nano zone on and must see the reports, so it fails
+  the day macOS no longer needs the setting.
+
 ## 0.12.1 (2026-09-28)
 
 From ToneMatcher's first CI runs: six runs and 76 minutes to its first green
