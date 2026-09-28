@@ -34,6 +34,9 @@ endif()
 # it; fast otherwise), stack protection, and for optimized builds _FORTIFY_SOURCE or Control
 # Flow Guard.
 if(CMAKE_HOST_WIN32)
+    # vcpkg sets up the Visual Studio environment only for its own toolchains; ports expect it
+    # (the resource compiler rc for CMake's link steps, the SDK, MSBuild).
+    set(VCPKG_LOAD_VCVARS_ENV ON)
     set(_cpp_policy_flags "")
     if(_cpp_policy_sanitizer STREQUAL "address")
         set(_cpp_policy_flags "/fsanitize=address")

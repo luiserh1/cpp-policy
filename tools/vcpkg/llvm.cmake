@@ -72,6 +72,9 @@ if(CMAKE_HOST_WIN32 AND VCPKG_C_FLAGS MATCHES "/fsanitize=address")
     foreach(_cpp_policy_kind IN ITEMS EXE SHARED MODULE)
         string(APPEND CMAKE_${_cpp_policy_kind}_LINKER_FLAGS_INIT "${_cpp_policy_asan_options}")
     endforeach()
+    # CMake's compiler checks build in the Debug configuration unless told otherwise, even in a
+    # Release build, and Debug means the debug C runtime (/MDd), which AddressSanitizer rejects.
+    set(CMAKE_TRY_COMPILE_CONFIGURATION Release)
 endif()
 
 # vcpkg's toolchain for the platform, which applies the triplet's VCPKG_*_FLAGS. vcpkg.cmake
