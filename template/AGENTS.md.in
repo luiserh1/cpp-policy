@@ -1,0 +1,73 @@
+# Instructions for AI agents
+
+This project follows **cpp-policy** (fetched by CMake; rules in
+`build/<preset>/_deps/cpp_policy-src/POLICY.md`, or
+https://github.com/luiserh1/cpp-policy/blob/main/POLICY.md).
+
+## The rules in short
+
+- C++23, LLVM Clang 23. Modern subset of the C++ Core Guidelines: no raw
+  `new`/`delete`, no C arrays, no pointer arithmetic, no C-style casts, no
+  `NULL`, no macros for constants, always initialize variables.
+- No `short`, `long` or `long long`: use `<cstdint>` fixed-width types,
+  `std::size_t` for sizes, or plain `int`.
+- Naming: `PascalCase` for types, `snake_case` for everything else, a
+  trailing `_` on private data members, `UPPER_CASE` macros.
+- Functions: at most 80 lines, 6 parameters and 4 levels of nesting; files at
+  most 350 lines (aim for 250).
+- Expected failures return `std::expected`; exceptions only for truly
+  exceptional cases. Every exception is caught in `main`, and at the top of
+  every thread function.
+- Threads: `std::jthread` and `std::scoped_lock`; no data shared between
+  threads without synchronization.
+- Low-level code (OS APIs, the C runtime, reinterpret casts) lives only in
+  `src/lowlevel/`, behind a safe interface.
+- Dependencies: ask before adding one.@VCPKG_AGENTS@
+
+## Layers
+
+`src/` is split into layers. A file may include headers from its own layer or
+a lower one, never a higher one, and always from the `src/` root
+(`#include "app/greeting.hpp"`):
+
+| Layer | Modules | Contents |
+|---|---|---|
+| 3 (top) | `main.cpp` | Program boundary: wires everything together |
+| 2 | `app/` | The program's logic |
+| 1 (bottom) | `lowlevel/` | Confined OS code; includes no other project module |
+
+A new module goes in `cpp_policy_layers()` in `CMakeLists.txt` and in this
+table; the owner edits this file.
+
+## Before you say you are done
+
+After editing C++ files, check them right away (a few seconds per file; pre-commit
+does the same for the staged files):
+
+```
+sh tools/hooks/tidy-files <file>...
+```
+
+Run the full gate and make sure it passes:
+
+```
+cmake --workflow --preset check        # macOS / Linux
+cmake --workflow --preset win-check    # Windows
+```
+
+Formatting problems: `cmake --build --preset check --target policy-format-fix`.
+
+## Never
+
+- Add `NOLINT` suppressions outside `src/lowlevel/`. Inside it, name the
+  check and give a reason: `// NOLINT(check-name): reason`.
+- Edit `.clang-tidy`, `.clang-format`, `CMakePresets.json`, compile flags in
+  `CMakeLists.txt`, `tools/`, `.github/`, `AGENTS.md` or agent settings
+  (`.claude/`).
+- Create a `CLAUDE.md`: Claude Code reads this file only while there is none.
+- Bypass git hooks (`--no-verify`, or overriding `core.hooksPath`).
+- "Fix" a toolchain error by changing the build. If the compiler check fails,
+  report it: the machine's LLVM installation or `PATH` needs fixing.
+
+If a rule seems impossible to satisfy, stop and explain why instead of
+working around it.

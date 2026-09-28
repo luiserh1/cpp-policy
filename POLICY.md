@@ -658,6 +658,9 @@ as `#pragma once` and suppressions, have fixtures in `tests/audit/`.
 These rules keep a codebase navigable as it grows, especially when AI agents
 make many small changes. Adapted from the Carreritas project.
 
+A new project starts from `tools/new-project.sh` (README, "Starting a new
+project"), which lays it out this way from the first commit.
+
 ### 11.1 Layers and dependency direction
 
 - Source code is split into modules, one directory each under `src/`

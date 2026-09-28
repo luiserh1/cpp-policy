@@ -1,0 +1,53 @@
+#!/bin/sh
+# Creates a new project that follows cpp-policy, from the release this copy of cpp-policy is:
+#
+#   sh <cpp-policy>/tools/new-project.sh <folder> <Name> [--vcpkg]
+#
+# <cpp-policy> is a clone checked out at a release tag (git checkout v0.14.0). The project is
+# pinned to that commit, in CMakeLists.txt and in its CI workflow, and gets that release's
+# policy files, agent instructions and settings, and a small program that shows each layer.
+# --vcpkg adds vcpkg.json, with the baseline your VCPKG_ROOT is checked out at. The folder
+# becomes a git repository with the hooks enabled; nothing is committed.
+set -eu
+
+usage() {
+    echo "usage: sh new-project.sh <folder> <Name> [--vcpkg]" >&2
+    exit 2
+}
+[ $# -ge 2 ] && [ $# -le 3 ] || usage
+dest=$1
+name=$2
+baseline=
+if [ $# -eq 3 ]; then
+    [ "$3" = --vcpkg ] || usage
+    [ -n "${VCPKG_ROOT:-}" ] || { echo "new-project: --vcpkg needs VCPKG_ROOT set" >&2; exit 1; }
+    baseline=$(git -C "$VCPKG_ROOT" rev-parse HEAD)
+fi
+
+policy=$(cd "$(dirname "$0")/.." && pwd)
+commit=$(git -C "$policy" rev-parse HEAD)
+# Pin a release: an untagged commit may never be published.
+tag=$(git -C "$policy" describe --tags --exact-match HEAD 2>/dev/null) || {
+    echo "new-project: $policy is at $commit, which is no release tag;" >&2
+    echo "  check out a release first (git -C $policy checkout v<version>)" >&2
+    exit 1
+}
+if [ -n "$(git -C "$policy" status --porcelain)" ]; then
+    echo "new-project: $policy has uncommitted changes; the project would pin other files" >&2
+    exit 1
+fi
+repository=https://github.com/luiserh1/cpp-policy.git
+
+mkdir -p "$dest"
+dest=$(cd "$dest" && pwd)
+cmake "-DPOLICY_ROOT=$policy" "-DDEST=$dest" "-DNAME=$name" "-DCOMMIT=$commit" "-DTAG=$tag" \
+    "-DREPOSITORY=$repository" "-DVCPKG_BASELINE=$baseline" -P "$policy/cmake/scripts/new_project.cmake"
+
+git -C "$dest" init --quiet
+git -C "$dest" config core.hooksPath tools/hooks
+echo
+echo "Next, in $dest:"
+echo "  cmake --workflow --preset check     (win-check on Windows)"
+echo "  git add --all && git commit         (the hooks check the first commit too)"
+echo "Then describe the project in README.md, and publish it (a private repository needs"
+echo "a decision about macOS in CI: .github/workflows/ci.yml says what)."

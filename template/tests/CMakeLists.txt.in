@@ -1,0 +1,8 @@
+foreach(name IN ITEMS app)
+    add_executable(test_${name} test_${name}.cpp)
+    target_link_libraries(test_${name} PRIVATE @TARGET@_core)
+    cpp_policy_apply(test_${name})
+    add_test(NAME ${name} COMMAND test_${name})
+    # A hang fails fast instead of holding up a push (the presets' limit is 60 seconds).
+    set_tests_properties(${name} PROPERTIES TIMEOUT 10)
+endforeach()

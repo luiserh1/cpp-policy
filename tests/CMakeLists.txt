@@ -133,6 +133,22 @@ add_test(NAME hooks/tidy_files
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/tidy_files"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tidy_files/run.cmake")
 
+# --- tools/new-project.sh's template: a generated project must pass its own gate. Only in the
+# builds with AddressSanitizer (dev, check), since it builds a whole project with the check
+# preset; the tsan and release workflows would only repeat it.
+if(CPP_POLICY_SANITIZERS)
+    if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+        set(project_preset win-check)
+    else()
+        set(project_preset check)
+    endif()
+    add_test(NAME template/new_project
+        COMMAND "${CMAKE_COMMAND}" "-DPOLICY_ROOT=${CPP_POLICY_ROOT}"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/new_project" "-DPRESET=${project_preset}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/new_project/run.cmake")
+    set_tests_properties(template/new_project PROPERTIES TIMEOUT 900)
+endif()
+
 # --- Audit fixtures: each directory is a mini project.
 #   expect.txt    regex the audit output must match (include "file:line:" to pin the line)
 #   options.cmake optional; appended to the generated config to override its defaults

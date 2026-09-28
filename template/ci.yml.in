@@ -1,0 +1,19 @@
+# The policy gate on Linux, Windows and macOS, from cpp-policy at the same commit as GIT_TAG in
+# CMakeLists.txt (the audit checks they match). On a private repository GitHub's macOS minutes
+# cost ten times more: run macOS on your own Mac (cpp-policy README, "Your own machine as a
+# runner", then add self_hosted: '["macos"]'), or leave it out of systems.
+name: CI
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    uses: @POLICY_GITHUB@/.github/workflows/gate.yml@@POLICY_COMMIT@ # @POLICY_TAG@
+    with:
+      systems: '["linux", "windows", "macos"]'
+      vcpkg: @VCPKG_CI@

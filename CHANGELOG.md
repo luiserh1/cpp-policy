@@ -3,6 +3,55 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.14.0 (2026-09-28)
+
+New projects are generated from the policy. A new feature that changes
+nothing for existing projects, so a minor release (POLICY.md 10).
+
+### Upgrading a project
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.14.0`. Nothing
+   else to do.
+
+### Tools
+
+- `tools/new-project.sh <folder> <Name> [--vcpkg]` creates a project from
+  the release it's run from (a clone checked out at a release tag). The
+  project is pinned to that release in `CMakeLists.txt` and its CI
+  workflow, has the release's `.clang-tidy`, `.clang-format`,
+  `CMakePresets.json`, `.gitignore`, `.gitattributes` and `tools/hooks/`,
+  an agent-neutral `AGENTS.md`, agent settings, a README and a CHANGELOG,
+  and a small program that shows each layer: `main.cpp`, an `app` module
+  returning `std::expected`, a confined `lowlevel` module (reading an
+  environment variable with POLICY.md 2.10's idiom) and a test. It becomes
+  a git repository with the hooks enabled. `--vcpkg` adds `vcpkg.json` with
+  the baseline `VCPKG_ROOT` is checked out at, the `VCPKG_ROOT` check and
+  `vcpkg: true` in CI. It refuses a checkout that isn't at a release tag or
+  has uncommitted changes, since the project would pin files nobody
+  published. *Why:* SimpleLocalServer and ToneMatcher were each set up by
+  hand, copying files and pins from the README; the generator gives a new
+  project everything at once, passing the gate from the first commit.
+- *Why a generator in cpp-policy and not a GitHub template repository:* a
+  template repository is a second copy of the policy files and pins that
+  would need an upgrade after every release, or new projects would start
+  behind. The generator produces each project from the release it's run
+  from, so there's nothing to keep in sync, and the self-test runs a
+  generated project's gate on every push, so a release can't ship a
+  template that fails its own policy. The owner chose this on 2026-09-28.
+- The template lives in `template/`, excluded from cpp-policy's own checks:
+  it's checked as a generated project instead, with its own layers and
+  confined area.
+
+### Self-test
+
+- `template/new_project` generates a project (and, with `VCPKG_ROOT` set,
+  the `--vcpkg` variant) pinned to the current commit, with FetchContent
+  pointed at this checkout. It must configure, build with clang-tidy, pass
+  the audit and the format check, pass its tests, print its greeting, and
+  make its first commit through its own hooks. A C-style cast added to the
+  template makes it fail. It runs in the builds with AddressSanitizer only
+  (dev, check).
+
 ## 0.13.0 (2026-09-28)
 
 clang-tidy on single files: a command for right after an edit, and in

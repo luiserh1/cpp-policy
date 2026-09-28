@@ -1,0 +1,5 @@
+{
+  "name": "@VCPKG_NAME@",
+  "dependencies": [],
+  "builtin-baseline": "@VCPKG_BASELINE@"
+}

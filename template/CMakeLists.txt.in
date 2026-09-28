@@ -1,0 +1,32 @@
+cmake_minimum_required(VERSION 3.29)
+@VCPKG_TOOLCHAIN@
+project(@PROJECT_NAME@ VERSION 0.1.0 LANGUAGES CXX)
+
+# cpp-policy, pinned by commit (POLICY.md 10). Upgrade with its tools/upgrade.sh, which moves
+# this pin and the one in .github/workflows/ci.yml together.
+include(FetchContent)
+FetchContent_Declare(cpp_policy
+    GIT_REPOSITORY @POLICY_REPOSITORY@
+    GIT_TAG        @POLICY_COMMIT@) # @POLICY_TAG@
+FetchContent_MakeAvailable(cpp_policy)
+
+# Everything except main(), so tests can link it.
+add_library(@TARGET@_core STATIC
+    src/app/greeting.cpp
+    src/lowlevel/environment.cpp)
+target_include_directories(@TARGET@_core PUBLIC src)
+cpp_policy_apply(@TARGET@_core)
+
+add_executable(@TARGET@ src/main.cpp)
+target_link_libraries(@TARGET@ PRIVATE @TARGET@_core)
+cpp_policy_apply(@TARGET@)
+
+enable_testing()
+add_subdirectory(tests)
+
+# Layers from the lowest up (POLICY.md 11.1); the audit checks every #include against them.
+# README.md ("Layout") and AGENTS.md describe what each layer holds.
+cpp_policy_layers(
+    LAYER lowlevel
+    LAYER app)
+cpp_policy_add_checks()
