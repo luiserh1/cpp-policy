@@ -194,6 +194,10 @@
         "all",
         "policy-audit",
         "policy-format-check"
+      ],
+      "nativeToolOptions": [
+        "-k",
+        "0"
       ]
     },
     {
@@ -219,6 +223,10 @@
         "all",
         "policy-audit",
         "policy-format-check"
+      ],
+      "nativeToolOptions": [
+        "-k",
+        "0"
       ]
     }
   ],

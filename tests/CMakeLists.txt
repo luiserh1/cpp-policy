@@ -1,5 +1,6 @@
 # --- Good code: must build with every check enabled and pass its tests -------
 add_library(policy_good good/numbers.cpp good/shapes.cpp good/tally.cpp good/idioms.cpp
+    good/allocation.cpp
     good/lowlevel/byte_view.cpp good/lowlevel/c_library.cpp)
 target_include_directories(policy_good PUBLIC good)
 # A C library, included the way vcpkg's are: a system directory, excluded from clang-tidy's
@@ -105,6 +106,12 @@ add_test(NAME format/fix_trailing_commas
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/format_fix"
             "-DCLANG_FORMAT=${CPP_POLICY_CLANG_FORMAT_EXE}" "-DCLANG_TIDY=${CPP_POLICY_CLANG_TIDY_EXE}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/format_fix/run.cmake")
+
+# --- Check build presets: a failing file mustn't stop the build (one run reports everything)
+add_test(NAME presets/keep_going
+    COMMAND "${CMAKE_COMMAND}" "-DPOLICY_ROOT=${CPP_POLICY_ROOT}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/keep_going" "-DCXX=${CMAKE_CXX_COMPILER}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/keep_going/run.cmake")
 
 # --- Audit fixtures: each directory is a mini project.
 #   expect.txt    regex the audit output must match (include "file:line:" to pin the line)

@@ -53,6 +53,11 @@ CheckOptions:
   cppcoreguidelines-non-private-member-variables-in-classes.IgnoreClassesWithAllMemberVariablesBeingPublic: true
   # A class may declare only a defaulted virtual destructor without the other four.
   cppcoreguidelines-special-member-functions.AllowSoleDefaultDtor: true
+  # std::bad_array_new_length is an allocation failure like std::bad_alloc, which the check
+  # already ignores. The MSVC STL throws it from every allocation (_Get_size_of_n), and its
+  # node containers allocate when moved, so without this every class holding a std::map is
+  # reported on Windows only. The name must be unqualified: qualified forms don't match.
+  bugprone-exception-escape.IgnoredExceptions: 'bad_array_new_length'
   # Ignoring an error-carrying return value is a bug.
   bugprone-unused-return-value.CheckedReturnTypes: '::std::error_code;::std::error_condition;::std::errc;::std::expected'
   # Function size (POLICY.md 11.3); cognitive complexity keeps its default of 25.

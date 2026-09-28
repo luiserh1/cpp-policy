@@ -3,6 +3,52 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.12.1 (2026-09-28)
+
+From ToneMatcher's first CI runs: six runs and 76 minutes to its first green
+build on Linux and Windows, one finding per run. Nothing that passes can
+fail, so a patch release (POLICY.md 10).
+
+### Upgrading a project
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.12.1`: it copies
+   the new `.clang-tidy` and `CMakePresets.json`.
+2. Rebuild from a clean folder (`rm -rf build/check`) once: the build
+   doesn't notice a changed `.clang-tidy`, so files it already built keep
+   their old results until they change.
+
+### Presets
+
+- The `check` and `win-check` build presets pass `-k 0` to Ninja: a failing
+  file no longer stops the build. *Why:* each of ToneMatcher's failing CI
+  runs showed one problem, because Ninja stopped at the first file; the
+  next only appeared after another push and a CI wait of up to 16 minutes.
+  One run now lists everything, in CI and in the local gate.
+
+### Rules
+
+- `bugprone-exception-escape` ignores `bad_array_new_length`, as it already
+  ignores `std::bad_alloc`. *Why:* the Microsoft library allocates when it
+  moves a `std::map` (and the other node containers) and reports allocation
+  failure with that type, so on Windows only, every class holding a
+  `std::map` failed the check; ToneMatcher replaced `std::map` with a map
+  of its own to pass. The name must be unqualified (the check doesn't match
+  `std::bad_array_new_length`), which ToneMatcher's agent found and tested.
+- POLICY.md 2.10 lists the findings that depend on the standard library,
+  each with the form that passes on every system: environment variables,
+  `environ`, stream open modes and `std::ranges::find`.
+- POLICY.md 8: a passing gate proves only the system that ran it; CI is the
+  authority for the others.
+
+### Self-test
+
+- `presets/keep_going`: a throwaway project with three broken files, built
+  with the check presets' options one file at a time, must report all
+  three. With Ninja's default it fails.
+- `tests/good/allocation.cpp` lets `std::bad_array_new_length` escape a
+  `noexcept` function; without the option the good build fails. The new bad
+  sample `exception_escape` shows other exceptions are still reported.
+
 ## 0.12.0 (2026-09-28)
 
 CI can run a system's jobs on the owner's own machine. A new optional

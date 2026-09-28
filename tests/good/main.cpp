@@ -1,3 +1,4 @@
+#include "allocation.hpp"
 #include "idioms.hpp"
 #include "lowlevel/byte_view.hpp"
 #include "lowlevel/c_library.hpp"
@@ -53,6 +54,8 @@ bool run_all() {
     const Size size{.width = 4, .height = 2};
     ok &= check(Grid{size}.index(1, 1) == 5, "Grid");
     ok &= check(palette_color(2).r == 255 && palette_color(2).g == 0, "palette_color");
+
+    ok &= check(buffer_bytes(4) == 4 * sizeof(double), "buffer_bytes");
 
     Tally tally;
     add_concurrently(tally, 8, 5);

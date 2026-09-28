@@ -292,6 +292,31 @@ works. The forms below pass; `tests/good/idioms.cpp` has each one, and
   `misc-const-correctness` asks for `const` on a local passed to a template
   parameter's call operator. Rewrite the code in both cases: suppressions
   outside confined areas aren't allowed (section 5).
+- **Checks that depend on the standard library.** clang-tidy reads each
+  platform's standard library, so the same code can pass on one system and
+  fail on another (section 8). Seen so far, each costing a CI round:
+  - **Environment variables:** the Windows C runtime deprecates `getenv`, a
+    warning and so an error. Read them in a confined area: `getenv_s` into a
+    `std::string` on Windows, `getenv` with a named suppression elsewhere
+    (`concurrency-mt-unsafe`).
+  - **The whole environment:** glibc declares `environ` in `<unistd.h>`, so
+    declaring it yourself is `readability-redundant-declaration` on Linux,
+    while macOS declares nothing. Use `*_NSGetEnviron()` (`<crt_externs.h>`)
+    on macOS and `environ` from `<unistd.h>` elsewhere.
+  - **Stream open modes:** the Microsoft library's `std::ios` flags are
+    `int`s, so combining them (`std::ios::binary | std::ios::trunc`) is
+    `bugprone-signed-bitwise` there. Pass one flag: an `std::ofstream`
+    already truncates.
+  - **Searching:** the Microsoft library routes `std::ranges::find` on a
+    trivially comparable element of 3 bytes (or any size other than 1, 2,
+    4 or 8) to a vectorized search that fails to compile. Use
+    `std::ranges::any_of` with a comparison.
+  - **Moving a `std::map`:** the Microsoft library allocates when node
+    containers (`map`, `set`, `list`, the unordered ones) are moved, and
+    reports allocation failure with `std::bad_array_new_length`. Like
+    `std::bad_alloc`, the policy's `.clang-tidy` doesn't count it as an
+    escaping exception (`bugprone-exception-escape`), so such members are
+    fine everywhere.
 
 ## 3. Error handling
 
@@ -511,6 +536,15 @@ The gate is `cmake --workflow --preset check` (`win-check` on Windows):
 configure, build with clang-tidy, audit, format check, and tests under
 sanitizers. It is the only definition of "passes the policy". Every other
 layer is a faster subset of it.
+
+A passing gate proves the policy on the system that ran it, with that
+system's standard library and headers: libc++ on macOS, libstdc++ on Linux,
+the Microsoft library on Windows. clang-tidy reads each one, and they differ
+(section 2.10), so a green `pre-push` on a Mac says nothing about the other
+two. CI covers the systems a project lists; it is the authority for them.
+
+The `check` build presets keep going after a file fails (`-k 0` to Ninja),
+so one run reports every finding instead of the first.
 
 ### 8.2 Commit messages
 
