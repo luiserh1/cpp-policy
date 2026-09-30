@@ -3,6 +3,50 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.17.0 (2026-09-30)
+
+CI pins the Microsoft toolset of self-hosted Windows runners. A job on a
+runner with another toolset now stops, so code that passed can fail: a
+minor release (POLICY.md 10).
+
+### Upgrading a project
+
+1. Self-hosted Windows runners must have MSVC 14.44 (Visual Studio 2022
+   17.14 or its Build Tools) and no other toolset. The owner's server
+   already has it. Projects without self-hosted Windows runners need
+   nothing.
+2. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.17.0`.
+
+### Toolchain (POLICY.md 1)
+
+- The Microsoft toolset is now part of the toolchain table: MSVC 14.44 or
+  later on developer machines, exactly `MSVC_TOOLSET` (14.44) on
+  self-hosted CI. *Why:* the server conversation asked (2026-09-30) which
+  toolset its Windows runners should have. The gate pinned LLVM but not the
+  toolset, whose standard library clang-tidy analyzes. Its runners had
+  14.44 and GitHub's image 14.51, and ToneMatcher found that five of its
+  first seven clang-tidy findings depended on the library.
+- Why a pin, and not GitHub's image or no rule:
+  - GitHub's image updates Visual Studio every few weeks, so following it
+    means a target that keeps moving;
+  - with no rule, a finding could come and go with a machine's updates;
+  - a pin changes only in a release, like `LLVM_VERSION`.
+
+  14.44 is the last Visual Studio 2022 release and only gets servicing
+  updates, so it holds without upkeep. cpp-policy's own CI keeps GitHub's
+  newer toolset, which gives an early warning before the pin moves. The
+  owner chose the pin (2026-09-30); a protocol for moving it is on the
+  roadmap.
+
+### CI (`gate.yml`)
+
+- `MSVC_TOOLSET: '14.44'` next to `LLVM_VERSION`. On a self-hosted Windows
+  runner, "Show the toolchain" reads the toolset `clang-cl` finds (from the
+  include paths of `clang-cl -###`) and stops the job if its major.minor
+  differs.
+- Every job prints its standard library's version: the MSVC toolset on
+  Windows, `_GLIBCXX_RELEASE` on Linux, `_LIBCPP_VERSION` on macOS.
+
 ## 0.16.0 (2026-09-28)
 
 How a project records its open and finished work. New guidance and a new

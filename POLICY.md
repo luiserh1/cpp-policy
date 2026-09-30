@@ -18,6 +18,7 @@ disagree.
 | Language standard | **C++23**, compiler extensions **off** (`CMAKE_CXX_EXTENSIONS OFF`) |
 | Compiler | **LLVM Clang** on all platforms: `clang++` on macOS/Linux, `clang-cl` on Windows |
 | LLVM version | **23.x** (clang, clang-tidy and clang-format from the same release) |
+| Microsoft toolset (Windows) | **MSVC 14.44** (Visual Studio 2022 17.14) or later: the standard library, runtime and libraries `clang-cl` builds with |
 | Build system | CMake ≥ 3.29, driven only through `CMakePresets.json` |
 | Generator | Ninja |
 | Dependencies | vcpkg in manifest mode (`vcpkg.json`), only when a project needs them (section 1.1) |
@@ -29,6 +30,25 @@ Notes:
   always come from the same LLVM release.
 - GCC and MSVC's own compiler (`cl.exe`) are not supported. They may be
   added later as extra build jobs without changing these rules.
+- **The standard library is part of the toolchain.** clang-tidy analyzes the
+  library's code along with the project's, so the same code can get different
+  findings with another version of it. ToneMatcher's first CI runs had five
+  such findings, each seen on one library only. On Windows the library comes
+  with the Microsoft toolset, not with LLVM, so CI pins it as well:
+  - Self-hosted Windows runners have exactly the toolset `gate.yml` names
+    (`MSVC_TOOLSET`, now 14.44), and only that one, since vcpkg's port builds
+    pick a toolset on their own. The gate stops a job on a runner with another
+    toolset. The pin changes only in a cpp-policy release, like
+    `LLVM_VERSION`. 14.44 is the last Visual Studio 2022 release, which only
+    gets servicing updates, so the pin needs no upkeep.
+  - GitHub's Windows image updates its own, newer toolset every few weeks.
+    cpp-policy's own CI keeps it, so findings from a newer library show up
+    there before any project moves to it.
+  - Every CI job prints its standard library's version (MSVC toolset,
+    libstdc++ or libc++), so a difference between two runs can be traced.
+
+  On Linux the library is the distribution's libstdc++; on macOS it is
+  libc++, which comes with LLVM and so is pinned with it.
 
 ### 1.1 Dependencies
 

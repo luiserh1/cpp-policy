@@ -9,7 +9,7 @@ The rules are in [POLICY.md](POLICY.md).
 From a clone of cpp-policy checked out at the release you want:
 
 ```
-git -C cpp-policy checkout v0.16.0
+git -C cpp-policy checkout v0.17.0
 sh cpp-policy/tools/new-project.sh ~/code/MyTool MyTool            # add --vcpkg for dependencies
 cd ~/code/MyTool && cmake --workflow --preset check
 git add --all && git commit
@@ -38,7 +38,7 @@ can't ship a template that fails its own policy.
 include(FetchContent)
 FetchContent_Declare(cpp_policy
     GIT_REPOSITORY https://github.com/luiserh1/cpp-policy.git
-    GIT_TAG        <commit>)   # v0.16.0, the latest release; see CHANGELOG.md
+    GIT_TAG        <commit>)   # v0.17.0, the latest release; see CHANGELOG.md
 FetchContent_MakeAvailable(cpp_policy)
 
 add_executable(app src/main.cpp)
@@ -56,7 +56,7 @@ and this repository's CMake code runs on every machine that configures the
 project (POLICY.md 10). The commit is the line ending in `^{}`:
 
 ```
-git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.16.0*'
+git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.17.0*'
 ```
 
 Don't add `GIT_SHALLOW`: it only works with branch and tag names.
@@ -66,7 +66,7 @@ Don't add `GIT_SHALLOW`: it only works with branch and tag names.
 From the project's root, with a clean working folder:
 
 ```
-sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.16.0
+sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.17.0
 ```
 
 Any copy of this repository's `tools/upgrade.sh` works (from v0.10.1 on): it
@@ -139,7 +139,7 @@ permissions:
   contents: read
 jobs:
   gate:
-    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@<commit> # v0.16.0
+    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@<commit> # v0.17.0
     with:
       systems: '["linux", "windows", "macos"]'
       vcpkg: true          # if the project has a vcpkg.json
@@ -211,7 +211,7 @@ machines no configuration is needed:
 | macOS (Intel) | `brew install llvm ninja` | `/usr/local/opt/llvm/bin` |
 | Debian / Ubuntu | [apt.llvm.org](https://apt.llvm.org) packages for LLVM 23, plus `ninja-build` | `/usr/lib/llvm-23/bin` |
 | Other Linux (e.g. Arch, CachyOS) | The official LLVM 23 release tarball (`LLVM-23.x.y-Linux-X64.tar.xz` from GitHub; check its SHA-256), extracted with `--strip-components=1` into `/usr/lib/llvm-23`, plus Ninja | `/usr/lib/llvm-23/bin` |
-| Windows | Official LLVM installer (default path), Ninja, and Visual Studio or Build Tools with the "C++ AddressSanitizer" component (for the Windows SDK, the runtime and `stl_asan.lib`) | `C:\Program Files\LLVM\bin` |
+| Windows | Official LLVM installer (default path), Ninja, and Visual Studio 2022 17.14 (MSVC 14.44) or later, or its Build Tools, with the "C++ AddressSanitizer" component (for the Windows SDK, the runtime and `stl_asan.lib`) | `C:\Program Files\LLVM\bin` |
 
 Things to know:
 
@@ -224,6 +224,8 @@ Things to know:
   `/usr/lib/llvm-23/bin` are what the presets use.
 - **Windows:** the LLVM that comes with Visual Studio may be older than 23.
   Use the official installer.
+- **Windows, self-hosted CI runners:** exactly the Microsoft toolset the gate
+  pins (`MSVC_TOOLSET` in `gate.yml`, POLICY.md 1), and no other.
 - **Windows:** the `win-dev` and `win-check` presets build with AddressSanitizer,
   and the MSVC standard library then links `stl_asan.lib`. It comes with the
   Visual Studio component "C++ AddressSanitizer"

@@ -15,10 +15,13 @@
 # "Linux", "Windows"). Its minutes are free. A job waits while the machine is off, and GitHub
 # fails it after 24 hours in the queue. The gate installs and resets nothing there: it uses
 # the machine's LLVM, CMake and Ninja as they are, and a vcpkg copy of its own in the runner's
-# tool folder (never the owner's VCPKG_ROOT).
+# tool folder (never the owner's VCPKG_ROOT). A self-hosted Windows machine must have the
+# Microsoft toolset MSVC_TOOLSET names, and the job stops if it doesn't; GitHub's Windows image
+# brings its own, newer one (POLICY.md 1).
 #
 # Every download is pinned: actions by commit, the Linux apt key by fingerprint, the Windows
-# LLVM archive by SHA-256. Change LLVM_VERSION and the hash together.
+# LLVM archive by SHA-256. Change LLVM_VERSION and the hash together. A change to LLVM_VERSION
+# or MSVC_TOOLSET means the self-hosted machines must be upgraded before projects pin it.
 name: gate
 
 on:
@@ -47,6 +50,9 @@ env:
   LLVM_WINDOWS_SHA256: 8fb91cdc44fcbbdcf6b3ffd0a1f9859abd14a3c3aae4423c2b6d4a4f90bf0095
   # apt.llvm.org signing key.
   LLVM_APT_KEY_FINGERPRINT: 6084F3CF814B57C1CF12EFD515CF4D18AF4F7421
+  # The Microsoft toolset (MSVC libraries, standard library and runtime) of self-hosted Windows
+  # runners, major.minor: 14.44 is Visual Studio 2022 17.14, which only gets servicing updates.
+  MSVC_TOOLSET: '14.44'
 
 jobs:
   gate:
@@ -127,6 +133,25 @@ jobs:
           clang-tidy --version
           cmake --version
           ninja --version
+          # The standard library the build reads: some clang-tidy findings depend on it.
+          if [ "${{ matrix.system }}" = windows ]; then
+            # The MSVC toolset clang-cl finds, from the include paths it passes to itself.
+            echo 'int main() {}' > toolset-probe.cpp
+            msvc=$(clang-cl -### -c toolset-probe.cpp 2>&1 \
+              | sed -n 's/.*MSVC[\\/]*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p')
+            msvc=${msvc%%$'\n'*}
+            rm -f toolset-probe.cpp
+            echo "MSVC toolset: ${msvc:-not found}"
+            if [ "$SELF_HOSTED" = true ] && [ "${msvc%.*}" != "$MSVC_TOOLSET" ]; then
+              echo "This runner's MSVC toolset is ${msvc:-missing}; the gate pins $MSVC_TOOLSET" \
+                "(MSVC_TOOLSET in gate.yml, POLICY.md 1). Install that toolset, and only that one."
+              exit 1
+            fi
+          else
+            printf '#include <version>\n' | clang++ -x c++ -std=c++23 -dM -E - \
+              | grep -E '#define (_LIBCPP_VERSION|_GLIBCXX_RELEASE|__GLIBCXX__) ' \
+              || echo "Standard library version: not found"
+          fi
 
       # The runner image's vcpkg is a checkout from when the image was built. Move it to the
       # manifest's builtin-baseline, as on a developer's machine: vcpkg reads port versions
