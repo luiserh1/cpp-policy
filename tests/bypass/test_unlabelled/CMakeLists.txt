@@ -1,12 +1,9 @@
 cmake_minimum_required(VERSION 3.29)
-project(bypass_clean LANGUAGES CXX)
+project(bypass_test_unlabelled LANGUAGES CXX)
 include("${POLICY_ROOT}/cmake/CppPolicy.cmake")
 
 add_executable(app app.cpp)
 cpp_policy_apply(app)
-# A test that isn't a doctest program is allowed when it is named and labelled like one.
 enable_testing()
 add_test(NAME integration/app/runs COMMAND app)
-set_tests_properties(integration/app/runs PROPERTIES LABELS integration)
-
 cpp_policy_add_checks()

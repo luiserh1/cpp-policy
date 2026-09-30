@@ -685,6 +685,9 @@ These rules rely on review (and on agents following `AGENTS.md`):
 - Project structure (section 11): layers and file size are checked; the
   helper extraction rule, comment accuracy and the roadmap's layout will
   always rely on review
+- How tests are written (section 13.4): test names, labels and skipped
+  tests are checked; `REQUIRE` versus `CHECK`, one behavior per test, fakes,
+  no sleeps and testing through public headers rely on review
 
 Every other rule in section 2, and the function size limits of section 11.3,
 has a sample in `tests/bad/` proving clang-tidy rejects it (one of them in a
@@ -979,3 +982,126 @@ day the feature appears (`tests/probes/`).
 
 When an item resolves: remove its workarounds (search for `Waiting Wn`),
 delete its row and probe, and record the change in `CHANGELOG.md`.
+
+## 13. Testing
+
+Every project tests its code with doctest, through `cpp_policy_add_tests()`,
+which turns the rules on names, labels and kinds into one line per test
+program. (cpp-policy's own self-test is exempt: it tests CMake scripts and
+tools, not a program's modules.)
+
+### 13.1 Kinds of tests
+
+| Kind | What it tests | Rules | Time limit |
+|---|---|---|---|
+| `unit` | One module, through its public header | No files, network, child processes, threads or clock; results don't depend on the machine | 10 seconds per test case (in practice milliseconds) |
+| `integration` | Modules together, or a module with the OS | Real sockets on ephemeral ports (port 0), temporary files and folders under the build folder, threads and processes; every wait has a timeout | 60 seconds, or less with `TIMEOUT` |
+
+**Regression tests** aren't a kind of their own. When a bug is fixed, a test
+that shows the bug comes with the fix. It is written first and seen failing,
+then passes with the fix, and it goes in `TEST_SUITE("regression")`, which
+labels it `regression` as well as its kind. It is kept, so the bug can't come
+back unnoticed. Benchmarks are reserved for the budgets and performance
+sections, still on the roadmap.
+
+### 13.2 Test programs and names
+
+```cmake
+cpp_policy_add_tests(unit message SOURCES test_sanitize.cpp LIBRARIES sls_core)
+cpp_policy_add_tests(integration server SOURCES test_server.cpp LIBRARIES sls_core
+                     TIMEOUT 30 ENVIRONMENT "HELPER=$<TARGET_FILE:helper>")
+```
+
+- **One program per kind and module,** `test_<kind>_<module>`, built with
+  the policy like any target and linked with doctest's `main()` from
+  cpp-policy.
+- **Each `TEST_CASE` is one CTest test,** named `<kind>/<module>/<test
+  case>` and labelled with its kind, so `ctest -L unit` and `-R <regex>`
+  select tests. `cmake --workflow --preset unit` (`win-unit`) builds without
+  clang-tidy and runs the unit tests only.
+  - Each test case runs in its own process, so no state can leak from one
+    to another, and a crash fails only its own test.
+  - Table rows are not separate tests. Each CTest test is a process, and
+    AddressSanitizer takes about 0.15 s to start one. Rows run in a loop in
+    their test case, and `CAPTURE` names the row that failed.
+- **A test case is named after its behavior,** as a sentence ("an empty name
+  is refused"). Names use letters, digits, spaces and `' . : ( ) + = - _`.
+  doctest selects a test by a filter in which `,` `*` `?` and `\` are
+  special, and two names that differ only in case would select each other.
+- **Registration checks the tests after every build,** and the build fails
+  on any of these:
+  - a skipped test case;
+  - a name outside those characters, or two names that differ only in case;
+  - a doctest suite other than `regression`;
+  - a program with no tests.
+- **A test that isn't a doctest program** is added with `add_test()`, named
+  and labelled the same way. Examples: running the finished program with
+  arguments, or a script. Configuration fails for a test without a
+  `<kind>/<module>/` name and its kind's label.
+
+### 13.3 doctest
+
+doctest was chosen over GoogleTest after both were tried on a real test file
+and on the three systems (CHANGELOG 0.19.0):
+- its `REQUIRE` stops the test even from inside a helper function;
+- its failures print both values without extra code;
+- clang-tidy sees all the test code, because table rows aren't written inside
+  macros;
+- it is header-only.
+
+Projects add it to `vcpkg.json` like any dependency (section 1.1).
+
+- **`main()` comes from cpp-policy** (`cmake/testing/doctest_main.cpp`), in
+  a file of its own. Compiled in the same file as the tests, doctest's
+  implementation lets the static analyzer follow its string class, and it
+  reports memory leaks that LeakSanitizer shows don't exist (seen on macOS
+  and Windows).
+- **Printing a project's types in failures.** doctest prints a value with
+  `operator<<` if one exists, and an enum as its number otherwise. The
+  operator goes in the type's namespace, where doctest finds it, inside an
+  inline anonymous namespace:
+
+  ```cpp
+  namespace app {
+  inline namespace {
+  std::ostream& operator<<(std::ostream& out, GreetingError error) {
+      return out << describe(error);
+  }
+  } // namespace
+  } // namespace app
+  ```
+
+  Why this shape: clang-tidy wants a function used in one file to have
+  internal linkage (`misc-use-internal-linkage`), and rejects `static` for it
+  (`misc-use-anonymous-namespace`). A plain anonymous namespace would hide the
+  operator from doctest, because argument-dependent lookup ignores
+  using-directives; an inline one doesn't.
+
+### 13.4 How tests are written
+
+- **`REQUIRE` only for what the rest of the test depends on;** `CHECK` for
+  everything else, so one run reports every failure. For example,
+  `REQUIRE(result.has_value())` comes before `*result`, and
+  `REQUIRE_FALSE(result.has_value())` before `result.error()`: either call on
+  the wrong alternative is undefined behavior.
+- **Compare inside the check,** as in `CHECK(*text == "Hello, Ada!")`: doctest
+  prints both sides only of a comparison.
+- **One behavior per test case,** named after it.
+- **Through the public interface:** a test includes the module's header from
+  `src/` like any other code. A private helper worth testing on its own
+  belongs in a module of its own.
+- **Tables for cases of one behavior:** a `std::array` of rows with a `what`
+  field, and a loop with `CAPTURE(row.what)`.
+- **Fakes rather than mocks:** a small class that implements the interface
+  with fixed behavior. No mocking framework.
+- **No sleeps.** Wait for the event itself, with a timeout: a condition
+  variable, `std::future::wait_for`, or polling with a deadline.
+- **No state shared between test cases,** and no mutable globals (clang-tidy
+  already rejects them).
+- **No skipped tests.** Registration refuses them: fix the test, or delete
+  it and record the missing test in `ROADMAP.md`.
+- **A bug fix comes with a regression test** that fails without it (13.1).
+
+*Enforcement:* the helper, registration and configuration check the names,
+labels, suites, skipped tests and time limits. The rest of 13.4 relies on
+review (section 8.1).

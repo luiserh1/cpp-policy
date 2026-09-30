@@ -16,4 +16,4 @@ jobs:
     uses: @POLICY_GITHUB@/.github/workflows/gate.yml@@POLICY_COMMIT@ # @POLICY_TAG@
     with:
       systems: '["linux", "windows", "macos"]'
-      vcpkg: @VCPKG_CI@
+      vcpkg: true

@@ -1,0 +1,1 @@
+test 'smoke' isn't named <kind>/<module>/<case>

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doctest binary="t" version="2.5.3">
+  <TestCase name="commas, stars * and questions?" filename="test_app.cpp" line="4" skipped="false"/>
+  <OverallResultsTestCases unskipped="1"/>
+</doctest>

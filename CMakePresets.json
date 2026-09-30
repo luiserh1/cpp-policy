@@ -247,6 +247,15 @@
       }
     },
     {
+      "name": "unit",
+      "inherits": "dev",
+      "filter": {
+        "include": {
+          "label": "^unit$"
+        }
+      }
+    },
+    {
       "name": "check",
       "configurePreset": "check",
       "output": {
@@ -292,6 +301,15 @@
       }
     },
     {
+      "name": "win-unit",
+      "inherits": "win-dev",
+      "filter": {
+        "include": {
+          "label": "^unit$"
+        }
+      }
+    },
+    {
       "name": "win-check",
       "configurePreset": "win-check",
       "output": {
@@ -313,6 +331,23 @@
     }
   ],
   "workflowPresets": [
+    {
+      "name": "unit",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "dev"
+        },
+        {
+          "type": "build",
+          "name": "dev"
+        },
+        {
+          "type": "test",
+          "name": "unit"
+        }
+      ]
+    },
     {
       "name": "check",
       "steps": [
@@ -361,6 +396,23 @@
         {
           "type": "test",
           "name": "tsan"
+        }
+      ]
+    },
+    {
+      "name": "win-unit",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "win-dev"
+        },
+        {
+          "type": "build",
+          "name": "win-dev"
+        },
+        {
+          "type": "test",
+          "name": "win-unit"
         }
       ]
     },

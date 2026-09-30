@@ -2,18 +2,18 @@
 # tools/new-project.sh runs it; see there.
 #
 #   cmake -DPOLICY_ROOT=<dir> -DDEST=<dir> -DNAME=<Name> -DCOMMIT=<sha> -DTAG=<v1.2.3>
-#         -DREPOSITORY=<url> [-DVCPKG_BASELINE=<sha>] -P new_project.cmake
+#         -DREPOSITORY=<url> -DVCPKG_BASELINE=<sha> -P new_project.cmake
 #
 # The project gets the release's policy files unchanged (.clang-tidy, .clang-format,
 # CMakePresets.json, .gitignore, .gitattributes, tools/hooks/), agent settings, a CI workflow
 # pinned to the same commit as CMakeLists.txt, a small program that shows each layer, and
-# CHANGELOG.md and ROADMAP.md (POLICY.md 11.5).
-# VCPKG_BASELINE set means the project uses vcpkg: it gets vcpkg.json with that baseline, and
-# tools/vcpkg/, through which its CMakeLists.txt loads vcpkg.
+# CHANGELOG.md and ROADMAP.md (POLICY.md 11.5). Every project uses vcpkg, at least for doctest
+# (POLICY.md 13): it gets vcpkg.json with VCPKG_BASELINE as its baseline, and tools/vcpkg/,
+# through which its CMakeLists.txt loads vcpkg.
 
 cmake_minimum_required(VERSION 3.29)
 
-foreach(variable IN ITEMS POLICY_ROOT DEST NAME COMMIT TAG REPOSITORY)
+foreach(variable IN ITEMS POLICY_ROOT DEST NAME COMMIT TAG REPOSITORY VCPKG_BASELINE)
     if(NOT DEFINED ${variable} OR "${${variable}}" STREQUAL "")
         message(FATAL_ERROR "new_project.cmake: ${variable} is required")
     endif()
@@ -47,19 +47,8 @@ else()
     set(POLICY_GITHUB "luiserh1/cpp-policy")
 endif()
 
-if(DEFINED VCPKG_BASELINE AND NOT VCPKG_BASELINE STREQUAL "")
-    file(READ "${template}/vcpkg-toolchain.cmake.in" VCPKG_TOOLCHAIN)
-    set(VCPKG_CI true)
-    set(VCPKG_AGENTS " Each `vcpkg.json` entry needs\n  `\"default-features\": false` and a `\"$reason\"`.")
-    set(VCPKG_REQUIREMENT ", plus vcpkg, with `VCPKG_ROOT` set to its folder")
-    set(VCPKG_README "\nDependencies come from vcpkg (`vcpkg.json`, pinned by its\n`builtin-baseline`); set `VCPKG_ROOT` before configuring.\n")
-else()
-    set(VCPKG_TOOLCHAIN "")
-    set(VCPKG_CI false)
-    set(VCPKG_AGENTS "")
-    set(VCPKG_REQUIREMENT "")
-    set(VCPKG_README "")
-endif()
+file(READ "${template}/vcpkg-toolchain.cmake.in" VCPKG_TOOLCHAIN)
+set(VCPKG_AGENTS " Each `vcpkg.json` entry needs\n  `\"default-features\": false` and a `\"$reason\"`.")
 
 # The release's policy files, unchanged; the hooks stay executable.
 file(MAKE_DIRECTORY "${DEST}/.claude" "${DEST}/.github/workflows")
@@ -81,11 +70,9 @@ configure_file("${template}/README.md.in" "${DEST}/README.md" @ONLY)
 configure_file("${template}/CHANGELOG.md.in" "${DEST}/CHANGELOG.md" @ONLY)
 configure_file("${template}/ROADMAP.md.in" "${DEST}/ROADMAP.md" @ONLY)
 configure_file("${template}/ci.yml.in" "${DEST}/.github/workflows/ci.yml" @ONLY)
-if(VCPKG_CI)
-    configure_file("${template}/vcpkg.json.in" "${DEST}/vcpkg.json" @ONLY)
-    # CMakeLists.txt loads vcpkg through these, unchanged like the hooks (POLICY.md 1.1).
-    file(COPY "${POLICY_ROOT}/tools/vcpkg" DESTINATION "${DEST}/tools")
-endif()
+configure_file("${template}/vcpkg.json.in" "${DEST}/vcpkg.json" @ONLY)
+# CMakeLists.txt loads vcpkg through these, unchanged like the hooks (POLICY.md 1.1).
+file(COPY "${POLICY_ROOT}/tools/vcpkg" DESTINATION "${DEST}/tools")
 
 # Every placeholder must have been filled in.
 file(GLOB_RECURSE written "${DEST}/*")

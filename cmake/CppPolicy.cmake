@@ -4,6 +4,7 @@
 #   FetchContent_Declare(cpp_policy GIT_REPOSITORY ... GIT_TAG vX.Y.Z)
 #   FetchContent_MakeAvailable(cpp_policy)
 #   cpp_policy_apply(my_target)      # once per target you own
+#   cpp_policy_add_tests(unit my_module SOURCES ... LIBRARIES ...)   # test programs
 #   cpp_policy_add_checks()          # once, adds the audit and format targets
 #
 # Options are normally set by CMakePresets.json, not by hand.
@@ -25,6 +26,7 @@ set(CPP_POLICY_CONFINED_DIRS "src/lowlevel" CACHE STRING
     "Directories (relative to the project root) where suppressions and low-level code are allowed")
 set(CPP_POLICY_EXCLUDED_DIRS "build;out;.git;third_party;external;vcpkg_installed" CACHE STRING
     "Directories (relative to the project root) that the audit and format checks skip")
+set(CPP_POLICY_TEST_KINDS unit integration CACHE INTERNAL "Test kinds (POLICY.md 13)")
 
 # ---------------------------------------------------------------------------
 # Toolchain verification
@@ -289,6 +291,33 @@ function(_cpp_policy_project_targets dir out)
     set(${out} ${targets} PARENT_SCOPE)
 endfunction()
 
+# Lists the tests added with add_test() in `dir` and its subdirectories, with the same
+# directories skipped as for targets. (Tests from cpp_policy_add_tests() are registered at
+# build time and aren't listed.)
+function(_cpp_policy_project_tests dir out)
+    get_property(tests DIRECTORY "${dir}" PROPERTY TESTS)
+    set(found "")
+    foreach(test IN LISTS tests)
+        list(APPEND found "${dir}|${test}")
+    endforeach()
+    get_property(subdirs DIRECTORY "${dir}" PROPERTY SUBDIRECTORIES)
+    foreach(sub IN LISTS subdirs)
+        cmake_path(IS_PREFIX CMAKE_BINARY_DIR "${sub}" NORMALIZE in_build_tree)
+        cmake_path(RELATIVE_PATH sub BASE_DIRECTORY "${CMAKE_SOURCE_DIR}" OUTPUT_VARIABLE rel)
+        set(excluded FALSE)
+        foreach(dir_name IN LISTS CPP_POLICY_EXCLUDED_DIRS)
+            if(rel STREQUAL dir_name OR rel MATCHES "^${dir_name}/")
+                set(excluded TRUE)
+            endif()
+        endforeach()
+        if(NOT in_build_tree AND NOT excluded)
+            _cpp_policy_project_tests("${sub}" sub_tests)
+            list(APPEND found ${sub_tests})
+        endif()
+    endforeach()
+    set(${out} ${found} PARENT_SCOPE)
+endfunction()
+
 # Appends a problem to the list named by `out_list` for each option that turns warnings or
 # clang-cl's hardening off. clang-cl accepts either prefix, so both are checked.
 # (The parameter must not be called `problems`: it would shadow the caller's list.)
@@ -357,6 +386,40 @@ function(_cpp_policy_verify_targets)
         list(JOIN problems "\n  " problem_list)
         message(FATAL_ERROR "cpp-policy: the policy is bypassed in CMake:\n  ${problem_list}\n"
             "Every target must call cpp_policy_apply() and keep its settings (POLICY.md 6).")
+    endif()
+    _cpp_policy_verify_tests()
+endfunction()
+
+# Tests added with add_test() instead of cpp_policy_add_tests() (a program run with arguments,
+# a script) follow the same names and labels (POLICY.md 13). cpp-policy's own self-test is
+# exempt: it tests CMake scripts and tools, not a program's modules.
+function(_cpp_policy_verify_tests)
+    if(CMAKE_PROJECT_NAME STREQUAL "cpp_policy")
+        return()
+    endif()
+    list(JOIN CPP_POLICY_TEST_KINDS "|" kinds)
+    set(problems "")
+    _cpp_policy_project_tests("${CMAKE_SOURCE_DIR}" tests)
+    foreach(entry IN LISTS tests)
+        string(REPLACE "|" ";" entry "${entry}")
+        list(GET entry 0 dir)
+        list(GET entry 1 test)
+        if(NOT test MATCHES "^(${kinds})/[a-z0-9_]+/.")
+            list(JOIN CPP_POLICY_TEST_KINDS ", " kind_list)
+            list(APPEND problems
+                "test '${test}' isn't named <kind>/<module>/<case> (kinds: ${kind_list})")
+            continue()
+        endif()
+        get_property(labels TEST "${test}" DIRECTORY "${dir}" PROPERTY LABELS)
+        if(NOT CMAKE_MATCH_1 IN_LIST labels)
+            list(APPEND problems "test '${test}' doesn't have the label '${CMAKE_MATCH_1}'")
+        endif()
+    endforeach()
+    if(problems)
+        list(JOIN problems "\n  " problem_list)
+        message(FATAL_ERROR "cpp-policy: tests outside the policy's names and labels:\n  "
+            "${problem_list}\nUse cpp_policy_add_tests(), or name and label the test as it "
+            "would (POLICY.md 13).")
     endif()
 endfunction()
 
@@ -484,6 +547,88 @@ function(cpp_policy_layers)
     endif()
     list(APPEND layers "${current}")
     set_property(GLOBAL PROPERTY CPP_POLICY_LAYERS "${layers}")
+endfunction()
+
+# ---------------------------------------------------------------------------
+# Tests (POLICY.md 13): one doctest program per kind and module.
+#   cpp_policy_add_tests(unit message SOURCES test_sanitize.cpp LIBRARIES sls_core)
+#   cpp_policy_add_tests(integration server SOURCES test_server.cpp LIBRARIES sls_core
+#                        TIMEOUT 30 ENVIRONMENT "HELPER=$<TARGET_FILE:helper>")
+# The program is test_<kind>_<module>, with doctest's main() from cpp-policy. After each build,
+# every test case becomes a CTest test named <kind>/<module>/<test case> and labelled with
+# its kind (scripts/doctest_tests.cmake). Unit tests have 10 seconds; integration tests 60,
+# or TIMEOUT.
+# ---------------------------------------------------------------------------
+function(cpp_policy_add_tests kind module)
+    cmake_parse_arguments(PARSE_ARGV 2 arg "" "TIMEOUT" "SOURCES;LIBRARIES;ENVIRONMENT")
+    set(usage "cpp_policy_add_tests(<kind> <module> SOURCES <file>... [LIBRARIES <target>...] "
+              "[TIMEOUT <seconds>] [ENVIRONMENT <VAR=value>...])")
+    string(JOIN "" usage ${usage})
+    if(arg_UNPARSED_ARGUMENTS OR NOT arg_SOURCES)
+        message(FATAL_ERROR "cpp-policy: usage: ${usage}")
+    endif()
+    if(NOT kind IN_LIST CPP_POLICY_TEST_KINDS)
+        message(FATAL_ERROR "cpp-policy: test kind '${kind}' isn't one of: ${CPP_POLICY_TEST_KINDS}")
+    endif()
+    if(NOT module MATCHES "^[a-z0-9_]+$")
+        message(FATAL_ERROR "cpp-policy: '${module}' isn't a module name (a directory under src/)")
+    endif()
+    if(kind STREQUAL "unit")
+        if(DEFINED arg_TIMEOUT)
+            message(FATAL_ERROR "cpp-policy: unit tests have a fixed limit of 10 seconds; a "
+                "slower test is an integration test (POLICY.md 13)")
+        endif()
+        set(timeout 10)
+    elseif(DEFINED arg_TIMEOUT)
+        if(NOT arg_TIMEOUT MATCHES "^[1-9][0-9]*$" OR arg_TIMEOUT GREATER 60)
+            message(FATAL_ERROR "cpp-policy: TIMEOUT is 1 to 60 seconds, the presets' limit")
+        endif()
+        set(timeout ${arg_TIMEOUT})
+    else()
+        set(timeout 60)
+    endif()
+    set(target test_${kind}_${module})
+    if(TARGET ${target})
+        message(FATAL_ERROR "cpp-policy: ${kind} tests for '${module}' are already added; "
+            "give one call all their SOURCES")
+    endif()
+
+    if(NOT TARGET doctest::doctest)
+        find_package(doctest CONFIG GLOBAL)
+        if(NOT doctest_FOUND)
+            message(FATAL_ERROR "cpp-policy: tests use doctest: add it to vcpkg.json "
+                "(POLICY.md 13)")
+        endif()
+    endif()
+    if(NOT TARGET cpp_policy_doctest_main)
+        add_library(cpp_policy_doctest_main OBJECT "${CPP_POLICY_ROOT}/cmake/testing/doctest_main.cpp")
+        target_link_libraries(cpp_policy_doctest_main PRIVATE doctest::doctest)
+        cpp_policy_apply(cpp_policy_doctest_main)
+    endif()
+
+    add_executable(${target} ${arg_SOURCES})
+    target_link_libraries(${target} PRIVATE ${arg_LIBRARIES} cpp_policy_doctest_main doctest::doctest)
+    cpp_policy_apply(${target})
+
+    # Registered after cpp_policy_apply(): on Windows, its post-build step copies the ASan
+    # runtime that the program needs to list its tests.
+    set(ctest_file "${CMAKE_CURRENT_BINARY_DIR}/${target}_tests.cmake")
+    add_custom_command(TARGET ${target} POST_BUILD
+        BYPRODUCTS "${ctest_file}"
+        COMMAND "${CMAKE_COMMAND}" "-DEXECUTABLE=$<TARGET_FILE:${target}>" "-DKIND=${kind}"
+                "-DMODULE=${module}" "-DTIMEOUT=${timeout}" "-DENVIRONMENT=${arg_ENVIRONMENT}"
+                "-DWORKING_DIR=${CMAKE_CURRENT_BINARY_DIR}" "-DCTEST_FILE=${ctest_file}"
+                -P "${CPP_POLICY_ROOT}/cmake/scripts/doctest_tests.cmake"
+        COMMENT "cpp-policy: registering the tests of ${target}"
+        VERBATIM)
+    set(include_file "${CMAKE_CURRENT_BINARY_DIR}/${target}_include.cmake")
+    file(WRITE "${include_file}"
+        "if(EXISTS [==[${ctest_file}]==])\n"
+        "    include([==[${ctest_file}]==])\n"
+        "else()\n"
+        "    add_test([==[${kind}/${module}/(not built)]==] [==[${target}-not-built]==])\n"
+        "endif()\n")
+    set_property(DIRECTORY APPEND PROPERTY TEST_INCLUDE_FILES "${include_file}")
 endfunction()
 
 # ---------------------------------------------------------------------------

@@ -1,26 +1,62 @@
 #include "app/greeting.hpp"
-#include "check.hpp"
-#include "lowlevel/environment.hpp"
 
+#include <doctest/doctest.h>
+
+#include <array>
+#include <ostream>
 #include <string>
+#include <string_view>
+
+// Failures show the error's description, not its number (POLICY.md 13): the operator is in
+// the enum's namespace, where doctest finds it, and inline so the anonymous namespace inside
+// keeps it private to this file.
+namespace app {
+inline namespace {
+std::ostream& operator<<(std::ostream& out, GreetingError error) {
+    return out << describe(error);
+}
+} // namespace
+} // namespace app
 
 namespace {
 
-void run(test::Checker& check) {
-    check.expect(app::greeting("Ada") == "Hello, Ada!", "a name is greeted");
-    check.expect(app::greeting("").error() == app::GreetingError::empty_name,
-                 "an empty name is an error");
-    const std::string long_name(app::max_name_length + 1, 'x');
-    check.expect(app::greeting(long_name).error() == app::GreetingError::name_too_long,
-                 "a name over the limit is an error");
+using app::GreetingError;
 
-    check.expect(lowlevel::environment_variable("PATH").has_value(), "PATH is set");
-    check.expect(!lowlevel::environment_variable("NO_SUCH_VARIABLE_4B1D").has_value(),
-                 "an unset variable is nothing");
-}
+struct Refused {
+    std::string_view what;
+    std::string name;
+    GreetingError error;
+};
 
 } // namespace
 
-int main() {
-    return test::run_tests(run);
+TEST_CASE("a name is greeted") {
+    const auto text = app::greeting("Ada");
+    REQUIRE(text.has_value());
+    CHECK(*text == "Hello, Ada!");
+}
+
+TEST_CASE("a name at the length limit is greeted") {
+    const std::string name(app::max_name_length, 'x');
+    const auto text = app::greeting(name);
+    REQUIRE(text.has_value());
+    CHECK(*text == "Hello, " + name + "!");
+}
+
+TEST_CASE("empty and too long names are refused") {
+    const std::array rows{
+        Refused{.what = "empty", .name = "", .error = GreetingError::empty_name},
+        Refused{
+            .what = "one character over the limit",
+            .name = std::string(app::max_name_length + 1, 'x'),
+            .error = GreetingError::name_too_long,
+        },
+    };
+    for (const auto& row : rows) {
+        CAPTURE(row.what);
+        const auto text = app::greeting(row.name);
+        // REQUIRE: error() on a success would be undefined behavior.
+        REQUIRE_FALSE(text.has_value());
+        CHECK(text.error() == row.error);
+    }
 }

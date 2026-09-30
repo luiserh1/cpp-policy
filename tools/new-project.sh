@@ -1,28 +1,29 @@
 #!/bin/sh
 # Creates a new project that follows cpp-policy, from the release this copy of cpp-policy is:
 #
-#   sh <cpp-policy>/tools/new-project.sh <folder> <Name> [--vcpkg]
+#   sh <cpp-policy>/tools/new-project.sh <folder> <Name>
 #
 # <cpp-policy> is a clone checked out at a release tag (git checkout v0.14.0). The project is
 # pinned to that commit, in CMakeLists.txt and in its CI workflow, and gets that release's
-# policy files, agent instructions and settings, and a small program that shows each layer.
-# --vcpkg adds vcpkg.json, with the baseline your VCPKG_ROOT is checked out at. The folder
-# becomes a git repository with the hooks enabled; nothing is committed.
+# policy files, agent instructions and settings, and a small program that shows each layer,
+# with its tests. It uses vcpkg, at least for doctest: vcpkg.json gets the baseline your
+# VCPKG_ROOT is checked out at. (--vcpkg, needed before v0.19.0, is still accepted.) The
+# folder becomes a git repository with the hooks enabled; nothing is committed.
 set -eu
 
 usage() {
-    echo "usage: sh new-project.sh <folder> <Name> [--vcpkg]" >&2
+    echo "usage: sh new-project.sh <folder> <Name>" >&2
     exit 2
 }
 [ $# -ge 2 ] && [ $# -le 3 ] || usage
+[ $# -eq 2 ] || [ "$3" = --vcpkg ] || usage
 dest=$1
 name=$2
-baseline=
-if [ $# -eq 3 ]; then
-    [ "$3" = --vcpkg ] || usage
-    [ -n "${VCPKG_ROOT:-}" ] || { echo "new-project: --vcpkg needs VCPKG_ROOT set" >&2; exit 1; }
-    baseline=$(git -C "$VCPKG_ROOT" rev-parse HEAD)
-fi
+[ -n "${VCPKG_ROOT:-}" ] || {
+    echo "new-project: set VCPKG_ROOT to your vcpkg folder (every project uses vcpkg)" >&2
+    exit 1
+}
+baseline=$(git -C "$VCPKG_ROOT" rev-parse HEAD)
 
 policy=$(cd "$(dirname "$0")/.." && pwd)
 commit=$(git -C "$policy" rev-parse HEAD)

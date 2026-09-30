@@ -23,26 +23,6 @@ in the walkthroughs of that time.
 Deliberately left for after everything else (owner's decision). They are one
 topic and will likely become new POLICY.md sections.
 
-- [ ] **Testing section (#38):** test kinds with their own rules: unit (one
-      module, no I/O, fast), integration (real sockets, files, threads;
-      ephemeral ports; timeouts), regression (a label on a test added with a
-      bug fix, written first), benchmark (see below). Suites as CTest labels,
-      names `<kind>/<module>/<case>`, a fast `unit` test preset. Framework: a
-      short spike porting one SimpleLocalServer test file to doctest and to
-      gtest (the one the owner knows), run through our clang-tidy, before
-      choosing (doctest favored: header-only, lightweight). The framework
-      stays optional for small projects.
-      The choice must keep the filtering the Carreritas runner had (by suite
-      and name, list only, stop at first failure, quiet), which CTest mostly
-      provides. Includes the working rule adopted during the walkthrough:
-      fixes that change what passes or fails come with a test (#26).
-- [ ] **Testing rules (#63):** framework-independent habits for POLICY.md:
-      REQUIRE/ASSERT only for preconditions and CHECK/EXPECT for checks,
-      comparisons that print both values, one behavior per test named after
-      it, no shared state (shuffle), test through public interfaces, fakes
-      over mocks, no sleeps, table-driven cases, no disabled tests without an
-      open item. Motivating case: `sanitize(x).error()` in SimpleLocalServer's
-      test_sanitize is undefined behavior if `sanitize` wrongly succeeds.
 - [ ] **Budgets (#52):** binary size of the `release` build (per platform,
       fail on unexplained growth; bloaty to explain it) and memory under a
       stress test (peak memory stays flat as load grows). The `benchmark`

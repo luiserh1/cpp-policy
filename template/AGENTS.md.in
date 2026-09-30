@@ -46,6 +46,20 @@ anything it lists under "Out of scope" or "Not planned". In the commit that
 finishes an item, tick it (or remove it from "Later"), and add the change,
 with its reason, to `CHANGELOG.md` under "Unreleased".
 
+## Tests
+
+- One doctest program per kind and module: `cpp_policy_add_tests(unit <module>
+  SOURCES ...)` in `tests/CMakeLists.txt`. Unit tests use no files, network or
+  threads and finish in well under a second; others are `integration`.
+- One behavior per `TEST_CASE`, named as a sentence about it. Tables of cases
+  go in a loop with `CAPTURE`.
+- `REQUIRE` only for what the rest of the test depends on (a value before
+  `*result` or `.error()`); `CHECK` for everything else. Compare with `==` so
+  failures print both values.
+- A fix for a bug comes with a test that fails without it, in
+  `TEST_SUITE("regression")`.
+- No sleeps, no skipped tests, no state shared between test cases.
+
 ## Before you say you are done
 
 After editing C++ files, check them right away (a few seconds per file; pre-commit

@@ -12,6 +12,6 @@ jobs:
   gate:
     uses: ./.github/workflows/gate.yml
     with:
-      # The self-test builds a small vcpkg project (tests/vcpkg_triplets) and the template's
-      # --vcpkg variant.
+      # The self-test builds a small vcpkg project (tests/vcpkg_triplets) and a project from
+      # the template, which uses vcpkg for doctest.
       vcpkg: true

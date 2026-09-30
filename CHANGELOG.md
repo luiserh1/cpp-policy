@@ -3,6 +3,111 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.19.0 (2026-09-30)
+
+A testing section and the tools that go with it: doctest for every project,
+one CTest test per test case, named and labelled by kind. Projects whose
+tests are added with `add_test()` under other names fail to configure until
+they move, so a minor release (POLICY.md 10).
+
+### Upgrading a project
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.19.0 --no-gate`.
+   The gate would fail until the next steps are done.
+2. Add doctest to `vcpkg.json`:
+   `{"name": "doctest", "default-features": false, "$reason": "..."}`.
+3. Move each test program to `cpp_policy_add_tests(<kind> <module> SOURCES
+   ... LIBRARIES ...)`, and its checks to doctest `TEST_CASE`s written as
+   POLICY.md 13.4 says. Tests that aren't doctest programs keep `add_test()`
+   with a `<kind>/<module>/<case>` name and their kind as label. Delete
+   `tests/check.hpp`.
+4. Have the owner update `AGENTS.md` with the "Tests" section of cpp-policy's
+   `template/AGENTS.md.in`.
+5. `cmake --workflow --preset check`, then commit.
+
+### Testing (POLICY.md 13, new)
+
+- **Kinds.**
+  - `unit`: one module; no files, network, processes, threads or clock;
+    10 s per test case.
+  - `integration`: modules together or with the OS; ephemeral ports, a
+    timeout on every wait; 60 s, or less with `TIMEOUT`.
+  - Regression tests are in doctest's `regression` suite and get that label
+    as well. They are written first, with the bug fix.
+- **`cpp_policy_add_tests()`** builds `test_<kind>_<module>` with the policy
+  and doctest's `main()` from cpp-policy. After each build, it registers
+  every `TEST_CASE` as the CTest test `<kind>/<module>/<test case>`,
+  labelled with its kind. The build fails on:
+  - a skipped test case;
+  - a name doctest can't select exactly (`,` `*` `?` `\`), or two names
+    that differ only in case;
+  - a suite other than `regression`;
+  - a program with no tests.
+- **Configuration** fails for a test added with `add_test()` without a
+  `<kind>/<module>/` name and its kind's label (cpp-policy's own self-test
+  is exempt).
+- **How tests are written (13.4):**
+  - `REQUIRE` only for preconditions of the rest of the test (the
+    `.error()` on a success in SimpleLocalServer's test was undefined
+    behavior);
+  - comparisons inside `CHECK`, one behavior per test, tables with
+    `CAPTURE`;
+  - fakes rather than mocks, no sleeps, no shared state, no skipped tests;
+  - a regression test with every bug fix.
+- *Why doctest:* a spike ported SimpleLocalServer's `test_sanitize` to
+  doctest and to GoogleTest. It ran them under the policy on macOS, then a
+  template project with both on Linux and Windows in CI. Both passed
+  everywhere; the differences:
+  - doctest's `REQUIRE` stops a test even from a helper function, while
+    GoogleTest's `ASSERT_*` only leaves the helper;
+  - doctest's failures print both values without extra code, while
+    GoogleTest prints table rows as raw bytes, even in CTest's test names,
+    until a printer is written for each type;
+  - clang-tidy checks all of doctest's test code, while code inside
+    GoogleTest's macros escapes some checks;
+  - doctest is header-only (smaller programs, nothing compiled per triplet).
+
+  GoogleTest was cleaner under clang-tidy with no setup, and the owner
+  knows it. The owner chose doctest (2026-09-30).
+- *Why doctest's `main()` is in its own file:* in the same file as the
+  tests, the static analyzer reports two memory leaks inside doctest's
+  string class on macOS and Windows. LeakSanitizer found none in 16 failing
+  checks over three runs, while the policy's leak test, run as a control,
+  reported its leaks.
+- *Why the printer idiom:* `operator<<` for a project enum must be found by
+  doctest (in the enum's namespace), have internal linkage
+  (`misc-use-internal-linkage`) and not be `static`
+  (`misc-use-anonymous-namespace`). Only an inline anonymous namespace does
+  all three; GoogleTest's `PrintTo` hook would also break the naming rule.
+- *Why one CTest test per test case, not per table row:* each CTest test is
+  a process, and AddressSanitizer takes about 0.15 s to start one. 33
+  row-level tests took 5.6 s where the programs took 0.04 s.
+
+### Presets
+
+- `unit` and `win-unit` workflows: build the `dev` configuration (no
+  clang-tidy) and run the tests labelled `unit`.
+
+### Template (`tools/new-project.sh`)
+
+- Every project uses vcpkg, at least for doctest: `VCPKG_ROOT` is required,
+  and `--vcpkg` is accepted but no longer needed. The owner chose doctest
+  for every project over a hand-written checker for small ones.
+- Tests for both modules with doctest through `cpp_policy_add_tests()`, and
+  `tests/check.hpp` is gone. `AGENTS.md` has a "Tests" section.
+
+### Self-test
+
+- `template/new_project` checks the generated project's tests as CTest sees
+  them (5 unit tests, by name) and that a skipped test case fails the
+  build. It now needs `VCPKG_ROOT`, like the vcpkg test.
+- `testing/*`: the registration script on saved doctest listings: an
+  accepted one, plus a skipped case, a bad name, two names that differ only
+  in case, another suite, and no tests.
+- `bypass/test_unnamed`, `bypass/test_unlabelled`: `add_test()` without the
+  name or the label fails configuration. `bypass/clean` has a correctly
+  named and labelled one.
+
 ## 0.18.0 (2026-09-30)
 
 How and when the toolchain pins move, and a guard so that Homebrew can't

@@ -135,8 +135,9 @@ add_test(NAME hooks/tidy_files
 
 # --- tools/new-project.sh's template: a generated project must pass its own gate. Only in the
 # builds with AddressSanitizer (dev, check), since it builds a whole project with the check
-# preset; the tsan and release workflows would only repeat it.
-if(CPP_POLICY_SANITIZERS)
+# preset; the tsan and release workflows would only repeat it. It needs vcpkg, for doctest
+# (the CI check for VCPKG_ROOT is with the vcpkg tests below).
+if(CPP_POLICY_SANITIZERS AND DEFINED ENV{VCPKG_ROOT})
     if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
         set(project_preset win-check)
     else()
@@ -175,11 +176,23 @@ if(DEFINED ENV{VCPKG_ROOT})
     set_tests_properties(vcpkg/dependencies_built_like_project PROPERTIES TIMEOUT 900)
 elseif(DEFINED ENV{CI})
     message(FATAL_ERROR "cpp-policy self-test: CI must set VCPKG_ROOT (gate.yml's vcpkg input), "
-        "or vcpkg/dependencies_built_like_project doesn't run")
+        "or vcpkg/dependencies_built_like_project and template/new_project don't run")
 else()
     message(STATUS "cpp-policy self-test: VCPKG_ROOT isn't set; "
-        "vcpkg/dependencies_built_like_project doesn't run")
+        "vcpkg/dependencies_built_like_project and template/new_project don't run")
 endif()
+
+# --- Test registration (POLICY.md 13): scripts/doctest_tests.cmake on saved doctest listings.
+# Each listing in testing/listings/ is <case>.xml, with <case>.expect: a regex the script's
+# output must match. "ok" must succeed and write the tests; the others must fail.
+file(GLOB listings CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/testing/listings/*.xml")
+foreach(listing IN LISTS listings)
+    cmake_path(GET listing STEM case)
+    add_test(NAME testing/${case}
+        COMMAND "${CMAKE_COMMAND}" "-DPOLICY_ROOT=${CPP_POLICY_ROOT}" "-DLISTING=${listing}"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/testing_${case}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/testing/run.cmake")
+endforeach()
 
 # --- Audit fixtures: each directory is a mini project.
 #   expect.txt    regex the audit output must match (include "file:line:" to pin the line)

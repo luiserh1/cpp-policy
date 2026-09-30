@@ -1,0 +1,1 @@
+test 'integration/app/runs' doesn't have the label 'integration'

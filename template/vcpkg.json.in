@@ -1,5 +1,11 @@
 {
   "name": "@VCPKG_NAME@",
-  "dependencies": [],
+  "dependencies": [
+    {
+      "name": "doctest",
+      "default-features": false,
+      "$reason": "The test framework (cpp-policy POLICY.md 13); header-only, MIT"
+    }
+  ],
   "builtin-baseline": "@VCPKG_BASELINE@"
 }
