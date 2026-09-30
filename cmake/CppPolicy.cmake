@@ -600,14 +600,20 @@ function(cpp_policy_add_tests kind module)
                 "(POLICY.md 13)")
         endif()
     endif()
+    # doctest includes the standard headers (<ostream> among them) only with libc++; with the
+    # other libraries it declares what it needs in namespace std itself, which the standard
+    # doesn't allow, and printing a std::string_view then fails to compile with Microsoft's
+    # library unless the test includes <ostream>. This makes doctest include them everywhere.
     if(NOT TARGET cpp_policy_doctest_main)
         add_library(cpp_policy_doctest_main OBJECT "${CPP_POLICY_ROOT}/cmake/testing/doctest_main.cpp")
         target_link_libraries(cpp_policy_doctest_main PRIVATE doctest::doctest)
+        target_compile_definitions(cpp_policy_doctest_main PRIVATE DOCTEST_CONFIG_USE_STD_HEADERS)
         cpp_policy_apply(cpp_policy_doctest_main)
     endif()
 
     add_executable(${target} ${arg_SOURCES})
     target_link_libraries(${target} PRIVATE ${arg_LIBRARIES} cpp_policy_doctest_main doctest::doctest)
+    target_compile_definitions(${target} PRIVATE DOCTEST_CONFIG_USE_STD_HEADERS)
     cpp_policy_apply(${target})
 
     # Registered after cpp_policy_apply(): on Windows, its post-build step copies the ASan

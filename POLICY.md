@@ -1056,6 +1056,12 @@ Projects add it to `vcpkg.json` like any dependency (section 1.1).
   implementation lets the static analyzer follow its string class, and it
   reports memory leaks that LeakSanitizer shows don't exist (seen on macOS
   and Windows).
+- **doctest uses the real standard headers.** `cpp_policy_add_tests()`
+  defines `DOCTEST_CONFIG_USE_STD_HEADERS`. Without it, doctest includes
+  `<ostream>` only with libc++, and with the other libraries declares what it
+  needs in `namespace std` itself, which the standard doesn't allow. A test
+  that printed a `std::string_view` (in `CAPTURE`, or a failed comparison)
+  then compiled on macOS and Linux but not with Microsoft's library.
 - **Printing a project's types in failures.** doctest prints a value with
   `operator<<` if one exists, and an enum as its number otherwise. The
   operator goes in the type's namespace, where doctest finds it, inside an

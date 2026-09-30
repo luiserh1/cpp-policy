@@ -3,6 +3,42 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.19.1 (2026-09-30)
+
+A fix to v0.19.0: a test that prints a `std::string_view` compiles on
+Windows. Nothing that passed can fail, so a patch release (POLICY.md 10).
+
+### Upgrading a project
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.19.1`, from v0.19.0
+   or, together with its steps, from an older release. A test that added
+   `#include <ostream>` only for this can drop it.
+
+### Testing (POLICY.md 13.3)
+
+- `cpp_policy_add_tests()` defines `DOCTEST_CONFIG_USE_STD_HEADERS` for
+  doctest's `main()` and every test program, so doctest includes the
+  standard headers (`<ostream>` among them) on every system. *Why:*
+  SimpleLocalServer's port to doctest (its report of 2026-09-30) failed to
+  compile on both Windows jobs. A test `CAPTURE`d a `std::string_view` without
+  including `<ostream>`, and Microsoft's library defines `string_view`'s
+  `operator<<` only with it.
+  - doctest includes the standard headers only with libc++. With libstdc++
+    and Microsoft's library it declares what it needs in `namespace std`
+    itself, which the standard doesn't allow (the header silences
+    clang-tidy's check for that).
+  - Chosen over the report's suggestion, a rule to include `<ostream>`:
+    nothing would check that rule, since `misc-include-cleaner` is off, and
+    the option removes the cause on every system.
+- The template's own test missed it because its file includes `<ostream>` for
+  a printer.
+
+### Self-test
+
+- The template's lowlevel test prints a `std::string_view` (in `CAPTURE`)
+  without including `<ostream>`. Without the fix, CI's Windows check job
+  failed with the report's error; with it, all jobs pass.
+
 ## 0.19.0 (2026-09-30)
 
 A testing section and the tools that go with it: doctest for every project,

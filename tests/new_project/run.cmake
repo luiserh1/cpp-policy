@@ -8,7 +8,9 @@
 # clang-tidy, pass the audit (policy files unchanged, CI pin, layers) and the format check,
 # pass its tests, print its greeting, and make its first commit through its own hooks. Its
 # tests must reach CTest one per test case, named and labelled by cpp_policy_add_tests(), and a
-# skipped test case must fail the build (POLICY.md 13). It needs VCPKG_ROOT, for doctest.
+# skipped test case must fail the build (POLICY.md 13). It needs VCPKG_ROOT, for doctest. The
+# template's lowlevel test prints a std::string_view without including <ostream>, which only
+# compiles with Microsoft's library because cpp_policy_add_tests() makes doctest include it.
 
 cmake_minimum_required(VERSION 3.29)
 find_package(Git REQUIRED)

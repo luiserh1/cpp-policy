@@ -2,8 +2,12 @@
 
 #include <doctest/doctest.h>
 
+#include <string_view>
+
 TEST_CASE("a variable that is set is read") {
-    CHECK(lowlevel::environment_variable("PATH").has_value());
+    constexpr std::string_view name = "PATH";
+    CAPTURE(name);
+    CHECK(lowlevel::environment_variable(name).has_value());
 }
 
 TEST_CASE("a variable that isn't set is nothing") {
