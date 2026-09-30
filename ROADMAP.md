@@ -11,13 +11,6 @@ in the walkthroughs of that time.
 
 ## Later
 
-- [ ] **Moving the toolchain pins:** a protocol for moving `MSVC_TOOLSET`
-      (and `LLVM_VERSION`) to newer versions from time to time. For
-      example: when to move, trying the new version on cpp-policy's own
-      CI and the server before a release, and the order of the messages to
-      the server and project conversations. The owner wants to move to
-      newer toolsets now and then (2026-09-30).
-
 ### Waiting
 
 - [ ] **Modules experiment:** once CMake makes `import std` stable, convert

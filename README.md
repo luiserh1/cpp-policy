@@ -9,7 +9,7 @@ The rules are in [POLICY.md](POLICY.md).
 From a clone of cpp-policy checked out at the release you want:
 
 ```
-git -C cpp-policy checkout v0.17.0
+git -C cpp-policy checkout v0.18.0
 sh cpp-policy/tools/new-project.sh ~/code/MyTool MyTool            # add --vcpkg for dependencies
 cd ~/code/MyTool && cmake --workflow --preset check
 git add --all && git commit
@@ -38,7 +38,7 @@ can't ship a template that fails its own policy.
 include(FetchContent)
 FetchContent_Declare(cpp_policy
     GIT_REPOSITORY https://github.com/luiserh1/cpp-policy.git
-    GIT_TAG        <commit>)   # v0.17.0, the latest release; see CHANGELOG.md
+    GIT_TAG        <commit>)   # v0.18.0, the latest release; see CHANGELOG.md
 FetchContent_MakeAvailable(cpp_policy)
 
 add_executable(app src/main.cpp)
@@ -56,7 +56,7 @@ and this repository's CMake code runs on every machine that configures the
 project (POLICY.md 10). The commit is the line ending in `^{}`:
 
 ```
-git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.17.0*'
+git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.18.0*'
 ```
 
 Don't add `GIT_SHALLOW`: it only works with branch and tag names.
@@ -66,7 +66,7 @@ Don't add `GIT_SHALLOW`: it only works with branch and tag names.
 From the project's root, with a clean working folder:
 
 ```
-sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.17.0
+sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.18.0
 ```
 
 Any copy of this repository's `tools/upgrade.sh` works (from v0.10.1 on): it
@@ -139,7 +139,7 @@ permissions:
   contents: read
 jobs:
   gate:
-    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@<commit> # v0.17.0
+    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@<commit> # v0.18.0
     with:
       systems: '["linux", "windows", "macos"]'
       vcpkg: true          # if the project has a vcpkg.json
@@ -207,8 +207,8 @@ machines no configuration is needed:
 
 | Platform | Install | Location searched by the presets |
 |---|---|---|
-| macOS (Apple Silicon) | `brew install llvm ninja` | `/opt/homebrew/opt/llvm/bin` |
-| macOS (Intel) | `brew install llvm ninja` | `/usr/local/opt/llvm/bin` |
+| macOS (Apple Silicon) | `brew install llvm ninja`, or `llvm@23` once Homebrew's `llvm` is a newer major | `/opt/homebrew/opt/llvm@23/bin`, then `/opt/homebrew/opt/llvm/bin` |
+| macOS (Intel) | `brew install llvm ninja`, or `llvm@23` as above | `/usr/local/opt/llvm@23/bin`, then `/usr/local/opt/llvm/bin` |
 | Debian / Ubuntu | [apt.llvm.org](https://apt.llvm.org) packages for LLVM 23, plus `ninja-build` | `/usr/lib/llvm-23/bin` |
 | Other Linux (e.g. Arch, CachyOS) | The official LLVM 23 release tarball (`LLVM-23.x.y-Linux-X64.tar.xz` from GitHub; check its SHA-256), extracted with `--strip-components=1` into `/usr/lib/llvm-23`, plus Ninja | `/usr/lib/llvm-23/bin` |
 | Windows | Official LLVM installer (default path), Ninja, and Visual Studio 2022 17.14 (MSVC 14.44) or later, or its Build Tools, with the "C++ AddressSanitizer" component (for the Windows SDK, the runtime and `stl_asan.lib`) | `C:\Program Files\LLVM\bin` |
@@ -219,6 +219,10 @@ Things to know:
   its LLVM ahead of it. That's why the presets search the Homebrew location
   explicitly. Apple Clang is always rejected: it has its own version numbering
   and ships without clang-tidy.
+- **macOS:** Homebrew's `llvm` moves to each new LLVM major within days of
+  its release, before the policy does (POLICY.md 10.1). The configure check
+  then reports the wrong major: `brew install llvm@23` fixes it, and the
+  presets find it first.
 - **Linux:** distributions often ship an older LLVM, or install it only under
   versioned names (`clang++-23`). The unversioned binaries in
   `/usr/lib/llvm-23/bin` are what the presets use.

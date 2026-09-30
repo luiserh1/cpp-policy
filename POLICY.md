@@ -39,7 +39,7 @@ Notes:
     (`MSVC_TOOLSET`, now 14.44), and only that one, since vcpkg's port builds
     pick a toolset on their own. The gate stops a job on a runner with another
     toolset. The pin changes only in a cpp-policy release, like
-    `LLVM_VERSION`. 14.44 is the last Visual Studio 2022 release, which only
+    `LLVM_VERSION` (section 10.1). 14.44 is the last Visual Studio 2022 release, which only
     gets servicing updates, so the pin needs no upkeep.
   - GitHub's Windows image updates its own, newer toolset every few weeks.
     cpp-policy's own CI keeps it, so findings from a newer library show up
@@ -731,6 +731,79 @@ as `#pragma once` and suppressions, have fixtures in `tests/audit/`.
 - **Before 1.0**, the minor version takes the major's role: `0.x` to
   `0.(x+1)` may break existing code, while patch releases still never do.
 
+### 10.1 Moving the toolchain pins
+
+The toolchain is pinned in three places:
+
+| Pin | Where | What depends on it |
+|---|---|---|
+| LLVM major | `CPP_POLICY_LLVM_MAJOR` (`CppPolicy.cmake`), `tools/vcpkg/llvm.cmake`, the presets' search paths, `LLVM_MAJOR` in `gate.yml` | Every machine: configuration fails with another major |
+| Exact LLVM on Windows CI | `LLVM_VERSION` and its SHA-256 in `gate.yml` | GitHub's Windows jobs; self-hosted Windows runners install the same archive |
+| Microsoft toolset | `MSVC_TOOLSET` in `gate.yml` | Self-hosted Windows runners (section 1) |
+
+LLVM patch releases on macOS and Linux aren't pinned: machines take them
+within the major in their normal updates. A self-test
+(`toolchain/pins`) checks that every file names the same LLVM major.
+
+**When.** The pins move in a *toolchain window*, twice a year. Each LLVM
+major release opens one, about every six months.
+- The target is the newest patch release of the new major when the window
+  opens, never its `.1.0`, which tends to have regressions.
+- The Microsoft toolset moves in the same window, to the newest one Visual
+  Studio offers then.
+- Both move in one release: the machines switch and the projects upgrade
+  once per window.
+- Outside a window, a pin moves only for a fix that is needed, following
+  the same steps.
+
+Homebrew's `llvm` moves to a new major within days of its release, which
+would otherwise set the date for us. The major the policy pins then stays
+available as `llvm@<major>`, which the presets, the vcpkg toolchain and the
+gate look for first. On a Mac, `brew install llvm@23` keeps a project
+building until its policy moves.
+
+**Steps.**
+1. **Open.** Choose the target versions from their release notes: new
+   clang-tidy checks, standard library changes, removed options. Write the
+   release's section in `ROADMAP.md`. Tell the administrators of the
+   self-hosted runners and the projects that the window is open, with the
+   targets.
+2. **Trial the policy.** On a branch with the new pins:
+   - cpp-policy's own CI and a local gate;
+   - a decision on each new clang-tidy check (enabled unless it only
+     produces noise);
+   - the section 12 items reviewed.
+
+   Nothing is released yet.
+3. **Trial the projects, before anything moves.** Each project is built
+   with the candidate toolchain against the policy branch, on every system
+   (`-DFETCHCONTENT_SOURCE_DIR_CPP_POLICY=<branch checkout>`).
+   - On a Windows runner machine: snapshot it, pause its runners (jobs
+     wait in the queue), install the candidate, run the builds, and restore
+     the snapshot.
+   - On Linux, the new LLVM installs next to the old one.
+   - Each project fixes its findings before the switch, in code that passes
+     with both toolchains. When no such code exists, the fix goes into the
+     upgrade commit instead.
+4. **Release** the new pins as a minor release (section 10), and tag it.
+   Tell the runner administrators the exact versions and checksums first.
+5. **Switch, on one agreed day.** The runner machines change first:
+   snapshot, install, and a trial build of cpp-policy at the new tag. Then
+   every project that uses them upgrades right away (`tools/upgrade.sh`).
+   - Until a project upgrades, its self-hosted Windows jobs stop at the
+     toolset check, so this gap should be as short as possible.
+   - A Windows runner machine holds one toolset at a time, so all projects
+     switch together. Keeping old and new side by side would take runner
+     labels per toolset and a second machine: the way out if too many
+     projects share the runners to switch in one day.
+6. **Roll back** if a project can't pass on the same day: the runner
+   machines restore their snapshot, and the projects that upgraded revert
+   their upgrade commit. The release stays; it is adopted in a later attempt.
+7. **Close.** Each project's first run prints the new versions ("Show the
+   toolchain"). The release commit already removed the window's section
+   from `ROADMAP.md` (section 11.5). An old LLVM major is uninstalled once
+   no project uses it.
+
 ## 11. Project structure
 
 These rules keep a codebase navigable as it grows, especially when AI agents
@@ -894,7 +967,7 @@ carries a `Waiting Wn` comment, so every place to change can be found when
 the item resolves.
 
 Items are reviewed at every toolchain upgrade (LLVM releases a major version
-about every six months, CMake a minor one about every four). Where a compile
+about every six months, section 10.1; CMake a minor one about every four). Where a compile
 can tell, a probe in the self-test does it for us: it fails, on purpose, the
 day the feature appears (`tests/probes/`).
 

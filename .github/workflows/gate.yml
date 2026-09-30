@@ -119,7 +119,15 @@ jobs:
 
       - name: Install LLVM (macOS)
         if: matrix.system == 'macos' && env.SELF_HOSTED != 'true'
-        run: brew install llvm ninja
+        # Homebrew's llvm moves to a new major days after its release, and the major the policy
+        # pins then stays available as llvm@<major> (POLICY.md 10.1).
+        run: |
+          stable=$(brew info --json=v2 --formula llvm | jq -r '.formulae[0].versions.stable')
+          if [ "${stable%%.*}" = "$LLVM_MAJOR" ]; then
+            brew install llvm ninja
+          else
+            brew install "llvm@${LLVM_MAJOR}" ninja
+          fi
 
       # The PATH the presets give the build, so this shows the LLVM the build will use (on a
       # self-hosted Linux machine it may be the system's, e.g. /usr/bin on Arch).
@@ -129,6 +137,8 @@ jobs:
             PATH="/c/Program Files/LLVM/bin:$PATH"
           else
             PATH="/opt/homebrew/opt/llvm/bin:/usr/local/opt/llvm/bin:/usr/lib/llvm-${LLVM_MAJOR}/bin:$PATH"
+            # llvm@<major> in front of the rest, as in the presets.
+            PATH="/opt/homebrew/opt/llvm@${LLVM_MAJOR}/bin:/usr/local/opt/llvm@${LLVM_MAJOR}/bin:$PATH"
           fi
           clang-tidy --version
           cmake --version

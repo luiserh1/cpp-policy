@@ -28,7 +28,7 @@
         "CMAKE_CXX_COMPILER": "clang++"
       },
       "environment": {
-        "PATH": "/opt/homebrew/opt/llvm/bin:/usr/local/opt/llvm/bin:/usr/lib/llvm-23/bin:$penv{PATH}"
+        "PATH": "/opt/homebrew/opt/llvm@23/bin:/usr/local/opt/llvm@23/bin:/opt/homebrew/opt/llvm/bin:/usr/local/opt/llvm/bin:/usr/lib/llvm-23/bin:$penv{PATH}"
       }
     },
     {

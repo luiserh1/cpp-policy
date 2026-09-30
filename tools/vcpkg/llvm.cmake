@@ -18,7 +18,10 @@ if(CMAKE_HOST_WIN32)
 else()
     set(_cpp_policy_c_names clang)
     set(_cpp_policy_cxx_names clang++)
-    set(_cpp_policy_llvm_dirs /opt/homebrew/opt/llvm/bin /usr/local/opt/llvm/bin
+    set(_cpp_policy_llvm_dirs
+        /opt/homebrew/opt/llvm@${_cpp_policy_llvm_major}/bin
+        /usr/local/opt/llvm@${_cpp_policy_llvm_major}/bin
+        /opt/homebrew/opt/llvm/bin /usr/local/opt/llvm/bin
         /usr/lib/llvm-${_cpp_policy_llvm_major}/bin)
 endif()
 find_program(CPP_POLICY_DEPS_C_COMPILER NAMES ${_cpp_policy_c_names}

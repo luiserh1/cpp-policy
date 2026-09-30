@@ -149,6 +149,12 @@ if(CPP_POLICY_SANITIZERS)
     set_tests_properties(template/new_project PROPERTIES TIMEOUT 900)
 endif()
 
+# --- The LLVM major is named in several files; they must all name the policy's (POLICY.md 10.1).
+add_test(NAME toolchain/pins
+    COMMAND "${CMAKE_COMMAND}" "-DPOLICY_ROOT=${CPP_POLICY_ROOT}"
+            "-DLLVM_MAJOR=${CPP_POLICY_LLVM_MAJOR}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/pins.cmake")
+
 # --- cpp-policy's triplets (tools/vcpkg/): vcpkg builds dependencies like the project. The
 # files test needs nothing. The build test configures a small project with this build's
 # compiler and options, so the check, tsan and release workflows each test their own triplet;

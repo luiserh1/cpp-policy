@@ -3,6 +3,62 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.18.0 (2026-09-30)
+
+How and when the toolchain pins move, and a guard so that Homebrew can't
+move LLVM before the policy does. Nothing that passes can fail, and projects
+get a new copy of `CMakePresets.json` and `tools/vcpkg/llvm.cmake`: a minor
+release (POLICY.md 10).
+
+### Upgrading a project
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.18.0`. It copies
+   the new presets and `llvm.cmake`. Nothing else to do.
+
+### Versioning (POLICY.md 10.1)
+
+- New section "Moving the toolchain pins": the LLVM major, the exact LLVM on
+  Windows CI, and `MSVC_TOOLSET`.
+  - They move in a *toolchain window* twice a year, opened by each LLVM
+    major release. The target is the new major's newest patch release,
+    never `.1.0`, and the newest Microsoft toolset.
+  - Both move in one release.
+  - The steps: open; trial the policy on a branch; trial the projects
+    before anything moves (Windows runner machines in a snapshot); release;
+    switch the runner machines and the projects on one agreed day; roll
+    back if needed; close.
+
+  *Why:* the owner wants to move to newer toolsets now and then
+  (2026-09-30). Since v0.17.0 pinned the toolset, a move needs the runner
+  machines and the projects to change in a known order. Self-hosted Windows
+  runners hold one toolset at a time, so all projects switch together, and
+  the project trial beforehand keeps that switch uneventful. The owner
+  chose two windows a year and one release per window (2026-09-30).
+
+### Toolchain
+
+- The presets, the vcpkg toolchain (`llvm.cmake`) and the gate look for
+  Homebrew's `llvm@23` before its `llvm`, and the gate installs `llvm@23`
+  on GitHub's macOS machines when Homebrew's `llvm` is another major.
+  *Why:* the presets used Homebrew's unversioned `llvm`, which Homebrew
+  moves to each new major within days of its release. With LLVM 24 (due
+  around March 2027), cpp-policy's own macOS CI and any Mac that ran `brew
+  upgrade` would have failed the compiler check before the policy chose to
+  move. Homebrew keeps the previous major as `llvm@<major>`, so the policy
+  now sets the date.
+- README, "Setup per platform": the macOS rows and a note on `llvm@23`.
+
+### Self-test
+
+- `toolchain/pins`: every file that names the LLVM major (the presets'
+  search paths, `LLVM_MAJOR` and `LLVM_VERSION` in `gate.yml`) names
+  `CPP_POLICY_LLVM_MAJOR`, so a major move can't forget one. Tried with 24:
+  it names each file left at 23.
+
+### cpp-policy
+
+- The roadmap item "Moving the toolchain pins" is resolved by this release.
+
 ## 0.17.0 (2026-09-30)
 
 CI pins the Microsoft toolset of self-hosted Windows runners. A job on a
