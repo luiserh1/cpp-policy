@@ -3,6 +3,40 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.21.0 (2026-10-01)
+
+Memory tests per command, and outputs that grow with the input (POLICY.md
+13.5), from ToneMatcher's v0.20.0 report. A tightened rule, though checked by
+review, so a minor release (POLICY.md 10).
+
+### Upgrading a project
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.21.0`.
+2. Every command that processes input of unbounded size gets its own memory
+   test. An output that grows with the number of inputs is streamed, paged,
+   or kept whole only up to a documented cap.
+
+### Budgets (POLICY.md 13.5)
+
+- **A memory test per command,** not per program. *Why:* ToneMatcher's
+  `export` had one and passed, while its `diff` kept every full-size diff
+  until the end: 528 MB on its 92 images. Only a test of `diff` sees that.
+  The owner chose per command (2026-10-01).
+- **An output that grows with the input counts as memory kept per input.**
+  Stream it if the format allows; otherwise use pages of fixed size, which
+  is the owner's call because it changes the output; or keep it whole only
+  up to a documented cap, and test at the cap. *Why:* ToneMatcher's single
+  contact sheet grows by about 0.5 MB per image, so `diff` can't pass a 10%
+  test even once its bug is fixed. ToneMatcher asked which the policy
+  prefers. The owner chose streaming first (2026-10-01).
+- **The first reading comes after the warm-up:** an unmeasured run before it,
+  or an N past the bend. *Why:* without a warm-up run, ToneMatcher's export
+  grew 7–12% from N to 5N, depending on N, as its allocator settled over the
+  first three runs; with one, 1–6% at every N. A test without either can
+  fail at random near the 10% limit.
+- **Memory tests run as CTest runs them.** doctest's `--success` keeps every
+  assertion's text: about 10 times the peak in ToneMatcher's test.
+
 ## 0.20.2 (2026-10-01)
 
 A correction to POLICY.md 13.5 (documentation only), so that projects don't

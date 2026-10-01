@@ -1146,16 +1146,24 @@ cpp_policy_size_budget(my_tool MACOS 109568 LINUX 93184 WINDOWS 285696)
   `lld-link`): it gives every function's and string's size, and comparing two
   maps shows what grew.
 
-**Memory under load.** A program that runs indefinitely (a server) or
-processes input of unbounded size (a batch over many files) has a memory test.
+**Memory under load.** A program that runs indefinitely (a server) has a
+memory test, and so does every command that processes input of unbounded size
+(a batch over many files): each its own, because a test of one command can't
+see what another keeps. ToneMatcher's `diff` kept every full-size diff until
+the end (528 MB on 92 images) while its `export` passed its test.
 - It is a `benchmark` test that drives the program's work N times, reads the
   peak memory with `cpp_policy::peak_memory_bytes()`, drives it 4N more times,
   and reads it again.
-- **N must cover the warm-up, on every system.** A program's peak first rises
-  while it settles: allocator pools, thread pools, caches, the operating
-  system's buffers. That rise is not a leak. Measure the curve once on each
-  system (the peak after each of many rounds), and choose N past the latest
-  bend. For SimpleLocalServer:
+- **The first reading comes after the warm-up, on every system.** A
+  program's peak first rises while it settles: allocator pools, thread
+  pools, caches, the operating system's buffers. That rise is not a leak.
+  Measure the curve once on each system (the peak after each of many
+  rounds). Then either run the work once, unmeasured, before the first
+  reading, sized past the latest bend, or choose an N that is past it.
+  - ToneMatcher's export grew 7–12% from N to 5N without a warm-up run,
+    depending on N, because its allocator settled over the first three
+    runs. With one warm-up run it grew 1–6% at every N.
+  - SimpleLocalServer chose a large N instead:
 
   | System | Warm-up | Peak growth from 15,000 to 50,000 messages |
   |---|---|---|
@@ -1167,6 +1175,17 @@ processes input of unbounded size (a batch over many files) has a memory test.
   Linux failed (+39%), on its second step. With N = 15,000 every system
   passes, and a sink that keeps 64 bytes per message still fails
   (9.8 → 19.0 MB).
+- **Run memory tests as CTest does.** doctest's `--success` keeps the text
+  of every assertion, which multiplied ToneMatcher's peak by about 10.
+- **An output that grows with the input counts too.** Memory may not grow
+  with the number of inputs, and that includes building one output that
+  covers all of them, such as a contact sheet of every image.
+  - Write such an output as it is produced (streaming), so the file stays the
+    same and memory stays flat.
+  - Where the format can't be written in parts, split the output into pages
+    of a fixed size. That changes what the user gets, so the owner decides.
+  - Keep the whole output in memory only when its size has a documented cap
+    (a maximum number of thumbnails, say), and test at that cap.
 - **Keep it inside its time limit.** Where setting up the work is slow, reuse
   it: on the home server's Windows VM a new connection costs about 10 ms, so
   SimpleLocalServer's test sends its messages over kept-alive connections.
