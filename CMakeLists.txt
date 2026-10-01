@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 3.29)
-project(cpp_policy VERSION 0.23.0 LANGUAGES CXX)
+project(cpp_policy VERSION 0.24.0 LANGUAGES CXX)
 
 include(cmake/CppPolicy.cmake)
 
 # When consumed through FetchContent, only the functions above are provided.
 # When built on its own, cpp-policy tests itself.
 if(PROJECT_IS_TOP_LEVEL)
-    # cmake/testing holds the operating-system code benchmark tests link (peak_memory.cpp).
+    # cmake/testing holds the operating-system code benchmark tests link (peak_memory.cpp, heap_bytes.cpp).
     set(CPP_POLICY_CONFINED_DIRS "tests/good/lowlevel;cmake/testing")
     # The audit fixtures and bad samples violate the policy on purpose. template/ is checked as
     # a generated project by tests/new_project, where it has its own layers and confined area.

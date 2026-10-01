@@ -619,15 +619,16 @@ endfunction()
 # The program is test_<kind>_<module>, with doctest's main() from cpp-policy. After each build,
 # every test case becomes a CTest test named <kind>/<module>/<test case> and labelled with
 # its kind (scripts/doctest_tests.cmake). Unit tests have 10 seconds; integration and
-# benchmark tests 60, or TIMEOUT. Benchmark programs also get cpp_policy::peak_memory_bytes(),
-# and nanobench when the project uses it, and are built everywhere (so clang-tidy checks them)
+# benchmark tests 60, or TIMEOUT. Benchmark programs also get cpp_policy::peak_heap_bytes()
+# and peak_memory_bytes(), and nanobench when the project uses it, and are built everywhere (so clang-tidy checks them)
 # but run only in builds without sanitizers, which distort memory and time.
 # ---------------------------------------------------------------------------
 function(_cpp_policy_testing_library)
     if(TARGET cpp_policy_testing)
         return()
     endif()
-    add_library(cpp_policy_testing STATIC "${CPP_POLICY_ROOT}/cmake/testing/peak_memory.cpp")
+    add_library(cpp_policy_testing STATIC "${CPP_POLICY_ROOT}/cmake/testing/peak_memory.cpp"
+        "${CPP_POLICY_ROOT}/cmake/testing/heap_bytes.cpp")
     target_include_directories(cpp_policy_testing PUBLIC "${CPP_POLICY_ROOT}/cmake/testing/include")
     if(WIN32)
         target_link_libraries(cpp_policy_testing PRIVATE psapi)

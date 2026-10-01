@@ -1167,15 +1167,58 @@ memory test, and so does every command that processes input of unbounded size
 (a batch over many files): each its own, because a test of one command can't
 see what another keeps. ToneMatcher's `diff` kept every full-size diff until
 the end (528 MB on 92 images) while its `export` passed its test.
-- It is a `benchmark` test that drives the program's work N times, reads the
-  peak memory with `cpp_policy::peak_memory_bytes()`, drives it 4N more times,
-  and reads it again.
-- **The first reading comes after the warm-up, on every system.** A
-  program's peak first rises while it settles: allocator pools, thread
-  pools, caches, the operating system's buffers. That rise is not a leak.
-  Measure the curve once on each system (the peak after each of many
-  rounds). Then either run the work once, unmeasured, before the first
-  reading, sized past the latest bend, or choose an N that is past it.
+- It is a `benchmark` test that drives the program's work, reads how much
+  memory that took, drives more work, and reads again. Benchmark tests get
+  two measures:
+
+  | Measure | What it reads | Use |
+  |---|---|---|
+  | `cpp_policy::peak_heap_bytes()` | An exact count of the C++ heap: every block from `operator new` until its `operator delete` | The memory test |
+  | `cpp_policy::peak_memory_bytes()` | The operating system's peak for the process | A second test, only where the memory is outside the C++ heap: a C library's `malloc`, mapped files |
+
+- **The heap test** (`#include <cpp_policy/heap_bytes.hpp>`):
+  1. Run the work once with N inputs, unmeasured, so that anything set up
+     once is in place.
+  2. `reset_peak_heap_bytes()`, run N inputs, read `peak_heap_bytes()`.
+  3. `reset_peak_heap_bytes()`, run 5N inputs, read it again.
+
+  The same work gives the same numbers to the byte on every run and every
+  machine load, so the limits are exact:
+  - **A server keeps nothing per request:** the second reading is less than
+    10% above the first.
+  - **A batch command may keep up to 1 KiB per input:** its name and a small
+    fixed-size record. The second reading is at most the first plus
+    4N × 1,024 bytes. A command that processes files in sorted order has to
+    hold their names. In ToneMatcher, two commands kept 0.45 and 0.9 KB per
+    file (the sorted list of paths) and pass. A third kept 3.1 KB per file (a
+    whole plan built before writing it) and doesn't: that one streams.
+- **Why not the operating system's peak:** it depends on what the allocator
+  did with freed blocks, and that depends on timing. A program that
+  allocates and frees six 1 MB buffers per round, with no leak, measured on
+  macOS from 10 rounds to 50:
+
+  | Condition | Growth of the peak, run by run |
+  |---|---|
+  | Idle machine | +80 to +82% in 6 of 6 runs |
+  | 14 busy processes | +1%, +19%, +68%, +81%: mixed over 12 runs |
+  | 14 busy processes, eight warm-up runs | 0.0% in 8 of 8 runs |
+
+  The peak has two levels, depending on whether a freed block is reused or
+  a new one is taken. ToneMatcher's `diff` test grew 4% in every idle run
+  and 30.6% on a busy CI machine. Warm-up runs help but don't guarantee it:
+  with eight, that test still failed 1 run in 10 under load.
+- **Where `peak_memory_bytes()` is used, the first reading comes after the
+  warm-up, on every system.** A program's peak first rises while it settles:
+  allocator pools, thread pools, caches, the operating system's buffers.
+  That rise is not a leak. Measure the curve once on each system (the peak
+  after each of many rounds). Then:
+  - For a server, either run the work once, unmeasured, before the first
+    reading, sized past the latest bend, or choose an N that is past it.
+  - For a batch command, warm up with several runs of N inputs (ToneMatcher
+    uses eight), never with one run larger than N. Peak memory never goes
+    down. After a warm-up run as large as the measured one, a command that
+    keeps memory per file and frees it at the end shows the same peak before
+    and after.
   - ToneMatcher's export grew 7–12% from N to 5N without a warm-up run,
     depending on N, because its allocator settled over the first three
     runs. With one warm-up run it grew 1–6% at every N.
@@ -1210,11 +1253,14 @@ the end (528 MB on 92 images) while its `export` passed its test.
   acknowledged, and delayed acknowledgment makes that about 44 ms per
   request: 200 messages took 8.9 s instead of 7 ms. macOS and Windows don't
   show it.
-- The peak may grow by **less than 10%**. Peak memory never goes down, so
-  growth means something is kept per unit of work.
-- `peak_memory_bytes()` comes with benchmark tests
-  (`#include <cpp_policy/peak_memory.hpp>`), so projects need no OS code of
-  their own for it.
+- With `peak_memory_bytes()` the peak may grow by **less than 10%**. Peak
+  memory never goes down, so growth means something is kept per unit of
+  work. Such a test can still fail on a busy machine; rerun it before
+  looking for a leak.
+- Both measures come with benchmark tests, so projects need no OS code of
+  their own. In builds with sanitizers, which have their own `operator new`,
+  the heap count reads 0; benchmark tests don't run there.
+- `peak_memory_bytes()` (`#include <cpp_policy/peak_memory.hpp>`):
   - On macOS and Linux it reports the peak resident memory (`ru_maxrss`).
   - On Windows it reports the peak private commit (`PeakPagefileUsage`): the
     memory the process allocated for itself. The peak working set also

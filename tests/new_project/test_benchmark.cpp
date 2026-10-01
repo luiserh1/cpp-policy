@@ -3,11 +3,13 @@
 // project lists nanobench in vcpkg.json, so cpp_policy_add_tests() links it.
 #include "app/greeting.hpp"
 
+#include <cpp_policy/heap_bytes.hpp>
 #include <cpp_policy/peak_memory.hpp>
 #include <doctest/doctest.h>
 #include <nanobench.h>
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 
 namespace {
@@ -34,6 +36,18 @@ TEST_CASE("memory stays flat as the number of greetings grows") {
     const auto second = cpp_policy::peak_memory_bytes();
     REQUIRE(second.has_value());
     CHECK(*second <= *first + (*first / 10));
+}
+
+TEST_CASE("the heap stays flat as the number of greetings grows") {
+    CHECK(greet_many(1'000) > 0); // anything set up once comes first
+    cpp_policy::reset_peak_heap_bytes();
+    CHECK(greet_many(1'000) > 0);
+    const std::uint64_t few = cpp_policy::peak_heap_bytes();
+    cpp_policy::reset_peak_heap_bytes();
+    CHECK(greet_many(5'000) > 0);
+    const std::uint64_t many = cpp_policy::peak_heap_bytes();
+    CHECK(few > 0); // the counter is active: doctest itself holds some heap
+    CHECK(many <= few + 1024);
 }
 
 TEST_CASE("greeting speed") {

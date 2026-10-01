@@ -3,6 +3,58 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.24.0 (2026-10-01)
+
+Memory tests that don't depend on the machine's load (POLICY.md 13.5). The
+rule for batch commands changes, so a test that passed may need rewriting: a
+minor release (POLICY.md 10).
+
+### Upgrading a project
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.24.0`.
+2. Rewrite each memory test with `cpp_policy::peak_heap_bytes()`
+   (POLICY.md 13.5, "The heap test"). Keep a `peak_memory_bytes()` test only
+   where the memory is outside the C++ heap.
+3. A batch command that keeps more than 1 KiB per input needs to write its
+   output as it is produced; that is a change for the project and its owner.
+
+### Added
+
+- **`cpp_policy::live_heap_bytes()`, `peak_heap_bytes()` and
+  `reset_peak_heap_bytes()`** (`#include <cpp_policy/heap_bytes.hpp>`), for
+  benchmark tests: an exact count of the C++ heap, made by replacing
+  `operator new` and `operator delete` in the test program. Self-test
+  `testing/heap_bytes`; the generated-project test uses it on every system.
+  *Why:* ToneMatcher reported that its `diff` memory test grew 4% on an idle
+  machine and 30.6% on a busy CI machine, with the same code. Reproduced
+  here with a program that only allocates and frees 1 MB buffers: the
+  operating system's peak grew +80% idle and anywhere from +1% to +81% under
+  load, because it depends on whether the allocator reuses a freed block.
+  macOS's peak physical footprint moved the same way. A count of live bytes
+  can't vary. The owner chose it (2026-10-01).
+  - It doesn't see memory a C library takes with `malloc()`, or mapped
+    files; `peak_memory_bytes()` stays for those.
+  - In builds with sanitizers nothing is replaced and it reads 0. The `check`
+    build therefore compiles and lints only that branch of `heap_bytes.cpp`;
+    the counting branch was linted by hand with the same configuration, on
+    macOS.
+
+### Changed (POLICY.md 13.5)
+
+- **A batch command may keep up to 1 KiB per input** (its name and a small
+  fixed-size record); the test allows 4N × 1,024 bytes between its two
+  readings. A server still keeps nothing per request (less than 10%).
+  *Why:* asked by ToneMatcher. A command that processes files in sorted
+  order must hold their names, and "less than 10%" of a 1 MB baseline failed
+  at a few hundred names. Its commands keep 0.45, 0.9 and 3.1 KB per file;
+  the last builds a whole plan in memory, which 13.5 already said to stream.
+  The owner chose the figure (2026-10-01).
+- **Warm-up for a batch command, where `peak_memory_bytes()` is still
+  used:** several runs of N inputs, never one run larger than N. *Why:*
+  found by ToneMatcher. Peak memory never goes down, so after a warm-up run
+  as large as the measured one, a command that keeps memory per file and
+  frees it at the end looks flat.
+
 ## 0.23.0 (2026-10-01)
 
 Standard-library hardening can no longer be turned off. A project that set

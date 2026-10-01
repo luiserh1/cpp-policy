@@ -190,6 +190,15 @@ target_link_libraries(policy_peak_memory PRIVATE cpp_policy_testing)
 cpp_policy_apply(policy_peak_memory)
 add_test(NAME testing/peak_memory COMMAND policy_peak_memory)
 
+# --- cpp_policy::peak_heap_bytes() (POLICY.md 13.5): built in every build, run where it
+# counts, which is without sanitizers (they bring their own operator new).
+add_executable(policy_heap_bytes testing/heap_bytes.cpp)
+target_link_libraries(policy_heap_bytes PRIVATE cpp_policy_testing)
+cpp_policy_apply(policy_heap_bytes)
+if(NOT CPP_POLICY_SANITIZERS AND NOT CPP_POLICY_THREAD_SANITIZER)
+    add_test(NAME testing/heap_bytes COMMAND policy_heap_bytes)
+endif()
+
 # --- Test registration (POLICY.md 13): scripts/doctest_tests.cmake on saved doctest listings.
 # Each listing in testing/listings/ is <case>.xml, with <case>.expect: a regex the script's
 # output must match. "ok" must succeed and write the tests; the others must fail.

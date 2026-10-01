@@ -11,7 +11,7 @@
 # skipped test case must fail the build (POLICY.md 13). It needs VCPKG_ROOT, for doctest. The
 # template's lowlevel test prints a std::string_view without including <ostream>, which only
 # compiles with Microsoft's library because cpp_policy_add_tests() makes doctest include it.
-# A memory test and a nanobench speed test (test_benchmark.cpp, with nanobench added to
+# Two memory tests and a nanobench speed test (test_benchmark.cpp, with nanobench added to
 # vcpkg.json) are added to the project: they must be built in the check build and run only in
 # the release build, which must also pass the program's size budget (POLICY.md 13.5, 14.2).
 
@@ -116,6 +116,7 @@ function(check_release)
     step("${dest}" "building ${release}" "${CMAKE_COMMAND}" --build --preset ${release})
     step("${dest}" "testing ${release}" "${CMAKE_CTEST_COMMAND}" --preset ${release})
     foreach(test IN ITEMS "benchmark/app/memory stays flat as the number of greetings grows"
+                          "benchmark/app/the heap stays flat as the number of greetings grows"
                           "benchmark/app/greeting speed" "benchmark/size/my_tool")
         string(FIND "${out}" "${test} " found)
         if(found EQUAL -1)
