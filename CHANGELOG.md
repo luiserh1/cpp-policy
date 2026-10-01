@@ -3,6 +3,43 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.19.2 (2026-10-01)
+
+A fix to v0.19.1's fix for random link failures on Windows. Nothing that passed
+can fail, so a patch release (POLICY.md 10).
+
+### Upgrading a project
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.19.2`. It copies the
+   new `tools/vcpkg/setup.cmake`. A workaround that orders links so that the
+   AddressSanitizer runtime is copied first can go.
+
+### Dependencies (POLICY.md 1.1)
+
+- `tools/vcpkg/setup.cmake` turns `VCPKG_APPLOCAL_DEPS` off. *Why:*
+  ToneMatcher's Windows check job still failed at random on v0.19.1, with
+  `open_for_read("…\clang_rt.asan_dynamic-x86_64.dll"): permission denied`
+  (its report of 2026-10-01, runs 36751433308 and 36820701579). That is
+  vcpkg's error, not CMake's. After every link vcpkg runs `z-applocal`,
+  which copies the program's DLLs next to it and reads the ones already
+  there. It read the AddressSanitizer runtime while another program's
+  post-build step was writing it, and v0.19.1's lock doesn't cover vcpkg.
+  - The policy's triplets link every dependency statically, so vcpkg had no
+    DLL to copy: turning the step off loses nothing, and saves a step per
+    link.
+  - ToneMatcher's analysis was right; v0.19.1's notes blamed only two copies
+    colliding. That race was real too (cpp-policy's own CI saw CMake's
+    "Error copying file"), and the lock stays.
+  - Chosen over the report's other option, copying the runtime once per
+    folder before anything there links: that would also work, but needs
+    more machinery once the reader is gone.
+
+### Self-test
+
+- `vcpkg/dependencies_built_like_project` fails if `build.ninja` still has
+  vcpkg's applocal step. With the check alone, both Windows jobs failed
+  (run 36821930703). With the fix, they pass.
+
 ## 0.19.1 (2026-09-30)
 
 A fix to v0.19.0: a test that prints a `std::string_view` compiles on

@@ -59,6 +59,13 @@ set(VCPKG_TARGET_TRIPLET "${_cpp_policy_triplet}" CACHE STRING
     "Chosen by tools/vcpkg/setup.cmake from the sanitizer options" FORCE)
 unset(_cpp_policy_triplet)
 
+# vcpkg has no DLLs to copy next to programs: the triplets link every dependency statically. On
+# Windows its step after each link (z-applocal) would still read the DLLs there, and it read the
+# AddressSanitizer runtime while cpp_policy_apply()'s step was writing it, which failed the link
+# at random (ToneMatcher, 2026-10-01).
+set(VCPKG_APPLOCAL_DEPS OFF CACHE BOOL
+    "Off: cpp-policy's triplets link dependencies statically (tools/vcpkg/setup.cmake)" FORCE)
+
 # Not FORCE: a -DCMAKE_TOOLCHAIN_FILE given on the command line still wins.
 set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE FILEPATH
     "vcpkg's toolchain (loaded by tools/vcpkg/setup.cmake)")

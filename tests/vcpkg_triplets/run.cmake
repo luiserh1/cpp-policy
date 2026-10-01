@@ -35,6 +35,13 @@ step("configuring the project (vcpkg builds the dependency)"
     "-DCPP_POLICY_THREAD_SANITIZER=${THREAD_SANITIZER}" "-DCPP_POLICY_HARDENING=${HARDENING}")
 step("building the project" "${CMAKE_COMMAND}" --build "${build}")
 
+# No vcpkg step copies DLLs after a link (setup.cmake turns VCPKG_APPLOCAL_DEPS off): on
+# Windows it raced with the copy of the AddressSanitizer runtime.
+file(READ "${build}/build.ninja" ninja)
+if(ninja MATCHES "z-applocal|applocal\\.ps1")
+    message(FATAL_ERROR "vcpkg_triplets: vcpkg still copies DLLs after each link (z-applocal)")
+endif()
+
 function(program_path name out)
     file(GLOB found "${build}/${name}" "${build}/${name}.exe")
     if(NOT found)
