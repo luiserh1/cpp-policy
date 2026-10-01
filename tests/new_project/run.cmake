@@ -11,6 +11,9 @@
 # skipped test case must fail the build (POLICY.md 13). It needs VCPKG_ROOT, for doctest. The
 # template's lowlevel test prints a std::string_view without including <ostream>, which only
 # compiles with Microsoft's library because cpp_policy_add_tests() makes doctest include it.
+# A memory test (test_benchmark.cpp) is added to the project: it must be built in the check
+# build and run only in the release workflow, which must also pass the program's size budget
+# (POLICY.md 13.5).
 
 cmake_minimum_required(VERSION 3.29)
 find_package(Git REQUIRED)
@@ -42,6 +45,9 @@ function(generate_and_check)
         ${ARGN} -P "${POLICY_ROOT}/cmake/scripts/new_project.cmake")
     step("${dest}" "git init" "${GIT_EXECUTABLE}" init --quiet)
     step("${dest}" "enabling the hooks" "${GIT_EXECUTABLE}" config core.hooksPath tools/hooks)
+    file(COPY_FILE "${CMAKE_CURRENT_LIST_DIR}/test_benchmark.cpp" "${dest}/tests/test_benchmark.cpp")
+    file(APPEND "${dest}/tests/CMakeLists.txt"
+        "cpp_policy_add_tests(benchmark app SOURCES test_benchmark.cpp LIBRARIES my_tool_core)\n")
 
     step("${dest}" "configuring the project"
         "${CMAKE_COMMAND}" --preset ${PRESET} "-DFETCHCONTENT_SOURCE_DIR_CPP_POLICY=${POLICY_ROOT}")
@@ -91,6 +97,28 @@ function(check_tests)
     if(NOT out MATCHES "Total Tests: 5\n")
         message(FATAL_ERROR "new_project: expected 5 unit tests, one per test case:\n${out}")
     endif()
+    # Benchmarks don't run with sanitizers.
+    step("${dest}" "listing the benchmarks" "${CMAKE_CTEST_COMMAND}" --preset ${PRESET} -N -L benchmark)
+    if(NOT out MATCHES "Total Tests: 0\n")
+        message(FATAL_ERROR "new_project: benchmarks are registered in the ${PRESET} build:\n${out}")
+    endif()
+endfunction()
+
+# The release workflow: the memory test and the size budget run, and pass.
+function(check_release)
+    set(dest "${WORK}/MyTool")
+    string(REPLACE "check" "release" release "${PRESET}")
+    step("${dest}" "configuring ${release}" "${CMAKE_COMMAND}" --preset ${release}
+        "-DFETCHCONTENT_SOURCE_DIR_CPP_POLICY=${POLICY_ROOT}")
+    step("${dest}" "building ${release}" "${CMAKE_COMMAND}" --build --preset ${release})
+    step("${dest}" "testing ${release}" "${CMAKE_CTEST_COMMAND}" --preset ${release})
+    foreach(test IN ITEMS "benchmark/app/memory stays flat as the number of greetings grows"
+                          "benchmark/size/my_tool")
+        string(FIND "${out}" "${test} " found)
+        if(found EQUAL -1)
+            message(FATAL_ERROR "new_project: ${release} didn't run '${test}':\n${out}")
+        endif()
+    endforeach()
 endfunction()
 
 # A skipped test case fails the build that registers the tests.
@@ -111,5 +139,6 @@ execute_process(COMMAND "${GIT_EXECUTABLE}" -C "$ENV{VCPKG_ROOT}" rev-parse HEAD
 generate_and_check("-DVCPKG_BASELINE=${baseline}")
 check_tests()
 first_commit()
+check_release()
 check_skipped_test_fails()
 message("new_project: OK")

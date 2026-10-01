@@ -23,18 +23,12 @@ in the walkthroughs of that time.
 Deliberately left for after everything else (owner's decision). They are one
 topic and will likely become new POLICY.md sections.
 
-- [ ] **Budgets (#52):** binary size of the `release` build (per platform,
-      fail on unexplained growth; bloaty to explain it) and memory under a
-      stress test (peak memory stays flat as load grows). The `benchmark`
-      label, run in CI. Baseline: SimpleLocalServer's release binary is
-      840,096 bytes on macOS arm64 (1,734,016 before brotli was removed) and
-      757,760 bytes on Windows x64 (clang-cl with Control Flow Guard,
-      cpp-policy v0.4.0; 751,616 before CFG).
 - [ ] **Performance (#13):** a POLICY.md section with the cost of each safety
       feature, defaults (contiguous containers, no needless copies), "measure
-      first", and how to speed up a proven hot spot. Benchmarks: a library
-      via vcpkg, a `bench` preset (Release, no sanitizers), results saved per
-      version and compared on the same machine.
+      first", and how to speed up a proven hot spot. Speed benchmarks: a
+      library via vcpkg or the `benchmark` test kind (POLICY.md 13.5), run in
+      Release without sanitizers, results saved per version and compared on
+      the same machine.
 - [ ] **Design approach (#27):** data-oriented design first (plain data +
       free functions, contiguous containers, `enum class`/`std::variant` for
       closed sets); classes only to protect an invariant or own a resource;

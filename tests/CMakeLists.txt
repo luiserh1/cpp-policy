@@ -182,6 +182,14 @@ else()
         "vcpkg/dependencies_built_like_project and template/new_project don't run")
 endif()
 
+# --- cpp_policy::peak_memory_bytes() (POLICY.md 13.5), which benchmark tests link: in every
+# build, since the operating-system calls differ per system.
+_cpp_policy_testing_library()
+add_executable(policy_peak_memory testing/peak_memory.cpp)
+target_link_libraries(policy_peak_memory PRIVATE cpp_policy_testing)
+cpp_policy_apply(policy_peak_memory)
+add_test(NAME testing/peak_memory COMMAND policy_peak_memory)
+
 # --- Test registration (POLICY.md 13): scripts/doctest_tests.cmake on saved doctest listings.
 # Each listing in testing/listings/ is <case>.xml, with <case>.expect: a regex the script's
 # output must match. "ok" must succeed and write the tests; the others must fail.

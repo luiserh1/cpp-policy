@@ -5,6 +5,7 @@
 #   FetchContent_MakeAvailable(cpp_policy)
 #   cpp_policy_apply(my_target)      # once per target you own
 #   cpp_policy_add_tests(unit my_module SOURCES ... LIBRARIES ...)   # test programs
+#   cpp_policy_size_budget(my_program MACOS <bytes> LINUX <bytes> WINDOWS <bytes>)
 #   cpp_policy_add_checks()          # once, adds the audit and format targets
 #
 # Options are normally set by CMakePresets.json, not by hand.
@@ -26,7 +27,7 @@ set(CPP_POLICY_CONFINED_DIRS "src/lowlevel" CACHE STRING
     "Directories (relative to the project root) where suppressions and low-level code are allowed")
 set(CPP_POLICY_EXCLUDED_DIRS "build;out;.git;third_party;external;vcpkg_installed" CACHE STRING
     "Directories (relative to the project root) that the audit and format checks skip")
-set(CPP_POLICY_TEST_KINDS unit integration CACHE INTERNAL "Test kinds (POLICY.md 13)")
+set(CPP_POLICY_TEST_KINDS unit integration benchmark CACHE INTERNAL "Test kinds (POLICY.md 13)")
 
 # ---------------------------------------------------------------------------
 # Toolchain verification
@@ -557,9 +558,23 @@ endfunction()
 #                        TIMEOUT 30 ENVIRONMENT "HELPER=$<TARGET_FILE:helper>")
 # The program is test_<kind>_<module>, with doctest's main() from cpp-policy. After each build,
 # every test case becomes a CTest test named <kind>/<module>/<test case> and labelled with
-# its kind (scripts/doctest_tests.cmake). Unit tests have 10 seconds; integration tests 60,
-# or TIMEOUT.
+# its kind (scripts/doctest_tests.cmake). Unit tests have 10 seconds; integration and
+# benchmark tests 60, or TIMEOUT. Benchmark programs also get cpp_policy::peak_memory_bytes(),
+# and are built everywhere (so clang-tidy checks them) but run only in builds without
+# sanitizers, which distort memory and time.
 # ---------------------------------------------------------------------------
+function(_cpp_policy_testing_library)
+    if(TARGET cpp_policy_testing)
+        return()
+    endif()
+    add_library(cpp_policy_testing STATIC "${CPP_POLICY_ROOT}/cmake/testing/peak_memory.cpp")
+    target_include_directories(cpp_policy_testing PUBLIC "${CPP_POLICY_ROOT}/cmake/testing/include")
+    if(WIN32)
+        target_link_libraries(cpp_policy_testing PRIVATE psapi)
+    endif()
+    cpp_policy_apply(cpp_policy_testing)
+endfunction()
+
 function(cpp_policy_add_tests kind module)
     cmake_parse_arguments(PARSE_ARGV 2 arg "" "TIMEOUT" "SOURCES;LIBRARIES;ENVIRONMENT")
     set(usage "cpp_policy_add_tests(<kind> <module> SOURCES <file>... [LIBRARIES <target>...] "
@@ -615,7 +630,14 @@ function(cpp_policy_add_tests kind module)
     add_executable(${target} ${arg_SOURCES})
     target_link_libraries(${target} PRIVATE ${arg_LIBRARIES} cpp_policy_doctest_main doctest::doctest)
     target_compile_definitions(${target} PRIVATE DOCTEST_CONFIG_USE_STD_HEADERS)
+    if(kind STREQUAL "benchmark")
+        _cpp_policy_testing_library()
+        target_link_libraries(${target} PRIVATE cpp_policy_testing)
+    endif()
     cpp_policy_apply(${target})
+    if(kind STREQUAL "benchmark" AND (CPP_POLICY_SANITIZERS OR CPP_POLICY_THREAD_SANITIZER))
+        return()
+    endif()
 
     # Registered after cpp_policy_apply(): on Windows, its post-build step copies the ASan
     # runtime that the program needs to list its tests.
@@ -636,6 +658,58 @@ function(cpp_policy_add_tests kind module)
         "    add_test([==[${kind}/${module}/(not built)]==] [==[${target}-not-built]==])\n"
         "endif()\n")
     set_property(DIRECTORY APPEND PROPERTY TEST_INCLUDE_FILES "${include_file}")
+endfunction()
+
+# ---------------------------------------------------------------------------
+# Size budgets (POLICY.md 13.5): the most a program may weigh, stripped, on each system.
+#   cpp_policy_size_budget(my_tool MACOS 109568 LINUX 93184 WINDOWS 285696)
+# In Release builds without sanitizers it adds the test benchmark/size/<program>, which
+# strips a copy of the program with llvm-strip and fails if it is larger than this system's
+# budget, or if this system has none. Raising a budget needs the owner's approval.
+# ---------------------------------------------------------------------------
+function(cpp_policy_size_budget target)
+    cmake_parse_arguments(PARSE_ARGV 1 arg "" "MACOS;LINUX;WINDOWS" "")
+    if(arg_UNPARSED_ARGUMENTS OR NOT TARGET ${target})
+        message(FATAL_ERROR "cpp-policy: usage: cpp_policy_size_budget(<program target> "
+            "[MACOS <bytes>] [LINUX <bytes>] [WINDOWS <bytes>])")
+    endif()
+    get_target_property(type ${target} TYPE)
+    if(NOT type STREQUAL "EXECUTABLE")
+        message(FATAL_ERROR "cpp-policy: cpp_policy_size_budget(): '${target}' isn't a program")
+    endif()
+    foreach(system IN ITEMS MACOS LINUX WINDOWS)
+        if(DEFINED arg_${system} AND NOT arg_${system} MATCHES "^[1-9][0-9]*$")
+            message(FATAL_ERROR "cpp-policy: the ${system} budget of '${target}' isn't a number "
+                "of bytes: '${arg_${system}}'")
+        endif()
+    endforeach()
+    if(NOT CMAKE_BUILD_TYPE STREQUAL "Release" OR CPP_POLICY_SANITIZERS
+       OR CPP_POLICY_THREAD_SANITIZER)
+        return()
+    endif()
+    if(APPLE)
+        set(budget "${arg_MACOS}")
+        set(system MACOS)
+    elseif(WIN32)
+        set(budget "${arg_WINDOWS}")
+        set(system WINDOWS)
+    else()
+        set(budget "${arg_LINUX}")
+        set(system LINUX)
+    endif()
+    cmake_path(GET CMAKE_CXX_COMPILER PARENT_PATH llvm_bin)
+    find_program(CPP_POLICY_STRIP_EXE NAMES llvm-strip HINTS "${llvm_bin}" NO_DEFAULT_PATH)
+    find_program(CPP_POLICY_SIZE_EXE NAMES llvm-size HINTS "${llvm_bin}" NO_DEFAULT_PATH)
+    if(NOT CPP_POLICY_STRIP_EXE OR NOT CPP_POLICY_SIZE_EXE)
+        message(FATAL_ERROR "cpp-policy: llvm-strip and llvm-size must be next to the compiler "
+            "in ${llvm_bin}")
+    endif()
+    add_test(NAME benchmark/size/${target}
+        COMMAND "${CMAKE_COMMAND}" "-DPROGRAM=$<TARGET_FILE:${target}>" "-DSYSTEM=${system}"
+                "-DBUDGET=${budget}" "-DSTRIP=${CPP_POLICY_STRIP_EXE}" "-DSIZE=${CPP_POLICY_SIZE_EXE}"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/cpp_policy_size"
+                -P "${CPP_POLICY_ROOT}/cmake/scripts/size_budget.cmake")
+    set_tests_properties(benchmark/size/${target} PROPERTIES LABELS benchmark TIMEOUT 60)
 endfunction()
 
 # ---------------------------------------------------------------------------

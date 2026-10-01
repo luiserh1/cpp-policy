@@ -20,6 +20,9 @@ cpp_policy_apply(@TARGET@_core)
 add_executable(@TARGET@ src/main.cpp)
 target_link_libraries(@TARGET@ PRIVATE @TARGET@_core)
 cpp_policy_apply(@TARGET@)
+# The most the program may weigh, stripped, on each system: its size plus 5% (cpp-policy
+# POLICY.md 13.5). The release workflow checks it; the owner approves raising a budget.
+cpp_policy_size_budget(@TARGET@ MACOS 109568 LINUX 93184 WINDOWS 285696)
 
 enable_testing()
 add_subdirectory(tests)

@@ -14,7 +14,7 @@ Dependencies come from vcpkg (`vcpkg.json`, pinned by its
 ```
 cmake --workflow --preset check        # the gate: build, clang-tidy, audit, format, tests
 cmake --workflow --preset unit         # quick: build without clang-tidy, unit tests only
-cmake --workflow --preset release      # optimized build
+cmake --workflow --preset release      # optimized build, size budget, benchmarks
 ```
 
 On Windows the presets carry a `win-` prefix (`win-check`, `win-unit`,

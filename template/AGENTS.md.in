@@ -59,6 +59,9 @@ with its reason, to `CHANGELOG.md` under "Unreleased".
 - A fix for a bug comes with a test that fails without it, in
   `TEST_SUITE("regression")`.
 - No sleeps, no skipped tests, no state shared between test cases.
+- The release workflow checks each program's size budget
+  (`cpp_policy_size_budget()` in `CMakeLists.txt`). Never raise a budget
+  yourself: if a change goes over it, shrink the change or ask the owner.
 
 ## Before you say you are done
 

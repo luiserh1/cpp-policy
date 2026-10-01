@@ -685,6 +685,8 @@ These rules rely on review (and on agents following `AGENTS.md`):
 - Project structure (section 11): layers and file size are checked; the
   helper extraction rule, comment accuracy and the roadmap's layout will
   always rely on review
+- Budgets (section 13.5): sizes and memory growth are checked; whether every
+  shipped program has a budget and every server a memory test is review
 - How tests are written (section 13.4): test names, labels and skipped
   tests are checked; `REQUIRE` versus `CHECK`, one behavior per test, fakes,
   no sleeps and testing through public headers rely on review
@@ -996,13 +998,14 @@ tools, not a program's modules.)
 |---|---|---|---|
 | `unit` | One module, through its public header | No files, network, child processes, threads or clock; results don't depend on the machine | 10 seconds per test case (in practice milliseconds) |
 | `integration` | Modules together, or a module with the OS | Real sockets on ephemeral ports (port 0), temporary files and folders under the build folder, threads and processes; every wait has a timeout | 60 seconds, or less with `TIMEOUT` |
+| `benchmark` | What a program costs: its size and its memory under load (13.5) | Built in every configuration, so clang-tidy checks it, but run only without sanitizers, which distort size, memory and time | 60 seconds, or less with `TIMEOUT` |
 
 **Regression tests** aren't a kind of their own. When a bug is fixed, a test
 that shows the bug comes with the fix. It is written first and seen failing,
 then passes with the fix, and it goes in `TEST_SUITE("regression")`, which
 labels it `regression` as well as its kind. It is kept, so the bug can't come
-back unnoticed. Benchmarks are reserved for the budgets and performance
-sections, still on the roadmap.
+back unnoticed. Speed benchmarks are left for the performance section, still
+on the roadmap.
 
 ### 13.2 Test programs and names
 
@@ -1110,4 +1113,52 @@ Projects add it to `vcpkg.json` like any dependency (section 1.1).
 
 *Enforcement:* the helper, registration and configuration check the names,
 labels, suites, skipped tests and time limits. The rest of 13.4 relies on
+review (section 8.1).
+
+### 13.5 Budgets: size and memory
+
+What a program costs is checked like what it does: a change that makes it
+noticeably bigger, or makes its memory grow with its load, fails the build.
+Both checks run in the `release` workflow, on every system CI runs.
+
+**Size.** Every program a project ships has a size budget per system, next to
+its target:
+
+```cmake
+cpp_policy_size_budget(my_tool MACOS 109568 LINUX 93184 WINDOWS 285696)
+```
+
+- The size is that of a copy stripped with `llvm-strip`: what would ship. The
+  file the build leaves keeps its symbol table, which grows with names rather
+  than code. In SimpleLocalServer's, it was 41% of the bytes.
+- A budget is the stripped size plus **5%**, rounded up to whole KiB. The test
+  `benchmark/size/<program>` prints the size, and the budget to set when there
+  is none for this system or when the program has outgrown it. A fresh build
+  gives the same size to the byte, and toolchain updates moved
+  SimpleLocalServer's by 544 bytes over many releases. So 5% catches real
+  growth (a new dependency, a large table) without failing on noise.
+- **Raising a budget needs the owner's approval** and a line in `CHANGELOG.md`
+  saying why. Agents ask. When the program shrank to well under its budget,
+  the test says so, and the budget can come down.
+- When a program is over budget, the test lists its sections (code,
+  constants, exception tables, strings). For detail, link with a map
+  (`-Wl,-map,<file>` on macOS, `-Wl,-Map=<file>` with `lld`, `/MAP` with
+  `lld-link`): it gives every function's and string's size, and comparing two
+  maps shows what grew.
+
+**Memory under load.** A program that runs indefinitely (a server) or
+processes input of unbounded size (a batch over many files) has a memory test.
+- It is a `benchmark` test that drives the program's work N times, reads the
+  peak memory with `cpp_policy::peak_memory_bytes()`, drives it 4N more times,
+  and reads it again.
+- The peak may grow by **less than 10%**. Peak memory never goes down, so
+  growth means something is kept per unit of work.
+- `peak_memory_bytes()` comes with benchmark tests
+  (`#include <cpp_policy/peak_memory.hpp>`), so projects need no OS code of
+  their own for it.
+- SimpleLocalServer's peak was 7.01 MB after 1,000 messages, 7.01 MB after
+  10,000 and 7.06 MB after 30,000.
+
+*Enforcement:* the budget and memory tests fail the release workflow. Whether
+every shipped program has a budget, and every server a memory test, relies on
 review (section 8.1).

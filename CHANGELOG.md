@@ -3,6 +3,73 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.20.0 (2026-10-01)
+
+Budgets: each program's size, and its memory under load, checked in the
+release workflow. Nothing that passes fails until a project adds budgets
+and memory tests, so a minor release (POLICY.md 10).
+
+### Upgrading a project
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.20.0`.
+2. Add `cpp_policy_size_budget(<program>)` for each program you ship, and run
+   `cmake --workflow --preset release` (`win-release`) on each system, or let
+   CI do it. Each system's test prints the budget to set. The owner approves
+   the numbers.
+3. A server, or a program that processes input of unbounded size, gets a
+   memory test (POLICY.md 13.5): `cpp_policy_add_tests(benchmark <module>
+   ...)`.
+4. Have the owner add the budget line of cpp-policy's
+   `template/AGENTS.md.in` ("Tests" section) to `AGENTS.md`.
+
+### Budgets (POLICY.md 13.5, new)
+
+- **`cpp_policy_size_budget(<program> MACOS … LINUX … WINDOWS …)`** adds the
+  test `benchmark/size/<program>` to Release builds without sanitizers. It
+  strips a copy with `llvm-strip` and fails if it is larger than this
+  system's budget, or if the system has none, printing the size, a budget
+  with 5% headroom, and the copy's sections. Raising a budget needs the
+  owner's approval and a CHANGELOG line.
+  - *Why the stripped size:* SimpleLocalServer's release file is 840,640
+    bytes on macOS, but 41% of that is its symbol table, which grows with
+    names. Stripped, it is 538,176, the same to the byte on a fresh build.
+  - *Why 5%:* toolchain updates moved SimpleLocalServer's size by 544 bytes
+    over many releases. 5% is about 27 KB: enough for noise, small enough to
+    catch a new dependency or a large table.
+  - *Why LLVM's tools and not bloaty:* `llvm-strip` and `llvm-size` come with
+    the LLVM every machine already has. bloaty's Homebrew version is from 2020
+    and it isn't in vcpkg. For detail, a link map gives every function's size
+    on all three systems (POLICY.md 13.5 says how).
+  - The owner chose budgets in `CMakeLists.txt` with owner approval, 5%
+    headroom, and memory tests for servers and unbounded input (2026-10-01).
+- **The `benchmark` test kind:** `cpp_policy_add_tests(benchmark …)` programs
+  are built in every configuration, so clang-tidy checks them, and run only
+  without sanitizers. They link **`cpp_policy::peak_memory_bytes()`**
+  (`#include <cpp_policy/peak_memory.hpp>`), the process's peak resident
+  memory from `getrusage()` or `GetProcessMemoryInfo()`.
+- **Memory tests** drive a program's work N times, read the peak, drive it
+  4N more, and require less than 10% growth. SimpleLocalServer's peak was
+  7.01 MB after 1,000 messages, 7.01 MB after 10,000 and 7.06 MB after
+  30,000 (measured from outside, 2026-10-01).
+- `cmake/testing/` is a confined folder in cpp-policy's own audit: it holds
+  `peak_memory.cpp`'s operating-system code. Its one `NOLINT` is for glibc,
+  which declares `ru_maxrss` in a union.
+
+### Template
+
+- The program has a size budget: 109,568 bytes on macOS, 93,184 on Linux and
+  285,696 on Windows, measured in CI with 5% headroom. `AGENTS.md` tells
+  agents not to raise budgets.
+
+### Self-test
+
+- `testing/peak_memory`: the peak rises by at least half of 64 MiB touched,
+  and doesn't fall when it is freed, in every build on every system.
+- `template/new_project` adds a memory test to the generated project. It
+  checks that the test is built but not registered in the check build, then
+  runs the release build, where the memory test and the size budget must
+  both run and pass.
+
 ## 0.19.2 (2026-10-01)
 
 A fix to v0.19.1's fix for random link failures on Windows. Nothing that passed
