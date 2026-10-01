@@ -1198,8 +1198,15 @@ the end (528 MB on 92 images) while its `export` passed its test.
   growth means something is kept per unit of work.
 - `peak_memory_bytes()` comes with benchmark tests
   (`#include <cpp_policy/peak_memory.hpp>`), so projects need no OS code of
-  their own for it. It reports the peak resident memory: `ru_maxrss` on macOS
-  and Linux, the peak working set on Windows, which also counts shared pages.
+  their own for it.
+  - On macOS and Linux it reports the peak resident memory (`ru_maxrss`).
+  - On Windows it reports the peak private commit (`PeakPagefileUsage`): the
+    memory the process allocated for itself. The peak working set also
+    counts shared pages. Measured on SimpleLocalServer over 25 rounds of
+    1,000 messages, private commit had the same warm-up and then stayed
+    identical to the byte, while the working set moved by 8 KB in one run
+    and by about 0.4 MB in steps in another. A sink keeping 64 bytes per
+    message showed +48% in private commit, against +27% in the working set.
 - SimpleLocalServer's peak was 7.01 MB after 1,000 messages, 7.01 MB after
   10,000 and 7.06 MB after 30,000.
 

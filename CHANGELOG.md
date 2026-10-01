@@ -36,6 +36,19 @@ review, so a minor release (POLICY.md 10).
   fail at random near the 10% limit.
 - **Memory tests run as CTest runs them.** doctest's `--success` keeps every
   assertion's text: about 10 times the peak in ToneMatcher's test.
+- **On Windows, `peak_memory_bytes()` reports the peak private commit**
+  (`PeakPagefileUsage`) instead of the peak working set. A test near its
+  limit can fail where it passed, since the same leak is a larger share of a
+  smaller number. *Why:* SimpleLocalServer measured both on the home
+  server's Windows VM, 25 rounds of 1,000 messages each (run 36850710397).
+  - After the same warm-up (about 4,000 messages), private commit stayed at
+    4,968,448 bytes to the byte up to 25,000. The working set moved by 8 KB
+    in that run, and by about 0.4 MB in steps in an earlier one.
+  - A sink keeping 64 bytes per message grew private commit by 48% (6.07 →
+    8.96 MB), against 27% for the working set: twice the margin over the
+    10% limit.
+  - macOS and Linux keep `ru_maxrss`, for which there is no such
+    measurement yet.
 
 ## 0.20.2 (2026-10-01)
 

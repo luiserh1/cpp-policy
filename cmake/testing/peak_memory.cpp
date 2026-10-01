@@ -1,6 +1,10 @@
-// The operating system's own record of the process's peak resident memory: getrusage() on
-// macOS and Linux, GetProcessMemoryInfo() on Windows. Code like this belongs in a confined
-// area (POLICY.md 4); cpp-policy keeps it here so that projects' tests don't need their own.
+// The operating system's own record of the process's peak memory: the peak resident memory
+// from getrusage() on macOS and Linux, and on Windows the peak private commit from
+// GetProcessMemoryInfo(): the memory the process allocated for itself. Windows' peak working
+// set also counts shared pages, and moved by a few hundred KB between identical runs; private
+// commit stayed flat to the byte and showed a leak with twice the margin (POLICY.md 13.5). Code
+// like this belongs in a confined area (POLICY.md 4); cpp-policy keeps it here so that projects'
+// tests don't need their own.
 #include "cpp_policy/peak_memory.hpp"
 
 #ifdef _WIN32
@@ -23,7 +27,7 @@ std::expected<std::uint64_t, std::string> peak_memory_bytes() {
         return std::unexpected{
             std::format("GetProcessMemoryInfo failed: error {}", GetLastError())};
     }
-    return counters.PeakWorkingSetSize;
+    return counters.PeakPagefileUsage;
 #else
     rusage usage{};
     if (getrusage(RUSAGE_SELF, &usage) != 0) {
