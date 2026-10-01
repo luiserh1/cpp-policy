@@ -9,7 +9,7 @@ The rules are in [POLICY.md](POLICY.md).
 From a clone of cpp-policy checked out at the release you want:
 
 ```
-git -C cpp-policy checkout v0.20.0
+git -C cpp-policy checkout v0.20.1
 sh cpp-policy/tools/new-project.sh ~/code/MyTool MyTool            # VCPKG_ROOT must be set
 cd ~/code/MyTool && cmake --workflow --preset check
 git add --all && git commit
@@ -38,7 +38,7 @@ can't ship a template that fails its own policy.
 include(FetchContent)
 FetchContent_Declare(cpp_policy
     GIT_REPOSITORY https://github.com/luiserh1/cpp-policy.git
-    GIT_TAG        <commit>)   # v0.20.0, the latest release; see CHANGELOG.md
+    GIT_TAG        <commit>)   # v0.20.1, the latest release; see CHANGELOG.md
 FetchContent_MakeAvailable(cpp_policy)
 
 add_library(app_core STATIC src/model/board.cpp)
@@ -70,7 +70,7 @@ and this repository's CMake code runs on every machine that configures the
 project (POLICY.md 10). The commit is the line ending in `^{}`:
 
 ```
-git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.20.0*'
+git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.20.1*'
 ```
 
 Don't add `GIT_SHALLOW`: it only works with branch and tag names.
@@ -80,7 +80,7 @@ Don't add `GIT_SHALLOW`: it only works with branch and tag names.
 From the project's root, with a clean working folder:
 
 ```
-sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.20.0
+sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.20.1
 ```
 
 Any copy of this repository's `tools/upgrade.sh` works (from v0.10.1 on): it
@@ -153,7 +153,7 @@ permissions:
   contents: read
 jobs:
   gate:
-    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@<commit> # v0.20.0
+    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@<commit> # v0.20.1
     with:
       systems: '["linux", "windows", "macos"]'
       vcpkg: true          # if the project has a vcpkg.json
@@ -210,7 +210,8 @@ it: `./svc.sh uninstall`, then `./config.sh remove` with the token GitHub shows.
 ## Requirements
 
 - LLVM **23.x**: `clang++` (macOS/Linux) or `clang-cl` (Windows), with
-  `clang-tidy` and `clang-format` from the same installation
+  `clang-tidy`, `clang-format`, `llvm-strip` and `llvm-size` from the same
+  installation (the last two check size budgets, POLICY.md 13.5)
 - CMake ≥ 3.29
 - Ninja
 
@@ -223,7 +224,7 @@ machines no configuration is needed:
 |---|---|---|
 | macOS (Apple Silicon) | `brew install llvm ninja`, or `llvm@23` once Homebrew's `llvm` is a newer major | `/opt/homebrew/opt/llvm@23/bin`, then `/opt/homebrew/opt/llvm/bin` |
 | macOS (Intel) | `brew install llvm ninja`, or `llvm@23` as above | `/usr/local/opt/llvm@23/bin`, then `/usr/local/opt/llvm/bin` |
-| Debian / Ubuntu | [apt.llvm.org](https://apt.llvm.org) packages for LLVM 23, plus `ninja-build` | `/usr/lib/llvm-23/bin` |
+| Debian / Ubuntu | [apt.llvm.org](https://apt.llvm.org) packages for LLVM 23 (`clang-23`, `clang-tidy-23`, `clang-format-23`, `libclang-rt-23-dev` and `llvm-23`), plus `ninja-build` | `/usr/lib/llvm-23/bin` |
 | Other Linux (e.g. Arch, CachyOS) | The official LLVM 23 release tarball (`LLVM-23.x.y-Linux-X64.tar.xz` from GitHub; check its SHA-256), extracted with `--strip-components=1` into `/usr/lib/llvm-23`, plus Ninja | `/usr/lib/llvm-23/bin` |
 | Windows | Official LLVM installer (default path), Ninja, and Visual Studio 2022 17.14 (MSVC 14.44) or later, or its Build Tools, with the "C++ AddressSanitizer" component (for the Windows SDK, the runtime and `stl_asan.lib`) | `C:\Program Files\LLVM\bin` |
 

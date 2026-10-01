@@ -96,8 +96,9 @@ jobs:
           echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-${LLVM_MAJOR} main" \
             | sudo tee /etc/apt/sources.list.d/llvm.list
           sudo apt-get update -q
+          # llvm-N: llvm-strip and llvm-size, for size budgets (POLICY.md 13.5).
           sudo apt-get install -y -q ninja-build "clang-${LLVM_MAJOR}" "clang-tidy-${LLVM_MAJOR}" \
-            "clang-format-${LLVM_MAJOR}" "libclang-rt-${LLVM_MAJOR}-dev"
+            "clang-format-${LLVM_MAJOR}" "libclang-rt-${LLVM_MAJOR}-dev" "llvm-${LLVM_MAJOR}"
 
       - name: Install LLVM (Windows)
         if: matrix.system == 'windows' && env.SELF_HOSTED != 'true'

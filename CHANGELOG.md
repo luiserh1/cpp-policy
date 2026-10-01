@@ -3,6 +3,48 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.20.1 (2026-10-01)
+
+Fixes from SimpleLocalServer's adoption of v0.20.0 (its report of
+2026-10-01). Nothing that passed can fail, so a patch release (POLICY.md 10).
+
+### Upgrading a project
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.20.1`. A
+   self-hosted Linux runner needs the `llvm-23` package (README, "Setup per
+   platform"). The home server's already has it.
+
+### Requirements
+
+- `llvm-strip` and `llvm-size` are now listed with the other LLVM tools,
+  and the gate installs `llvm-23` on GitHub's Linux machines. *Why:*
+  `cpp_policy_size_budget()` needs them, but nothing named them.
+  - On GitHub's Ubuntu, apt also installs `clang-23`'s recommended packages,
+    `llvm-23-dev` and with it `llvm-23`, so they were there.
+  - The home server builds its Linux image from the gate's list without
+    recommended packages, so SimpleLocalServer's release job failed at
+    configure there (run 36838148786).
+  - The server conversation found the cause, installed `llvm-23` and
+    suggested naming it in the gate (2026-10-01).
+  - Homebrew's LLVM and the official Windows archive include both tools.
+
+### Budgets (POLICY.md 13.5)
+
+- Memory tests must choose N past the program's warm-up. Measure the peak
+  after each of many rounds once on each system, and start past the bend.
+  *Why:* with N = 1,000, SimpleLocalServer's test failed on Windows (+11%) on
+  warm-up alone. Its 25-round curve rose 0.95 MB over the first 4,000
+  messages on Windows (230 KB over 5,000 on macOS), then stayed flat
+  (+0.6%). With N = 5,000 it passes, and a sink that keeps 64 bytes per
+  message still fails it.
+- Memory tests stay inside their time limit by reusing slow setup: a new
+  connection costs about 10 ms on the home server's Windows VM.
+- `peak_memory_bytes()` is documented per system: `ru_maxrss` on macOS and
+  Linux, the peak working set on Windows, which counts shared pages too.
+  The report suggests the peak private commit (`PeakPagefileUsage`) as a
+  steadier signal on Windows. It isn't switched here: SimpleLocalServer was
+  asked to measure both first.
+
 ## 0.20.0 (2026-10-01)
 
 Budgets: each program's size, and its memory under load, checked in the
