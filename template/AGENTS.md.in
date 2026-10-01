@@ -13,6 +13,9 @@ https://github.com/luiserh1/cpp-policy/blob/main/POLICY.md).
   `std::size_t` for sizes, or plain `int`.
 - Naming: `PascalCase` for types, `snake_case` for everything else, a
   trailing `_` on private data members, `UPPER_CASE` macros.
+- Design: plain data is a `struct` with free functions; a `class` only to
+  protect an invariant or own a resource; `enum class` or `std::variant` for
+  a closed set of kinds; no inheritance without asking first.
 - Functions: at most 80 lines, 6 parameters and 4 levels of nesting; files at
   most 350 lines (aim for 250).
 - Expected failures return `std::expected`; exceptions only for truly

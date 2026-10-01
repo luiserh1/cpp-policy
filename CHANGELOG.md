@@ -3,6 +3,43 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.25.0 (2026-10-02)
+
+Design (POLICY.md 15, new): the last item of the roadmap's "how we test,
+measure and design".
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** none.
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.25.0`.
+2. Optional: add the "Design" line of the template's `AGENTS.md` to the
+   project's own (the owner edits that file).
+
+### Added
+
+- **POLICY.md 15, Design:** plain data in `struct`s with free functions; a
+  `class` only to protect an invariant or own a resource; `enum class` or
+  `std::variant` for closed sets, inheritance only for open runtime
+  polymorphism; `std::vector` by default, with cache layout as a technique
+  for measured hot spots; tests first where the behaviour is known up
+  front; single-threaded by default. *Why:* issue #27. It is written as
+  guidance checked in review, because it is judgement and both projects
+  already work this way (71 `struct`s, 25 `class`es, no derived class or
+  virtual function between them). The one mechanical part, a type's data
+  being all public or all private, was already a clang-tidy check.
+  SimpleLocalServer's review (0.24.2) said no rule about the code had got
+  in its way; this section is meant to keep that true. The owner agreed the
+  approach, and that "data-oriented" in the strict sense (layout for the
+  cache) belongs to measured hot spots (2026-10-02).
+- The template's `AGENTS.md` has a "Design" line.
+
+### Roadmap
+
+- "Design approach (#27)" is done, and with it the group "how we test,
+  measure and design". Only the modules experiment remains, waiting on
+  CMake.
+
 ## 0.24.2 (2026-10-02)
 
 Corrections from SimpleLocalServer's review of what the policy has cost it.

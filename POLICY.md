@@ -1390,8 +1390,75 @@ median of three reruns), 2026-10-01:
   iterators, avoid allocation in the loop, choose a better algorithm or data
   layout. Never turn hardening or a sanitizer off for speed: configuration
   rejects it (section 6), and 14.1 shows the gain wouldn't be there.
-- **Parallel computation** belongs with the design section, still on the
-  roadmap, once libc++ provides the parallel algorithms (W3 in section 12).
+- **Parallel computation:** section 15.5.
 
 *Enforcement:* the build settings are presets and configuration checks;
 "measure first" and before/after numbers rely on review.
+
+## 15. Design
+
+How a program is shaped, where sections 2 and 11 say how its parts are
+written and arranged. It describes what both projects already do:
+SimpleLocalServer and ToneMatcher have 71 `struct`s and 25 `class`es between
+them, and no derived class or virtual function. Most of it is judgement, so
+it relies on review; no rule here needs a tool the gate doesn't already run.
+
+### 15.1 Data first
+
+- **Plain data is a `struct`:** public members, no invariant between them.
+  Behaviour is free functions that take it, in the module that owns the
+  type. Such a function can be tested with a value built in the test, and
+  read without knowing a class.
+- **A `class` needs a reason.** It protects an invariant (its members must
+  agree with each other, so only its functions may change them) or it owns a
+  resource (a file, a handle, a temporary directory). Its data is private.
+  Section 2.6 says how to write one; this says when.
+- A type is one or the other: all data public, or all private. clang-tidy
+  enforces that
+  (`cppcoreguidelines-non-private-member-variables-in-classes`).
+- No getters and setters around data that has no invariant: that is a
+  `struct` with more code.
+
+### 15.2 Closed sets and polymorphism
+
+- **A closed set of kinds is an `enum class`** (the kinds differ in a value)
+  **or a `std::variant`** (they differ in what they hold). A set is closed
+  when the module that defines it knows every member. A `switch` over it
+  has no `default`, so the compiler reports a kind that was added and not
+  handled.
+- **Behaviour passed in is a function parameter:** a template parameter or
+  `std::function`, not an interface with one virtual function.
+- **Inheritance is only for open runtime polymorphism:** code outside the
+  module adds new kinds, chosen at run time. Neither project has needed it.
+  When one does, section 2.6 applies, and the base class has no data.
+- No inheritance to share code. Share it with a function or a member.
+
+### 15.3 Containers and layout
+
+- `std::vector` (or `std::array`, `std::string`) by default (14.3).
+  `std::map` and `std::set` are right where ordered iteration or lookup by
+  key is the point; ToneMatcher uses them fifteen times.
+- **Layout for the cache is a technique for measured hot spots, not the
+  default style.** Splitting an array of objects into arrays of fields can
+  speed up a loop that reads one field of many objects. It makes the code
+  harder to read, so it comes with a benchmark showing the gain (14.2).
+
+### 15.4 Tests first where the behaviour is known
+
+- **A bug fix:** the failing test is written first (13.4).
+- **A function whose inputs and outputs are clear before it is written**
+  (a parser, a conversion, a calculation): its tests come first, or in the
+  same commit.
+- **Not for code whose shape is still being found.** Write it, then test
+  what it turned out to do before the commit that finishes it. Every
+  behaviour still ends with a test (section 13); this is only about order.
+
+### 15.5 Parallel computation
+
+Single-threaded by default. Threads for work that must be concurrent (a
+server's connections) follow section 2.8. Threads for speed need a
+measurement first (14.2), and wait for libc++'s parallel algorithms where
+those would do (W3 in section 12). This section will grow when they arrive.
+
+*Enforcement:* the `struct`/`class` split by clang-tidy; the rest relies on
+review (section 8.1).
