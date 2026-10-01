@@ -111,7 +111,8 @@ function(_cpp_policy_windows_asan_runtime target)
         target_link_options(${target} PRIVATE
             "${lib}" "/wholearchive:${thunk}" "/include:__asan_seh_interceptor")
         add_custom_command(TARGET ${target} POST_BUILD
-            COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${dll}" "$<TARGET_FILE_DIR:${target}>"
+            COMMAND "${CMAKE_COMMAND}" "-DSOURCE=${dll}" "-DDESTINATION=$<TARGET_FILE_DIR:${target}>"
+                    -P "${CPP_POLICY_ROOT}/cmake/scripts/copy_runtime.cmake"
             VERBATIM)
     endif()
 endfunction()

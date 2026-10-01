@@ -33,6 +33,19 @@ Windows. Nothing that passed can fail, so a patch release (POLICY.md 10).
 - The template's own test missed it because its file includes `<ostream>` for
   a printer.
 
+### Windows (POLICY.md 7.3)
+
+- The AddressSanitizer runtime is copied next to each program under a lock on
+  the folder (`cmake/scripts/copy_runtime.cmake`). *Why:* this release's
+  first CI run on `main` failed once on Windows with "Error copying file
+  (if different) … Permission denied", and passed when rerun. Programs in
+  one folder link in parallel and each copies the same DLL there. One copy
+  could read the file while another was writing it, find it different, and
+  fail to overwrite it. The race is older than this release, but the
+  test-registration step runs each test program right after the copy, so a
+  folder of test programs meets it more often. ToneMatcher's tests folder
+  will have eleven.
+
 ### Self-test
 
 - The template's lowlevel test prints a `std::string_view` (in `CAPTURE`)
