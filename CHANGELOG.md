@@ -3,6 +3,33 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.20.2 (2026-10-01)
+
+A correction to POLICY.md 13.5 (documentation only), so that projects don't
+copy a number that fails. A patch release (POLICY.md 10).
+
+### Upgrading a project
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.20.2`. Nothing
+   else.
+
+### Budgets (POLICY.md 13.5)
+
+- The warm-up example now covers all three systems, and says to choose N past
+  the latest bend. *Why:* v0.20.1 cited N = 5,000 as passing, which held on
+  macOS and Windows only. Once the home server's Linux runner had
+  `llvm-strip`, SimpleLocalServer's test failed there at N = 5,000 (+39%).
+  The Linux peak rises in two steps of exactly 1 MiB, at about 6,000 and
+  11,000 messages, then stays flat to 50,000 (run 36842331640). With
+  N = 15,000, growth up to 50,000 is 0% on Linux, 0.5% on Windows and 4% on
+  macOS. All 8 jobs pass (run 36842841438), and a sink that keeps 64 bytes
+  per message still fails. (SimpleLocalServer's report of 2026-10-01.)
+- A client that reuses connections sets `TCP_NODELAY`. *Why:* on Linux,
+  Nagle's algorithm with delayed acknowledgment cost about 44 ms per request
+  over a kept-alive connection: 200 messages took 8,881 ms, against 7 ms
+  with `TCP_NODELAY` (run 36841795360). Reusing connections, which 13.5
+  recommends, is what exposes it.
+
 ## 0.20.1 (2026-10-01)
 
 Fixes from SimpleLocalServer's adoption of v0.20.0 (its report of

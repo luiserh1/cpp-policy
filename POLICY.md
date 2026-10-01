@@ -1151,16 +1151,30 @@ processes input of unbounded size (a batch over many files) has a memory test.
 - It is a `benchmark` test that drives the program's work N times, reads the
   peak memory with `cpp_policy::peak_memory_bytes()`, drives it 4N more times,
   and reads it again.
-- **N must cover the warm-up.** A program's peak first rises while it settles:
-  allocator pools, thread pools, caches, the operating system's buffers. That
-  rise is not a leak. Measure the curve once on each system (the peak after
-  each of many rounds) and choose N past its bend. For SimpleLocalServer the
-  bend was at about 4,000 messages on Windows and 5,000 on macOS, so with
-  N = 1,000 Windows failed (+11%) on warm-up alone. With N = 5,000 it passes,
-  and a sink that keeps 64 bytes per message still fails it.
+- **N must cover the warm-up, on every system.** A program's peak first rises
+  while it settles: allocator pools, thread pools, caches, the operating
+  system's buffers. That rise is not a leak. Measure the curve once on each
+  system (the peak after each of many rounds), and choose N past the latest
+  bend. For SimpleLocalServer:
+
+  | System | Warm-up | Peak growth from 15,000 to 50,000 messages |
+  |---|---|---|
+  | macOS | about 5,000 messages | 4% |
+  | Windows | about 4,000 messages | 0.5% |
+  | Linux | two steps of exactly 1 MiB, at about 6,000 and 11,000 messages | 0% |
+
+  With N = 1,000, Windows failed (+11%) on warm-up alone. With N = 5,000,
+  Linux failed (+39%), on its second step. With N = 15,000 every system
+  passes, and a sink that keeps 64 bytes per message still fails
+  (9.8 → 19.0 MB).
 - **Keep it inside its time limit.** Where setting up the work is slow, reuse
   it: on the home server's Windows VM a new connection costs about 10 ms, so
   SimpleLocalServer's test sends its messages over kept-alive connections.
+  A client that reuses a connection sets `TCP_NODELAY`. Otherwise, on Linux,
+  Nagle's algorithm holds each request's body until its headers are
+  acknowledged, and delayed acknowledgment makes that about 44 ms per
+  request: 200 messages took 8.9 s instead of 7 ms. macOS and Windows don't
+  show it.
 - The peak may grow by **less than 10%**. Peak memory never goes down, so
   growth means something is kept per unit of work.
 - `peak_memory_bytes()` comes with benchmark tests
