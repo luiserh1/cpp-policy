@@ -23,12 +23,6 @@ in the walkthroughs of that time.
 Deliberately left for after everything else (owner's decision). They are one
 topic and will likely become new POLICY.md sections.
 
-- [ ] **Performance (#13):** a POLICY.md section with the cost of each safety
-      feature, defaults (contiguous containers, no needless copies), "measure
-      first", and how to speed up a proven hot spot. Speed benchmarks: a
-      library via vcpkg or the `benchmark` test kind (POLICY.md 13.5), run in
-      Release without sanitizers, results saved per version and compared on
-      the same machine.
 - [ ] **Design approach (#27):** data-oriented design first (plain data +
       free functions, contiguous containers, `enum class`/`std::variant` for
       closed sets); classes only to protect an invariant or own a resource;

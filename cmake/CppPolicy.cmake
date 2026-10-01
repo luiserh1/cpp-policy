@@ -320,16 +320,61 @@ function(_cpp_policy_project_tests dir out)
     set(${out} ${found} PARENT_SCOPE)
 endfunction()
 
-# Appends a problem to the list named by `out_list` for each option that turns warnings or
-# clang-cl's hardening off. clang-cl accepts either prefix, so both are checked.
+# Whether a standard-library hardening or fortify definition (NAME or NAME=value) keeps the
+# policy's protection: the levels the policy itself sets, or stronger.
+function(_cpp_policy_definition_weakens definition out)
+    set(weakens FALSE)
+    if(definition MATCHES "^(_LIBCPP_HARDENING_MODE|_GLIBCXX_ASSERTIONS|_MSVC_STL_HARDENING|_FORTIFY_SOURCE)(=([^>]*))?")
+        set(name "${CMAKE_MATCH_1}")
+        set(value "${CMAKE_MATCH_3}")
+        if(name STREQUAL "_LIBCPP_HARDENING_MODE")
+            if(NOT value MATCHES "^_LIBCPP_HARDENING_MODE_(FAST|EXTENSIVE|DEBUG)$")
+                set(weakens TRUE)
+            endif()
+        elseif(name STREQUAL "_FORTIFY_SOURCE")
+            if(NOT value STREQUAL "3")
+                set(weakens TRUE)
+            endif()
+        elseif(value STREQUAL "0")
+            set(weakens TRUE)
+        endif()
+    endif()
+    set(${out} ${weakens} PARENT_SCOPE)
+endfunction()
+
+# Appends a problem to the list named by `out_list` for each option that turns warnings off,
+# or weakens a protection the policy turns on: the stack protector, fortify, control-flow
+# protection, standard-library hardening, the sanitizers, and clang-cl's hardening. clang-cl
+# accepts either prefix, so both are checked.
 # (The parameter must not be called `problems`: it would shadow the caller's list.)
 function(_cpp_policy_check_options what options out_list)
     set(found ${${out_list}})
     foreach(option IN LISTS options)
         if(option MATCHES "-Wno-|/wd[0-9]" OR option MATCHES "^[-/]w$" OR option STREQUAL "/W0")
             list(APPEND found "${what} turns warnings off: ${option}")
-        elseif(option MATCHES "^[-/](GS|guard:cf|sdl)-$")
+        elseif(option MATCHES "^[-/](GS|guard:cf|sdl)-$"
+               OR option MATCHES "^-fno-stack-protector$|^-fstack-protector$"
+               OR (option MATCHES "^-fcf-protection=" AND NOT option MATCHES "^-fcf-protection=full$")
+               OR option MATCHES "^-fno-sanitize="
+               OR option MATCHES "^[-/]U(_LIBCPP_HARDENING_MODE|_GLIBCXX_ASSERTIONS|_MSVC_STL_HARDENING)$")
             list(APPEND found "${what} turns hardening off: ${option}")
+        elseif(option MATCHES "^[-/]D(.*)$")
+            _cpp_policy_definition_weakens("${CMAKE_MATCH_1}" weakens)
+            if(weakens)
+                list(APPEND found "${what} turns hardening off: ${option}")
+            endif()
+        endif()
+    endforeach()
+    set(${out_list} ${found} PARENT_SCOPE)
+endfunction()
+
+# The same for compile definitions (target_compile_definitions, add_compile_definitions).
+function(_cpp_policy_check_definitions what definitions out_list)
+    set(found ${${out_list}})
+    foreach(definition IN LISTS definitions)
+        _cpp_policy_definition_weakens("${definition}" weakens)
+        if(weakens)
+            list(APPEND found "${what} turns hardening off: ${definition}")
         endif()
     endforeach()
     set(${out_list} ${found} PARENT_SCOPE)
@@ -361,6 +406,13 @@ function(_cpp_policy_verify_targets)
                 _cpp_policy_check_options("target '${target}' (${property})" "${options}" problems)
             endif()
         endforeach()
+        foreach(property IN ITEMS COMPILE_DEFINITIONS INTERFACE_COMPILE_DEFINITIONS)
+            get_target_property(definitions ${target} ${property})
+            if(definitions)
+                _cpp_policy_check_definitions("target '${target}' (${property})" "${definitions}"
+                    problems)
+            endif()
+        endforeach()
         if(CPP_POLICY_CLANG_TIDY)
             get_target_property(tidy ${target} CXX_CLANG_TIDY)
             _cpp_policy_tidy_config(config)
@@ -381,6 +433,12 @@ function(_cpp_policy_verify_targets)
                     _cpp_policy_check_options("target '${target}': ${source}" "${options}" problems)
                 endif()
             endforeach()
+            get_source_file_property(definitions "${source}" TARGET_DIRECTORY ${target}
+                COMPILE_DEFINITIONS)
+            if(definitions)
+                _cpp_policy_check_definitions("target '${target}': ${source}" "${definitions}"
+                    problems)
+            endif()
         endforeach()
     endforeach()
 
@@ -560,8 +618,8 @@ endfunction()
 # every test case becomes a CTest test named <kind>/<module>/<test case> and labelled with
 # its kind (scripts/doctest_tests.cmake). Unit tests have 10 seconds; integration and
 # benchmark tests 60, or TIMEOUT. Benchmark programs also get cpp_policy::peak_memory_bytes(),
-# and are built everywhere (so clang-tidy checks them) but run only in builds without
-# sanitizers, which distort memory and time.
+# and nanobench when the project uses it, and are built everywhere (so clang-tidy checks them)
+# but run only in builds without sanitizers, which distort memory and time.
 # ---------------------------------------------------------------------------
 function(_cpp_policy_testing_library)
     if(TARGET cpp_policy_testing)
@@ -633,6 +691,20 @@ function(cpp_policy_add_tests kind module)
     if(kind STREQUAL "benchmark")
         _cpp_policy_testing_library()
         target_link_libraries(${target} PRIVATE cpp_policy_testing)
+        # Speed benchmarks use nanobench when the project lists it in vcpkg.json (POLICY.md 14.2):
+        # its implementation is compiled once, like doctest's main().
+        if(NOT TARGET nanobench::nanobench)
+            find_package(nanobench CONFIG QUIET GLOBAL)
+        endif()
+        if(TARGET nanobench::nanobench)
+            if(NOT TARGET cpp_policy_nanobench)
+                add_library(cpp_policy_nanobench OBJECT
+                    "${CPP_POLICY_ROOT}/cmake/testing/nanobench_impl.cpp")
+                target_link_libraries(cpp_policy_nanobench PRIVATE nanobench::nanobench)
+                cpp_policy_apply(cpp_policy_nanobench)
+            endif()
+            target_link_libraries(${target} PRIVATE cpp_policy_nanobench nanobench::nanobench)
+        endif()
     endif()
     cpp_policy_apply(${target})
     if(kind STREQUAL "benchmark" AND (CPP_POLICY_SANITIZERS OR CPP_POLICY_THREAD_SANITIZER))

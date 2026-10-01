@@ -488,9 +488,17 @@ The following files define enforcement and must not be weakened in a project:
 Rules can't be switched off from CMake either. At the end of configuration
 the module checks that every target the project builds (fetched dependencies
 and excluded directories aside) calls `cpp_policy_apply()` and keeps its
-settings: no options that turn warnings off (`-Wno-…`, `/wd…`, `-w`) on
-targets, source files or `CMAKE_CXX_FLAGS`, no `SKIP_LINTING`, and no changes
-to `CXX_CLANG_TIDY`. Configuration fails otherwise.
+settings:
+- no options that turn warnings off (`-Wno-…`, `/wd…`, `-w`) on targets,
+  source files or `CMAKE_CXX_FLAGS`;
+- no options or definitions that weaken a protection the policy turns on:
+  `-fno-stack-protector` (or the weaker `-fstack-protector`),
+  `-fcf-protection=none`, `_FORTIFY_SOURCE` below 3, a standard-library
+  hardening macro turned off, `-fno-sanitize=…`, and `clang-cl`'s `/GS-`,
+  `/guard:cf-` and `/sdl-`;
+- no `SKIP_LINTING`, and no changes to `CXX_CLANG_TIDY`.
+
+Configuration fails otherwise.
 
 Projects can't change the rules locally: their `.clang-tidy`,
 `.clang-format`, `CMakePresets.json`, git hooks (`tools/hooks/`) and, with a
@@ -522,7 +530,8 @@ looser, is made in `cpp-policy` itself.
 |---|---|---|
 | `dev` | Daily work | Debug, warnings as errors, AddressSanitizer (with leak detection) + UndefinedBehaviorSanitizer, standard library hardening (debug level) |
 | `release` | Shipping | Optimized, warnings as errors, standard library hardening (fast level), `_FORTIFY_SOURCE=3`, `-fstack-protector-strong`, `-fcf-protection` where supported; with `clang-cl`, Control Flow Guard (`/guard:cf`) on top of its default stack cookies (7.4) |
-| `check` | The gate | Full build + full clang-tidy + format check + tests under sanitizers + suppression audit |
+| `check` | The gate | Full build + full clang-tidy + format check + tests under sanitizers + suppression audit; like `dev`, but compiled at `-O1` so the tests run 15 to 21 times faster (14.1) |
+| `unit` | Quick check while working | Like `check` without clang-tidy, the audit and the format check; runs only the unit tests |
 | `debug` | Step-through debugging | Debug, no sanitizers, standard library hardening (debug level) |
 | `tsan` | Data races | Debug, ThreadSanitizer, standard library hardening (debug level); macOS and Linux only |
 
@@ -531,7 +540,8 @@ are optimized (`RelWithDebInfo`, see 7.3), so `win-debug` is the one to step
 through. The `release` workflow runs the tests on the optimized build, where
 some bugs only appear; it is meant for CI rather than every push. So is the
 `tsan` workflow: ThreadSanitizer can't be combined with AddressSanitizer, so
-it needs a build of its own, and `clang-cl` doesn't provide it.
+it needs a build of its own, and `clang-cl` doesn't provide it. `dev` and
+`debug` stay at `-O0`, so that a debugger shows every variable.
 
 Test presets:
 - Every test has a 60-second timeout, so a hung test fails instead of holding
@@ -687,6 +697,8 @@ These rules rely on review (and on agents following `AGENTS.md`):
   always rely on review
 - Budgets (section 13.5): sizes and memory growth are checked; whether every
   shipped program has a budget and every server a memory test is review
+- Performance (section 14): measuring before optimizing, and giving before
+  and after numbers, rely on review
 - How tests are written (section 13.4): test names, labels and skipped
   tests are checked; `REQUIRE` versus `CHECK`, one behavior per test, fakes,
   no sleeps and testing through public headers rely on review
@@ -1213,3 +1225,75 @@ the end (528 MB on 92 images) while its `export` passed its test.
 *Enforcement:* the budget and memory tests fail the release workflow. Whether
 every shipped program has a budget, and every server a memory test, relies on
 review (section 8.1).
+
+## 14. Performance
+
+### 14.1 What the safety features cost
+
+Measured on two workloads (SimpleLocalServer's `sanitize()`, which scans
+text, and ToneMatcher's Gaussian blur, which indexes vectors in tight loops)
+on an Apple Silicon Mac, best of five runs (the blur's unsanitized builds:
+median of three reruns), 2026-10-01:
+
+| Build | Cost against the release build |
+|---|---|
+| The release build's protections: standard-library hardening (`fast`), `-fstack-protector-strong`, `_FORTIFY_SOURCE=3` | Not measurable: within the machine's run-to-run noise (±15%). Builds with none of them were no faster |
+| Standard-library hardening at the `debug` level | Also within noise |
+| AddressSanitizer + UndefinedBehaviorSanitizer, at `-O3` | ×1.8 to ×2.4 |
+| The same at `-O1` (the `check` and `unit` builds) | ×2 to ×6 |
+| The same at `-O0` (the `dev` build, and `check` before v0.22.0) | ×43 to ×86 |
+| ThreadSanitizer, at `-O3` | ×11 to ×14 |
+
+- **Every protection stays on in release:** they cost less than the noise
+  in which any speed difference would have to show.
+- **What costs is optimization in the test builds.** That's why `check` and
+  `unit` compile at `-O1`: their tests run 15 to 21 times faster than at
+  `-O0`, with the same sanitizers, hardening and checks. `dev` and `debug`
+  stay at `-O0` for the debugger.
+
+### 14.2 Speed benchmarks
+
+- **Measure first.** Speed work starts from a measurement that shows where
+  the time goes (a profiler, or a benchmark of the suspected part), not from
+  a guess. The change then shows the same measurement before and after.
+- **Benchmarks are `benchmark` tests with nanobench.** A project lists
+  `nanobench` in `vcpkg.json`, and `cpp_policy_add_tests(benchmark …)` links
+  it and compiles its implementation once:
+
+  ```cpp
+  TEST_CASE("sanitize speed on a 4 KB message") {
+      ankerl::nanobench::Bench bench;
+      bench.title("sanitize").unit("message").minEpochIterations(200);
+      bench.run("4 KB mixed text", [&] {
+          auto result = sls::message::sanitize(text);
+          ankerl::nanobench::doNotOptimizeAway(result);
+      });
+      CHECK_FALSE(bench.results().empty());
+  }
+  ```
+
+  It prints the time per unit, the throughput and the error margin. Like
+  every benchmark test, it runs only in the release build.
+- **Only compare on one quiet machine, over several runs.** The same binary
+  varied by up to 15% between runs on a quiet Mac, and a build running
+  alongside slowed a measurement by 80%. CI machines are shared, so speed is
+  never a CI check. A change that claims a speed-up, or might cost speed,
+  gives nanobench's before and after (machine, median of several runs) in
+  its `CHANGELOG.md` entry.
+
+### 14.3 Writing fast code without weakening it
+
+- **Defaults that cost nothing:** contiguous containers (`std::vector`,
+  `std::array`, `std::string`); `reserve()` when the size is known; pass
+  large objects by `const&` and move what is handed over; no copies to
+  satisfy an interface that could take a `std::span` or `std::string_view`.
+- **A proven hot spot is made fast within the rules.** Remove work rather
+  than checks: hoist a size check out of the loop and iterate with ranges or
+  iterators, avoid allocation in the loop, choose a better algorithm or data
+  layout. Never turn hardening or a sanitizer off for speed: configuration
+  rejects it (section 6), and 14.1 shows the gain wouldn't be there.
+- **Parallel computation** belongs with the design section, still on the
+  roadmap, once libc++ provides the parallel algorithms (W3 in section 12).
+
+*Enforcement:* the build settings are presets and configuration checks;
+"measure first" and before/after numbers rely on review.

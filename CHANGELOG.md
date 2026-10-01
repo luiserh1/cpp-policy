@@ -3,6 +3,89 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.22.0 (2026-10-01)
+
+Performance (POLICY.md 14, new), from measurements. The `check` build is
+optimized, and configuration rejects options that weaken the release
+protections, so code that passed can fail: a minor release (POLICY.md 10).
+
+### Upgrading a project
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.22.0`. It copies
+   the new `CMakePresets.json`.
+2. If configuration now reports "turns hardening off", remove that option or
+   definition (POLICY.md 6).
+3. Optional: speed benchmarks with nanobench (POLICY.md 14.2).
+
+### Performance (POLICY.md 14, new)
+
+- **14.1, what the safety features cost**, measured on SimpleLocalServer's
+  `sanitize()` and ToneMatcher's Gaussian blur:
+  - The release build's protections (hardening, stack protector,
+    fortify 3) cost less than the machine's run-to-run noise (±15%), so
+    they all stay.
+  - ASan + UBSan cost ×1.8–2.4 at `-O3`, ×2–6 at `-O1`, and ×43–86 at `-O0`.
+  - ThreadSanitizer costs ×11–14.
+- **14.2, speed benchmarks:** measure first. Benchmarks are `benchmark`
+  tests with nanobench. Speed is compared only on one quiet machine, over
+  several runs, and is never a CI check; a change that claims or risks speed
+  gives its before and after in `CHANGELOG.md`.
+  - *Why nanobench:* it's header-only, MIT, and in vcpkg, and runs inside a
+    doctest test case. It built with no clang-tidy findings, implementation
+    included, and agreed with a hand-written timing loop within 5%. Google
+    Benchmark has its own `main()` and registration macros, which don't fit
+    doctest.
+  - *Why no CI check:* the same binary varied by up to 15% between runs on a
+    quiet Mac, and a build running alongside slowed one measurement by 80%.
+    The owner chose before/after numbers in the commit (2026-10-01).
+- **14.3, writing fast code within the rules:** cheap defaults (contiguous
+  containers, `reserve()`, `std::span` and `std::string_view`), and removing
+  work rather than checks in a proven hot spot.
+
+### Presets
+
+- `check` compiles at `-O1` (`cfg-optimized-tests`): its tests run 15–21
+  times faster than at `-O0` (`sanitize()`: 76.6 s → 3.6 s; the blur:
+  8.6 s → 0.57 s), with the same sanitizers, hardening and clang-tidy. The
+  owner chose it for `check`, with `dev` and `debug` staying at `-O0` for the
+  debugger (2026-10-01).
+- `unit` has its own configuration, `dev` at `-O1` without clang-tidy, so
+  the quick workflow is quick too. `win-check` and `win-unit` were already
+  optimized (`RelWithDebInfo`, POLICY.md 7.3).
+
+### Bypass checks (POLICY.md 6)
+
+- Configuration rejects the following on targets, source files and
+  `CMAKE_CXX_FLAGS`, as it rejects `-Wno-…`:
+  - `-fno-stack-protector` and the weaker `-fstack-protector`;
+  - `-fcf-protection` other than `full`;
+  - `_FORTIFY_SOURCE` below 3;
+  - `-U` or a disabling value of the standard-library hardening macros;
+  - `-fno-sanitize=…`.
+
+  Compile definitions are now checked too. *Why:* found while measuring.
+  These were the release protections that a project could still turn off
+  from CMake without configuration noticing; only warnings and `clang-cl`'s
+  `/GS-`, `/guard:cf-` and `/sdl-` were checked. The owner chose to close it
+  in this release (2026-10-01).
+- `CPP_POLICY_HARDENING=none` is still accepted when a project sets it
+  itself. Whether to forbid it is left for the owner.
+
+### Benchmark tests
+
+- With nanobench in the project's `vcpkg.json`, `cpp_policy_add_tests(benchmark …)`
+  links it and compiles its implementation once
+  (`cmake/testing/nanobench_impl.cpp`).
+
+### Self-test
+
+- `bypass/protection_options` and `bypass/hardening_definitions`: each
+  weakened protection fails configuration. `bypass/clean` proves the
+  policy's own options aren't flagged.
+- `template/new_project` adds nanobench and a speed test to the generated
+  project. It must be built under clang-tidy in the check build and run in
+  the release build.
+
 ## 0.21.0 (2026-10-01)
 
 Memory tests per command, and outputs that grow with the input (POLICY.md

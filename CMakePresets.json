@@ -100,6 +100,15 @@
       }
     },
     {
+      "name": "cfg-optimized-tests",
+      "hidden": true,
+      "description": "Sanitized builds that run tests at -O1: 15-21 times faster than -O0, same checks (POLICY.md 14.1)",
+      "cacheVariables": {
+        "CMAKE_C_FLAGS_DEBUG": "-g -O1",
+        "CMAKE_CXX_FLAGS_DEBUG": "-g -O1"
+      }
+    },
+    {
       "name": "dev",
       "displayName": "dev",
       "inherits": [
@@ -128,7 +137,17 @@
       "displayName": "check",
       "inherits": [
         "unix",
-        "cfg-check"
+        "cfg-check",
+        "cfg-optimized-tests"
+      ]
+    },
+    {
+      "name": "unit",
+      "displayName": "unit",
+      "inherits": [
+        "unix",
+        "cfg-dev",
+        "cfg-optimized-tests"
       ]
     },
     {
@@ -178,6 +197,10 @@
     {
       "name": "dev",
       "configurePreset": "dev"
+    },
+    {
+      "name": "unit",
+      "configurePreset": "unit"
     },
     {
       "name": "debug",
@@ -253,7 +276,8 @@
         "include": {
           "label": "^unit$"
         }
-      }
+      },
+      "configurePreset": "unit"
     },
     {
       "name": "check",
@@ -336,11 +360,11 @@
       "steps": [
         {
           "type": "configure",
-          "name": "dev"
+          "name": "unit"
         },
         {
           "type": "build",
-          "name": "dev"
+          "name": "unit"
         },
         {
           "type": "test",

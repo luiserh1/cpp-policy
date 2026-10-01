@@ -11,9 +11,9 @@
 # skipped test case must fail the build (POLICY.md 13). It needs VCPKG_ROOT, for doctest. The
 # template's lowlevel test prints a std::string_view without including <ostream>, which only
 # compiles with Microsoft's library because cpp_policy_add_tests() makes doctest include it.
-# A memory test (test_benchmark.cpp) is added to the project: it must be built in the check
-# build and run only in the release workflow, which must also pass the program's size budget
-# (POLICY.md 13.5).
+# A memory test and a nanobench speed test (test_benchmark.cpp, with nanobench added to
+# vcpkg.json) are added to the project: they must be built in the check build and run only in
+# the release build, which must also pass the program's size budget (POLICY.md 13.5, 14.2).
 
 cmake_minimum_required(VERSION 3.29)
 find_package(Git REQUIRED)
@@ -46,6 +46,9 @@ function(generate_and_check)
     step("${dest}" "git init" "${GIT_EXECUTABLE}" init --quiet)
     step("${dest}" "enabling the hooks" "${GIT_EXECUTABLE}" config core.hooksPath tools/hooks)
     file(COPY_FILE "${CMAKE_CURRENT_LIST_DIR}/test_benchmark.cpp" "${dest}/tests/test_benchmark.cpp")
+    file(READ "${dest}/vcpkg.json" manifest)
+    string(REPLACE "\"dependencies\": [" "\"dependencies\": [\n    {\"name\": \"nanobench\", \"default-features\": false, \"$reason\": \"speed benchmarks\"}," manifest "${manifest}")
+    file(WRITE "${dest}/vcpkg.json" "${manifest}")
     file(APPEND "${dest}/tests/CMakeLists.txt"
         "cpp_policy_add_tests(benchmark app SOURCES test_benchmark.cpp LIBRARIES my_tool_core)\n")
 
@@ -113,7 +116,7 @@ function(check_release)
     step("${dest}" "building ${release}" "${CMAKE_COMMAND}" --build --preset ${release})
     step("${dest}" "testing ${release}" "${CMAKE_CTEST_COMMAND}" --preset ${release})
     foreach(test IN ITEMS "benchmark/app/memory stays flat as the number of greetings grows"
-                          "benchmark/size/my_tool")
+                          "benchmark/app/greeting speed" "benchmark/size/my_tool")
         string(FIND "${out}" "${test} " found)
         if(found EQUAL -1)
             message(FATAL_ERROR "new_project: ${release} didn't run '${test}':\n${out}")

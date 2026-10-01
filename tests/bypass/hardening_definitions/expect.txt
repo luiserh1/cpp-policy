@@ -1,0 +1,1 @@
+turns hardening off: _LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_NONE.*turns hardening off: _FORTIFY_SOURCE=1
