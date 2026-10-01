@@ -612,6 +612,51 @@ function(cpp_policy_layers)
 endfunction()
 
 # ---------------------------------------------------------------------------
+# Dependencies kept in their modules (POLICY.md 11.6): the headers named may be included only
+# from the modules after TO. A name ending in "/" stands for every header under it.
+#   cpp_policy_confine_includes(httplib.h TO server)
+#   cpp_policy_confine_includes(nlohmann/ zlib.h TO backend SOURCES_ONLY)
+# With SOURCES_ONLY, only those modules' source files may include them, not their headers, so
+# no other module gets them through a header either. Call it before cpp_policy_add_checks().
+# ---------------------------------------------------------------------------
+function(cpp_policy_confine_includes)
+    if(TARGET policy-audit)
+        message(FATAL_ERROR
+            "cpp-policy: call cpp_policy_confine_includes() before cpp_policy_add_checks()")
+    endif()
+    set(usage "cpp_policy_confine_includes(<header or directory/>... TO <module>... [SOURCES_ONLY])")
+    set(headers "")
+    set(modules "")
+    set(sources_only "")
+    set(reading headers)
+    foreach(argument IN LISTS ARGN)
+        if(argument STREQUAL "TO" AND reading STREQUAL "headers")
+            set(reading modules)
+        elseif(argument STREQUAL "SOURCES_ONLY" AND reading STREQUAL "modules")
+            set(sources_only "sources")
+        elseif(reading STREQUAL "headers")
+            if(NOT argument MATCHES "^[A-Za-z0-9_+.-]+(/[A-Za-z0-9_+.-]+)*/?$")
+                message(FATAL_ERROR "cpp-policy: '${argument}' isn't a header name or a "
+                                    "directory ending in '/': ${usage}")
+            endif()
+            list(APPEND headers "${argument}")
+        elseif(NOT argument MATCHES "^[a-z0-9_]+$")
+            message(FATAL_ERROR "cpp-policy: '${argument}' isn't a module name (a directory "
+                                "under src/): ${usage}")
+        else()
+            list(APPEND modules "${argument}")
+        endif()
+    endforeach()
+    if(headers STREQUAL "" OR modules STREQUAL "")
+        message(FATAL_ERROR "cpp-policy: ${usage}")
+    endif()
+    list(JOIN headers "," headers)
+    list(JOIN modules "," modules)
+    set_property(GLOBAL APPEND PROPERTY CPP_POLICY_CONFINED_INCLUDES
+        "${headers}|${modules}|${sources_only}")
+endfunction()
+
+# ---------------------------------------------------------------------------
 # Tests (POLICY.md 13): one doctest program per kind and module.
 #   cpp_policy_add_tests(unit message SOURCES test_sanitize.cpp LIBRARIES sls_core)
 #   cpp_policy_add_tests(integration server SOURCES test_server.cpp LIBRARIES sls_core
@@ -806,6 +851,7 @@ function(cpp_policy_add_checks)
 
     _cpp_policy_commit(policy_commit)
     get_property(layers GLOBAL PROPERTY CPP_POLICY_LAYERS)
+    get_property(confined_includes GLOBAL PROPERTY CPP_POLICY_CONFINED_INCLUDES)
     set(config "${CMAKE_BINARY_DIR}/cpp_policy_config.cmake")
     file(WRITE "${config}"
         "set(SOURCE_DIR [==[${CMAKE_SOURCE_DIR}]==])\n"
@@ -814,6 +860,7 @@ function(cpp_policy_add_checks)
         "set(CONFINED_DIRS [==[${CPP_POLICY_CONFINED_DIRS}]==])\n"
         "set(EXCLUDED_DIRS [==[${CPP_POLICY_EXCLUDED_DIRS}]==])\n"
         "set(LAYERS [==[${layers}]==])\n"
+        "set(CONFINED_INCLUDES [==[${confined_includes}]==])\n"
         "set(CLANG_FORMAT [==[${CPP_POLICY_CLANG_FORMAT_EXE}]==])\n"
         "set(CLANG_TIDY [==[${CPP_POLICY_CLANG_TIDY_EXE}]==])\n"
         "set(BUILD_DIR [==[${CMAKE_BINARY_DIR}]==])\n")

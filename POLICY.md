@@ -998,6 +998,39 @@ Its `AGENTS.md` tells agents to read `ROADMAP.md` before they start work.
 
 *Enforcement:* review. The audit doesn't read prose.
 
+### 11.6 Dependencies stay in their modules
+
+A third-party library is used through one module (or a few), and the rest of
+the program uses that module's own types. A frontend then can't come to
+depend on the library by accident, and replacing the library touches only
+that module.
+
+- The project names each library's headers and the modules that may include
+  them, before `cpp_policy_add_checks()`:
+
+  ```cmake
+  cpp_policy_confine_includes(httplib.h TO server)
+  cpp_policy_confine_includes(nlohmann/ zlib.h TO backend SOURCES_ONLY)
+  ```
+
+  A name ending in `/` stands for every header under it.
+- **`SOURCES_ONLY`** allows the include only in those modules' source files,
+  not in their headers. A header that includes the library passes it on to
+  every file that includes that header, in any module. With `SOURCES_ONLY`
+  no header can, so the library's types can't appear in the module's
+  interface. Use it wherever the interface doesn't need them.
+- Every dependency in `vcpkg.json` that the program's own code includes has
+  such a line (doctest and nanobench are used only by tests).
+- This is the rule behind a backend with several frontends (a command line,
+  a window, later a phone): the frontends include the backend's interface,
+  written with the project's own plain types (section 15.1), and nothing
+  else of it.
+
+*Enforcement:* the audit rejects, under `src/`, an include of a named header
+(written with `<>` or `""`) from any other module or from `main.cpp`, and
+with `SOURCES_ONLY` from any header. It also fails if a line names a module
+that `src/` doesn't have. That every dependency has a line relies on review.
+
 ## 12. Waiting on the toolchain
 
 Some decisions work around features the toolchain doesn't provide yet. Each

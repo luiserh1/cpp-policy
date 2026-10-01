@@ -15,6 +15,9 @@
 # Fails if an #include in src/ points to a higher layer (LAYERS, from cpp_policy_layers()),
 # uses a relative path, or leaves a confined module; if src/ has two or more modules and
 # no layers; or if a module is in no layer (POLICY.md 11.1).
+# Fails if a file in src/ includes a header that CONFINED_INCLUDES (from
+# cpp_policy_confine_includes()) keeps in other modules, or in source files only; or if that
+# names a module src/ doesn't have (POLICY.md 11.6).
 # Fails if dynamic_cast or typeid lacks `// rtti: reason`, or catch (...) lacks
 # `// boundary: which`, on the same line (POLICY.md 3).
 # With CHECK_PROJECT_FILES, also fails if the project's .clang-tidy, .clang-format,
@@ -58,6 +61,23 @@ foreach(layer IN LISTS LAYERS)
     endforeach()
 endforeach()
 list(LENGTH modules module_count)
+
+# Dependencies kept in their modules (POLICY.md 11.6). Each entry of CONFINED_INCLUDES is
+# "<headers>|<modules>|<sources or empty>", the first two comma-separated.
+if(NOT DEFINED CONFINED_INCLUDES)
+    set(CONFINED_INCLUDES "")
+endif()
+foreach(entry IN LISTS CONFINED_INCLUDES)
+    string(REPLACE "|" ";" parts "${entry};")
+    list(GET parts 1 entry_modules)
+    string(REPLACE "," ";" entry_modules "${entry_modules}")
+    foreach(module IN LISTS entry_modules)
+        if(NOT module IN_LIST modules)
+            report("src/${module}" 1
+                "cpp_policy_confine_includes() names module '${module}', which src/ doesn't have (POLICY.md 11.6)")
+        endif()
+    endforeach()
+endforeach()
 if(LAYERS STREQUAL "" AND module_count GREATER 1)
     string(REPLACE ";" ", " module_names "${modules}")
     report("CMakeLists.txt" 1
@@ -156,6 +176,39 @@ foreach(file IN LISTS files)
                         "includes \"${included}\" from a higher layer: '${own}' is layer ${layer_of_${own}}, '${target}' is layer ${layer_of_${target}} (POLICY.md 11.1)")
                 endif()
             endif()
+        endif()
+
+        # A dependency's headers stay in the modules it is confined to (POLICY.md 11.6).
+        if(NOT CONFINED_INCLUDES STREQUAL "" AND file MATCHES "^src/"
+           AND line MATCHES "^[ \t]*#[ \t]*include[ \t]*[<\"]([^>\"]+)[>\"]")
+            set(included "${CMAKE_MATCH_1}")
+            set(own "")
+            if(file MATCHES "^src/([^/]+)/")
+                set(own "${CMAKE_MATCH_1}")
+            endif()
+            foreach(entry IN LISTS CONFINED_INCLUDES)
+                string(REPLACE "|" ";" parts "${entry};")
+                list(GET parts 0 entry_headers)
+                list(GET parts 1 entry_modules)
+                list(GET parts 2 entry_sources)
+                string(REPLACE "," ";" entry_headers "${entry_headers}")
+                string(REPLACE "," ";" entry_module_list "${entry_modules}")
+                set(matches FALSE)
+                foreach(header IN LISTS entry_headers)
+                    string(LENGTH "${header}" header_length)
+                    string(SUBSTRING "${included}" 0 ${header_length} start)
+                    if(included STREQUAL header OR (header MATCHES "/$" AND start STREQUAL header))
+                        set(matches TRUE)
+                    endif()
+                endforeach()
+                if(matches AND NOT own IN_LIST entry_module_list)
+                    report("${file}" ${number}
+                        "includes <${included}>, which only these modules may include: ${entry_modules} (POLICY.md 11.6)")
+                elseif(matches AND entry_sources STREQUAL "sources" AND file MATCHES "\\.(h|hpp|hh|hxx)$")
+                    report("${file}" ${number}
+                        "includes <${included}> in a header; only source files of ${entry_modules} may include it (POLICY.md 11.6)")
+                endif()
+            endforeach()
         endif()
 
         # Constructs allowed only with a reason on the same line (POLICY.md 3). Only the code

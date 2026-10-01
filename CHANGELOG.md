@@ -3,6 +3,40 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.26.0 (2026-10-02)
+
+A dependency's headers can be kept in the modules that use it
+(POLICY.md 11.6, new). Optional until a project declares one: a minor
+release.
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** none required.
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.26.0`.
+2. When convenient, add a `cpp_policy_confine_includes()` line for each
+   dependency the program's code includes, before `cpp_policy_add_checks()`.
+   Both projects already keep theirs in one module, so the lines record what
+   is true: `httplib.h TO server` in SimpleLocalServer; `nlohmann/ TO config`
+   and `zlib.h TO lowlevel SOURCES_ONLY` in ToneMatcher.
+
+### Added
+
+- **`cpp_policy_confine_includes(<header or directory/>... TO <module>...
+  [SOURCES_ONLY])`**, checked by the audit: the named headers may be
+  included only from those modules, and with `SOURCES_ONLY` only from their
+  source files. Audit fixtures `includes_outside`, `includes_header`,
+  `includes_ok`, `includes_unknown_module`; bypass fixture `includes_late`.
+  *Why:* the owner plans a project with a backend, an interface and several
+  frontends (a command line, a window, later iOS and Android), so that the
+  backend's many dependencies don't reach the frontends. Layers
+  (11.1) only order the project's own modules; nothing stopped a frontend
+  from including a third-party header directly. `SOURCES_ONLY` exists
+  because a header that includes a library passes it on to every file that
+  includes that header, which is how a dependency reaches a frontend without
+  anyone writing its name there.
+- The template's `AGENTS.md` mentions the rule.
+
 ## 0.25.0 (2026-10-02)
 
 Design (POLICY.md 15, new): the last item of the roadmap's "how we test,

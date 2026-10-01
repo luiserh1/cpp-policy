@@ -26,6 +26,8 @@ https://github.com/luiserh1/cpp-policy/blob/main/POLICY.md).
 - Low-level code (OS APIs, the C runtime, reinterpret casts) lives only in
   `src/lowlevel/`, behind a safe interface.
 - Dependencies: ask before adding one.@VCPKG_AGENTS@
+  A dependency's headers are included only from the modules that
+  `cpp_policy_confine_includes()` in `CMakeLists.txt` allows.
 
 ## Layers
 
