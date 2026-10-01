@@ -63,9 +63,9 @@ with its reason, to `CHANGELOG.md` under "Unreleased".
   (`cpp_policy_size_budget()` in `CMakeLists.txt`). Never raise a budget
   yourself: if a change goes over it, shrink the change or ask the owner.
 - A command that processes input of unbounded size has a memory test with
-  `cpp_policy::peak_heap_bytes()` (POLICY.md 13.5). It may keep at most 1 KiB
-  per input (its name and a small record); anything larger is written as it
-  is produced.
+  `cpp_policy::peak_heap_bytes()` (POLICY.md 13.5). It may keep 1 KiB per
+  input (its name and a small record). Never raise that budget yourself: if
+  a command needs more, say what it keeps and ask the owner.
 
 ## Before you say you are done
 

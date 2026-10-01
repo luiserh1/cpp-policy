@@ -3,6 +3,35 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.24.1 (2026-10-02)
+
+The memory a batch command may keep per input is a budget, not a fixed
+figure (POLICY.md 13.5). Nothing that passed fails: a patch release.
+
+### Changed (POLICY.md 13.5)
+
+- **1 KiB per input is the default budget. A command may have a higher
+  one,** with the owner's approval and a `CHANGELOG.md` line saying what the
+  record is and why it is kept, like a size budget. The budget is for
+  records; memory that grows with the inputs' content is still streamed,
+  paged or capped. *Why:* proposed by ToneMatcher after moving its twelve
+  memory tests to the heap counter. The fixed 1 KiB of 0.24.0 was set from
+  estimates made before anyone had measured with the counter, and was wrong
+  in two ways:
+  - The count differs between systems. The same code kept 621, 1,032 and
+    2,200 bytes per file on macOS, Windows and Linux, because each standard
+    library stores a path and a string differently. A fixed limit judged the
+    library as much as the design.
+  - It was far below what matters. Each input there is an image of several
+    megabytes; the record is about 2 KB. Passing would have cost a temporary
+    file and a two-pass reader in the main command, and gave the user
+    nothing.
+
+  The owner chose budgets, and approved 4 KiB per file for ToneMatcher's
+  `export`, `pipeline` and `match-tone` (2026-10-02).
+- 13.5 now says that the heap count is exact per system and differs between
+  systems, so a limit must hold on the largest.
+
 ## 0.24.0 (2026-10-01)
 
 Memory tests that don't depend on the machine's load (POLICY.md 13.5). The

@@ -1183,15 +1183,26 @@ the end (528 MB on 92 images) while its `export` passed its test.
   3. `reset_peak_heap_bytes()`, run 5N inputs, read it again.
 
   The same work gives the same numbers to the byte on every run and every
-  machine load, so the limits are exact:
+  machine load, so the limits are exact. The numbers differ between systems,
+  because each standard library stores a string or a path differently: a
+  limit has to hold on the system where the count is largest.
   - **A server keeps nothing per request:** the second reading is less than
     10% above the first.
-  - **A batch command may keep up to 1 KiB per input:** its name and a small
-    fixed-size record. The second reading is at most the first plus
-    4N × 1,024 bytes. A command that processes files in sorted order has to
-    hold their names. In ToneMatcher, two commands kept 0.45 and 0.9 KB per
-    file (the sorted list of paths) and pass. A third kept 3.1 KB per file (a
-    whole plan built before writing it) and doesn't: that one streams.
+  - **A batch command has a budget per input, 1 KiB by default:** enough
+    for its name and a small fixed-size record. The second reading is at most
+    the first plus 4N × the budget. A command that processes files in sorted
+    order has to hold their names.
+  - **A higher budget needs the owner's approval** and a line in
+    `CHANGELOG.md` saying what the record is and why it is kept, like a size
+    budget. It is a named constant in the command's test. Agents ask.
+    ToneMatcher's `export`, `pipeline` and `match-tone` have 4 KiB per file:
+    they keep each file's path and a record per layer, 621 bytes on macOS,
+    1,032 on Windows and 2,200 on Linux for the same code. Passing 1 KiB
+    would have needed a temporary file and a two-pass reader in the main
+    command, to save 2 KB next to images of several megabytes each.
+  - The budget is for records, not for content. Memory that grows with the
+    size of the inputs (a decoded image, a whole output) is streamed, paged
+    or capped, as below, whatever the budget.
 - **Why not the operating system's peak:** it depends on what the allocator
   did with freed blocks, and that depends on timing. A program that
   allocates and frees six 1 MB buffers per round, with no leak, measured on
