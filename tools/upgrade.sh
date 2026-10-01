@@ -205,6 +205,7 @@ awk -v heading="## $version " 'index($0, heading) == 1 { show = 1; print; next }
     show { print }' "$policy/CHANGELOG.md"
 echo "---"
 echo "The .gitignore and .gitattributes lines the release requires are checked by the audit."
+echo "In CHANGELOG.md, update the line \"Policy: cpp-policy $tag.\" (POLICY.md 11.5)."
 
 # 6. The gate, with the preset for this system (as the git hooks choose it).
 if [ "$gate" = yes ]; then

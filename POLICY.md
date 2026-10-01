@@ -745,6 +745,14 @@ as `#pragma once` and suppressions, have fixtures in `tests/audit/`.
   `CMakeLists.txt`. A release commit sets it, adds the release to
   `CHANGELOG.md` (each change with its reason), updates the tag in the
   `README.md` example, and gets an annotated tag `v<version>`.
+- A release's `CHANGELOG.md` entry starts its "Upgrading a project" steps
+  with **"Work beyond `upgrade.sh`"**: "none", or what a project has to
+  change. The owner can then batch the releases that need none.
+- A release that changes what projects must write (a test recipe, a rule) is
+  first run on each shape it applies to, on all three systems: at least a
+  batch command and a server with a thread pool. Two recipes of 13.5 failed
+  on SimpleLocalServer at first contact because they were developed on the
+  other shape.
 - **Major:** a new rule or tightened rule that can break existing code.
 - **Minor:** new optional features, new presets, tooling improvements.
 - **Patch:** fixes that never make passing code fail, for example removing a
@@ -916,7 +924,17 @@ Two files record a project's work, each with one job:
   reason.
 
 The commit that finishes a piece of work also records it in `CHANGELOG.md`
-(under "Unreleased" until the release). `ROADMAP.md` has up to three parts,
+(under "Unreleased" until the release).
+
+**cpp-policy upgrades are one line.** `CHANGELOG.md` is about the program.
+Its introduction has a line `Policy: cpp-policy v<version>.`, updated in
+place at each upgrade. An upgrade gets an entry only for what it changed in
+the project's own code or tests, with the reason; why the policy changed is
+in cpp-policy's `CHANGELOG.md`, and git history has every upgrade commit.
+SimpleLocalServer's changelog had about 170 lines of "Upgraded to
+cpp-policy vX" over nine upgrades that changed nothing in `src/`.
+
+ `ROADMAP.md` has up to three parts,
 in this order:
 
 ```markdown
@@ -1173,21 +1191,39 @@ the end (528 MB on 92 images) while its `export` passed its test.
 
   | Measure | What it reads | Use |
   |---|---|---|
-  | `cpp_policy::peak_heap_bytes()` | An exact count of the C++ heap: every block from `operator new` until its `operator delete` | The memory test |
-  | `cpp_policy::peak_memory_bytes()` | The operating system's peak for the process | A second test, only where the memory is outside the C++ heap: a C library's `malloc`, mapped files |
+  | `cpp_policy::live_heap_bytes()`, `peak_heap_bytes()` | An exact count of the C++ heap: every block from `operator new` until its `operator delete` | The memory test |
+  | `cpp_policy::peak_memory_bytes()` | The operating system's peak for the process | A second test, only where the program's own memory is outside the C++ heap: a C library's `malloc`, mapped files. Sockets don't count: their buffers are the kernel's |
 
-- **The heap test** (`#include <cpp_policy/heap_bytes.hpp>`):
+- **The heap test** (`#include <cpp_policy/heap_bytes.hpp>`) differs for a
+  batch command and a server. `live_heap_bytes()` gives the same number to
+  the byte for the same work, on every run and every machine load. So does
+  `peak_heap_bytes()` when the work runs on one thread; with several, the
+  peak depends on how they overlap (SimpleLocalServer's moved by a few
+  hundred bytes in 560,000). The numbers differ between systems, because
+  each standard library stores a string or a path differently: a limit has
+  to hold on the system where the count is largest.
+- **A server keeps nothing per request.** Its test:
+  1. Warm up in rounds of N requests until a round leaves
+     `live_heap_bytes()` no higher than it found it, up to a maximum number
+     of rounds. Fail if it never settles: that is a leak.
+  2. Read `live_heap_bytes()`, serve 5N more requests, read it again. The
+     second reading is less than 10% above the first.
+
+  One unmeasured run is not a warm-up for a server. A thread pool settles
+  only when every thread has served a request, and how long that takes
+  depends on the machine. cpp-httplib allocates a table of about 700 bytes
+  in each pool thread the first time it serves a connection. With rounds of
+  1,000 messages SimpleLocalServer's live heap was flat from round 2 on
+  macOS, round 5 on Windows and round 14 on Linux, and then identical to the
+  byte for the rest of 30 rounds. The first version of this recipe (v0.24.0: N
+  unmeasured, N, 5N) failed there with +45% on Linux and +20% on Windows,
+  without a leak. cpp-policy's self-test `testing/heap_pool` now runs this
+  recipe on a pool of that shape on every system.
+- **A batch command** runs on its own each time, so its test is:
   1. Run the work once with N inputs, unmeasured, so that anything set up
      once is in place.
   2. `reset_peak_heap_bytes()`, run N inputs, read `peak_heap_bytes()`.
   3. `reset_peak_heap_bytes()`, run 5N inputs, read it again.
-
-  The same work gives the same numbers to the byte on every run and every
-  machine load, so the limits are exact. The numbers differ between systems,
-  because each standard library stores a string or a path differently: a
-  limit has to hold on the system where the count is largest.
-  - **A server keeps nothing per request:** the second reading is less than
-    10% above the first.
   - **A batch command has a budget per input, 1 KiB by default:** enough
     for its name and a small fixed-size record. The second reading is at most
     the first plus 4N × the budget. A command that processes files in sorted
@@ -1266,8 +1302,9 @@ the end (528 MB on 92 images) while its `export` passed its test.
   show it.
 - With `peak_memory_bytes()` the peak may grow by **less than 10%**. Peak
   memory never goes down, so growth means something is kept per unit of
-  work. Such a test can still fail on a busy machine; rerun it before
-  looking for a leak.
+  work. Such a test can fail on a busy machine without a leak, which is why
+  it is not the main test. Don't get used to rerunning it: a project whose
+  test fails that way and has no memory outside the C++ heap drops it.
 - Both measures come with benchmark tests, so projects need no OS code of
   their own. In builds with sanitizers, which have their own `operator new`,
   the heap count reads 0; benchmark tests don't run there.

@@ -44,7 +44,9 @@ table; the owner edits this file.
 `ROADMAP.md` says what comes next. Read it before you start. Ask before doing
 anything it lists under "Out of scope" or "Not planned". In the commit that
 finishes an item, tick it (or remove it from "Later"), and add the change,
-with its reason, to `CHANGELOG.md` under "Unreleased".
+with its reason, to `CHANGELOG.md` under "Unreleased". A cpp-policy upgrade
+only updates the "Policy:" line there, plus an entry for anything it changed
+in this project's own code or tests.
 
 ## Tests
 

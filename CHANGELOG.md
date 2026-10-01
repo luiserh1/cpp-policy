@@ -3,6 +3,62 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.24.2 (2026-10-02)
+
+Corrections from SimpleLocalServer's review of what the policy has cost it.
+Nothing that passed fails: a patch release.
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** none required.
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.24.2`.
+2. When convenient: replace the "Upgraded to cpp-policy" entries in
+   `CHANGELOG.md` with the one line `Policy: cpp-policy v0.24.2.`
+   (POLICY.md 11.5).
+3. A server whose heap test follows v0.24.0's recipe (N unmeasured, N, 5N)
+   moves to the one below. SimpleLocalServer's already does.
+
+### Changed
+
+- **13.5, the server's heap test:** warm up in rounds until a round leaves
+  `live_heap_bytes()` no higher, up to a maximum; then 5N more requests may
+  raise it by less than 10%. A leak never settles and fails in the warm-up.
+  *Why:* v0.24.0's recipe was developed on ToneMatcher's batch commands and
+  not tried on a server. On SimpleLocalServer it failed with +45% on Linux
+  and +20% on Windows, without a leak: cpp-httplib allocates a table in each
+  pool thread on first use, and Linux needed 13,000 messages to reach them
+  all. The notice for v0.24.0 said N could be much smaller and no warm-up
+  curve was needed; that was wrong. The new recipe is SimpleLocalServer's
+  own fix.
+- **13.5, what is exact:** `live_heap_bytes()` always; `peak_heap_bytes()`
+  only for work on one thread. *Why:* SimpleLocalServer measured peaks
+  between 562,240 and 563,072 bytes over identical rounds.
+- **13.5, the operating system's peak test:** not required for sockets
+  (kernel memory), and "rerun it" is gone: a project whose test fails
+  without a cause and has no memory outside the C++ heap drops it. *Why:*
+  SimpleLocalServer's failed once on Windows (+21%) and passed on the next
+  run with the same code; a test that fails now and then teaches people to
+  rerun. That one failure is unexplained.
+- **11.5, cpp-policy upgrades are one line in a project's `CHANGELOG.md`**
+  (`Policy: cpp-policy v<version>.`), plus entries only for what an upgrade
+  changed in the project itself. The template has the line and `upgrade.sh`
+  reminds of it. *Why:* SimpleLocalServer's changelog had about 170 lines of
+  upgrade entries, which buried what changed in the program. The owner chose
+  this (2026-10-02).
+- **10, releases:** every "Upgrading a project" section starts with "Work
+  beyond `upgrade.sh`", and a release that changes what projects must write
+  is first run on each shape it applies to, on all three systems. *Why:*
+  nine upgrades in one stretch, three needing real work, and two 13.5
+  recipes that failed at first contact with the server.
+
+### Added
+
+- Self-test `testing/heap_pool`: the server recipe on a pool of 32 threads
+  that each allocate a table on first use, and a handler that keeps 64 bytes
+  per request, which must never settle. It gives cpp-policy a server-shaped
+  case of its own on every system.
+
 ## 0.24.1 (2026-10-02)
 
 The memory a batch command may keep per input is a budget, not a fixed

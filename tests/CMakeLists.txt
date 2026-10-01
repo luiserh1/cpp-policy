@@ -195,8 +195,13 @@ add_test(NAME testing/peak_memory COMMAND policy_peak_memory)
 add_executable(policy_heap_bytes testing/heap_bytes.cpp)
 target_link_libraries(policy_heap_bytes PRIVATE cpp_policy_testing)
 cpp_policy_apply(policy_heap_bytes)
+# heap_pool is the server recipe on a thread pool whose threads allocate on first use.
+add_executable(policy_heap_pool testing/heap_pool.cpp)
+target_link_libraries(policy_heap_pool PRIVATE cpp_policy_testing)
+cpp_policy_apply(policy_heap_pool)
 if(NOT CPP_POLICY_SANITIZERS AND NOT CPP_POLICY_THREAD_SANITIZER)
     add_test(NAME testing/heap_bytes COMMAND policy_heap_bytes)
+    add_test(NAME testing/heap_pool COMMAND policy_heap_pool)
 endif()
 
 # --- Test registration (POLICY.md 13): scripts/doctest_tests.cmake on saved doctest listings.
