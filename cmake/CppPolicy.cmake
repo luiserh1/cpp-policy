@@ -21,8 +21,8 @@ option(CPP_POLICY_SANITIZERS "Enable AddressSanitizer + UndefinedBehaviorSanitiz
 option(CPP_POLICY_THREAD_SANITIZER "Enable ThreadSanitizer (not with CPP_POLICY_SANITIZERS)" OFF)
 option(CPP_POLICY_CLANG_TIDY "Run clang-tidy as part of the build" OFF)
 option(CPP_POLICY_EXCEPTIONS "Enable C++ exceptions and RTTI" ON)
-set(CPP_POLICY_HARDENING "fast" CACHE STRING "Standard library hardening level: none, fast, debug")
-set_property(CACHE CPP_POLICY_HARDENING PROPERTY STRINGS none fast debug)
+set(CPP_POLICY_HARDENING "fast" CACHE STRING "Standard library hardening level: fast, debug")
+set_property(CACHE CPP_POLICY_HARDENING PROPERTY STRINGS fast debug)
 set(CPP_POLICY_CONFINED_DIRS "src/lowlevel" CACHE STRING
     "Directories (relative to the project root) where suppressions and low-level code are allowed")
 set(CPP_POLICY_EXCLUDED_DIRS "build;out;.git;third_party;external;vcpkg_installed" CACHE STRING
@@ -187,8 +187,10 @@ function(cpp_policy_apply target)
             _LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_DEBUG
             _GLIBCXX_ASSERTIONS
             _MSVC_STL_HARDENING=1)
-    elseif(NOT CPP_POLICY_HARDENING STREQUAL "none")
-        message(FATAL_ERROR "cpp-policy: unknown CPP_POLICY_HARDENING '${CPP_POLICY_HARDENING}'")
+    else()
+        # There is no "none": hardening costs less than can be measured (POLICY.md 14.1).
+        message(FATAL_ERROR "cpp-policy: CPP_POLICY_HARDENING must be 'fast' or 'debug', not "
+                            "'${CPP_POLICY_HARDENING}' (POLICY.md 7.2)")
     endif()
 
     # Low-cost security hardening for optimized builds (POLICY.md 7, 7.4).

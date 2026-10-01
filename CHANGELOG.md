@@ -3,6 +3,28 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.23.0 (2026-10-01)
+
+Standard-library hardening can no longer be turned off. A project that set
+`CPP_POLICY_HARDENING=none` now fails to configure: a minor release
+(POLICY.md 10).
+
+### Upgrading a project
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.23.0`.
+2. Nothing else, unless the project sets `CPP_POLICY_HARDENING=none` itself
+   (the presets never did): remove that setting.
+
+### Changed
+
+- **`CPP_POLICY_HARDENING` accepts only `fast` and `debug`.** Any other
+  value, `none` included, stops configuration (POLICY.md 6, 7.2; bypass
+  fixture `hardening_none`). *Why:* 0.22.0 rejected the options and
+  definitions that weaken one protection, but this switch still removed the
+  standard library's checks in one line. The measurements in POLICY.md 14.1
+  found no speed to gain from that: builds without the protections were no
+  faster. The owner decided to remove the value (2026-10-01).
+
 ## 0.22.0 (2026-10-01)
 
 Performance (POLICY.md 14, new), from measurements. The `check` build is
@@ -69,7 +91,7 @@ protections, so code that passed can fail: a minor release (POLICY.md 10).
   `/GS-`, `/guard:cf-` and `/sdl-` were checked. The owner chose to close it
   in this release (2026-10-01).
 - `CPP_POLICY_HARDENING=none` is still accepted when a project sets it
-  itself. Whether to forbid it is left for the owner.
+  itself. Whether to forbid it is left for the owner. (Removed in 0.23.0.)
 
 ### Benchmark tests
 

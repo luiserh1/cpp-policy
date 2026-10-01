@@ -9,7 +9,7 @@ The rules are in [POLICY.md](POLICY.md).
 From a clone of cpp-policy checked out at the release you want:
 
 ```
-git -C cpp-policy checkout v0.22.0
+git -C cpp-policy checkout v0.23.0
 sh cpp-policy/tools/new-project.sh ~/code/MyTool MyTool            # VCPKG_ROOT must be set
 cd ~/code/MyTool && cmake --workflow --preset check
 git add --all && git commit
@@ -38,7 +38,7 @@ can't ship a template that fails its own policy.
 include(FetchContent)
 FetchContent_Declare(cpp_policy
     GIT_REPOSITORY https://github.com/luiserh1/cpp-policy.git
-    GIT_TAG        <commit>)   # v0.22.0, the latest release; see CHANGELOG.md
+    GIT_TAG        <commit>)   # v0.23.0, the latest release; see CHANGELOG.md
 FetchContent_MakeAvailable(cpp_policy)
 
 add_library(app_core STATIC src/model/board.cpp)
@@ -72,7 +72,7 @@ and this repository's CMake code runs on every machine that configures the
 project (POLICY.md 10). The commit is the line ending in `^{}`:
 
 ```
-git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.22.0*'
+git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.23.0*'
 ```
 
 Don't add `GIT_SHALLOW`: it only works with branch and tag names.
@@ -82,7 +82,7 @@ Don't add `GIT_SHALLOW`: it only works with branch and tag names.
 From the project's root, with a clean working folder:
 
 ```
-sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.22.0
+sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.23.0
 ```
 
 Any copy of this repository's `tools/upgrade.sh` works (from v0.10.1 on): it
@@ -155,7 +155,7 @@ permissions:
   contents: read
 jobs:
   gate:
-    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@<commit> # v0.22.0
+    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@<commit> # v0.23.0
     with:
       systems: '["linux", "windows", "macos"]'
       vcpkg: true          # if the project has a vcpkg.json
@@ -204,7 +204,7 @@ it: `./svc.sh uninstall`, then `./config.sh remove` with the token GitHub shows.
 | `CPP_POLICY_SANITIZERS` | `OFF` | ASan + UBSan (ASan only on Windows) |
 | `CPP_POLICY_THREAD_SANITIZER` | `OFF` | ThreadSanitizer (not with the option above; not on Windows) |
 | `CPP_POLICY_CLANG_TIDY` | `OFF` | Run clang-tidy during the build |
-| `CPP_POLICY_HARDENING` | `fast` | Standard library hardening: `none`, `fast`, `debug` |
+| `CPP_POLICY_HARDENING` | `fast` | Standard library hardening: `fast` or `debug` |
 | `CPP_POLICY_EXCEPTIONS` | `ON` | Exceptions and RTTI |
 | `CPP_POLICY_CONFINED_DIRS` | `src/lowlevel` | Where suppressions are allowed |
 | `CPP_POLICY_EXCLUDED_DIRS` | `build;out;.git;third_party;external;vcpkg_installed` | Skipped by audit/format |

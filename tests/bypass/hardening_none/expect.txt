@@ -1,0 +1,1 @@
+CPP_POLICY_HARDENING must be 'fast' or 'debug', not 'none'

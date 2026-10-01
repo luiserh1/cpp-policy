@@ -495,7 +495,7 @@ settings:
   `-fno-stack-protector` (or the weaker `-fstack-protector`),
   `-fcf-protection=none`, `_FORTIFY_SOURCE` below 3, a standard-library
   hardening macro turned off, `-fno-sanitize=…`, and `clang-cl`'s `/GS-`,
-  `/guard:cf-` and `/sdl-`;
+  `/guard:cf-` and `/sdl-`; `CPP_POLICY_HARDENING` has no "off" value (7.2);
 - no `SKIP_LINTING`, and no changes to `CXX_CLANG_TIDY`.
 
 Configuration fails otherwise.
@@ -587,6 +587,10 @@ switch for all of them (each library ignores the others):
 | libc++ | macOS | `_LIBCPP_HARDENING_MODE` |
 | libstdc++ | Linux | `_GLIBCXX_ASSERTIONS` |
 | Microsoft STL | Windows | `_MSVC_STL_HARDENING` |
+
+`CPP_POLICY_HARDENING` picks the level: `fast` (the default, and what
+`release` uses) or `debug`. It can't be turned off: the checks cost less than
+can be measured (14.1), so configuration fails for any other value.
 
 ### 7.3 Sanitizers on Windows (`clang-cl`)
 
