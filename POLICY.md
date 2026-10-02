@@ -1476,6 +1476,29 @@ median of three reruns), 2026-10-01:
   never a CI check. A change that claims a speed-up, or might cost speed,
   gives nanobench's before and after (machine, median of several runs) in
   its `CHANGELOG.md` entry.
+- **Instruction counts, a trial.** Time can't be compared in CI, but the
+  number of instructions a benchmark executes can. Measured on the home
+  server, 20 runs idle and 20 with every processor busy:
+
+  | Program | Instructions, spread | Time, idle to busy |
+  |---|---|---|
+  | A fixed loop (4.9 billion instructions) | 0.000% | +33% |
+  | ToneMatcher's `diff` heap test (79 billion) | 0.001% | +35% |
+
+  - nanobench prints the count in a column `ins/<unit>` where the processor's
+    counters are readable. That is only on the owner's Linux runner labelled
+    `benchmark`: the counters are closed by default, and opening them is a
+    security setting of the machine.
+  - A project calls `benchmark.yml` next to the gate, pinned to the same
+    commit. It runs the benchmark tests there and keeps their output in the
+    job's summary and as an artifact. **It checks nothing yet:** the trial is
+    to see how the counts move over real commits before any budget is
+    written.
+  - What a count doesn't see: time in the kernel (disk, starting a process),
+    and waiting. It includes child processes. It is valid for one processor
+    family and one toolchain build, so a toolchain window (10.1) changes it.
+  - Linux only: Windows and macOS don't give a program these counters
+    without elevated rights.
 
 ### 14.3 Writing fast code without weakening it
 

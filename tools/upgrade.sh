@@ -142,17 +142,18 @@ fi
 sed -n "${pin_line}p" CMakeLists.txt | grep -q "$commit.*# $tag" ||
     fail "the GIT_TAG pin didn't change as expected (CMakeLists.txt line $pin_line)"
 
-# 2. The CI gate pins: every call to cpp-policy's gate.yml moves to the same commit.
-gate_ref='cpp-policy/\.github/workflows/gate\.ya*ml@'
+# 2. The CI pins: every call to one of cpp-policy's workflows (gate.yml, benchmark.yml) moves
+# to the same commit.
+gate_ref='cpp-policy/\.github/workflows/[a-z_-]*\.ya*ml@'
 for workflow in .github/workflows/*.yml .github/workflows/*.yaml; do
     [ -f "$workflow" ] || continue
     grep -q "$gate_ref" "$workflow" || continue
     # "|" as the delimiter: the pattern contains slashes.
     rewrite "$workflow" \
-        -e "\\|$gate_ref|s|\\(gate\\.ya*ml@\\)[^[:space:]]*|\\1$commit|" \
+        -e "\\|$gate_ref|s|\\(\\.ya*ml@\\)[^[:space:]]*|\\1$commit|" \
         -e "\\|$gate_ref|s|#[[:space:]]*v[0-9][0-9.]*|# $tag|"
     if grep "$gate_ref" "$workflow" | grep -qv "@$commit"; then
-        fail "$workflow still calls the gate at another commit"
+        fail "$workflow still calls a cpp-policy workflow at another commit"
     fi
 done
 

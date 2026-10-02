@@ -122,7 +122,9 @@ file(WRITE "${project}/.github/workflows/ci.yml"
     "  gate:\n"
     "    uses: someone/cpp-policy/.github/workflows/gate.yml@${old} # v1.0.0\n"
     "    with:\n"
-    "      vcpkg: true\n")
+    "      vcpkg: true\n"
+    "  benchmark:\n"
+    "    uses: someone/cpp-policy/.github/workflows/benchmark.yml@${old} # v1.0.0\n")
 # Release 1.0.0's files, as the project copied them.
 run("${policy}" ${git} checkout --quiet v1.0.0 -- .)
 foreach(name IN ITEMS .clang-tidy .clang-format CMakePresets.json tools/hooks/pre-commit
@@ -182,6 +184,8 @@ file(READ "${project}/.github/workflows/ci.yml" ci)
 string(FIND "${ci}" "gate.yml@${new} # v2.0.0\n" pinned)
 string(FIND "${ci}" "      vcpkg: true\n" untouched)
 expect("pinned;GREATER;-1;AND;untouched;GREATER;-1" "the CI gate must be pinned to v2.0.0's commit")
+string(FIND "${ci}" "benchmark.yml@${new} # v2.0.0\n" pinned)
+expect("pinned;GREATER;-1" "the CI benchmark workflow must be pinned to v2.0.0's commit")
 
 foreach(name IN ITEMS .clang-tidy .clang-format CMakePresets.json tools/hooks/pre-commit
                      tools/hooks/pre-push)

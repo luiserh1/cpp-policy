@@ -1,0 +1,88 @@
+# Instruction counts of the benchmark tests (POLICY.md 14.2), a trial: it records, and checks
+# nothing yet. Reusable, called by a project next to the gate and pinned to the same commit:
+#
+#   jobs:
+#     benchmark:
+#       uses: luiserh1/cpp-policy/.github/workflows/benchmark.yml@<commit> # v<version>
+#
+# It runs on the owner's Linux runner labelled "benchmark", the only one where a program may
+# read the processor's counters (the others keep them closed). There the count of
+# instructions a benchmark executes repeats to 0.001% whatever else the machine is doing,
+# where its time moves by a third. nanobench prints it in a column "ins/<unit>" when the
+# counters are readable, and leaves the column out when they aren't.
+#
+# The job builds the release preset, runs the benchmark tests, and keeps their output in the
+# job's summary and as an artifact. A failing benchmark test doesn't fail this job: the
+# gate's release workflow runs the same tests and decides. Where the counters aren't
+# readable, or the project has no nanobench benchmark, it says so and passes.
+#
+# The runner brings its own LLVM, CMake and Ninja, like the gate's self-hosted runners; the
+# count depends on the toolchain, so the runner's image must be the gate's.
+name: benchmark
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    name: instruction counts
+    runs-on: [self-hosted, Linux, benchmark]
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # As in gate.yml: a copy of vcpkg of the runner's own, at the manifest's baseline.
+      - name: Use the runner's vcpkg at the manifest's baseline
+        run: |
+          baseline=$(sed -n 's/.*"builtin-baseline"[^"]*"\([0-9a-f]\{40\}\)".*/\1/p' vcpkg.json)
+          if [ -z "$baseline" ]; then echo "vcpkg.json has no builtin-baseline commit"; exit 1; fi
+          root=$RUNNER_TOOL_CACHE/cpp-policy-vcpkg
+          if [ ! -d "$root/.git" ]; then
+            git clone --quiet https://github.com/microsoft/vcpkg.git "$root"
+          fi
+          git -C "$root" fetch --quiet origin
+          git -C "$root" -c advice.detachedHead=false checkout --quiet --force "$baseline"
+          "$root/bootstrap-vcpkg.sh" -disableMetrics
+          echo "VCPKG_ROOT=$root" >> "$GITHUB_ENV"
+
+      - name: Build the release preset
+        run: |
+          cmake --preset release
+          cmake --build --preset release
+
+      - name: Run the benchmark tests
+        run: |
+          # -V shows each test's output, where nanobench prints its table. A failing test is
+          # the gate's to report.
+          ctest --preset release -L '^benchmark$' -V > benchmarks.txt 2>&1 || true
+          cat benchmarks.txt
+          {
+            echo "## Benchmark tests at ${GITHUB_SHA}"
+            echo
+            # The columns are named after each benchmark's unit: "ins/op", "ins/greeting".
+            if grep -Eq '\| +ins/' benchmarks.txt; then
+              echo '```'
+              # nanobench's tables: the header, its rule and one row per benchmark.
+              grep -E '^[0-9]+: *\|' benchmarks.txt | sed 's/^[0-9]*: *//'
+              echo '```'
+            elif grep -Eq '\| +ns/' benchmarks.txt; then
+              echo "nanobench ran but printed no instruction counts: this runner can't read the"
+              echo "processor's counters. Nothing was recorded."
+            else
+              echo "No nanobench benchmark ran (POLICY.md 14.2). Nothing was recorded."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: benchmarks-${{ github.sha }}
+          path: benchmarks.txt
+          retention-days: 90

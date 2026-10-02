@@ -312,8 +312,8 @@ if(CHECK_PROJECT_FILES)
     endforeach()
 endif()
 
-# A project's CI must run the same policy as its build: the reusable gate it calls
-# (cpp-policy/.github/workflows/gate.yml@<ref>) must be pinned to the commit the build uses
+# A project's CI must run the same policy as its build: the reusable workflows it calls
+# (cpp-policy/.github/workflows/gate.yml@<ref>, benchmark.yml@<ref>) must be pinned to the commit the build uses
 # (POLICY.md 8). A tag or branch name fails too: it can move.
 if(POLICY_COMMIT AND NOT source_norm STREQUAL policy_norm)
     file(GLOB workflows RELATIVE "${SOURCE_DIR}"
@@ -323,11 +323,12 @@ if(POLICY_COMMIT AND NOT source_norm STREQUAL policy_norm)
         set(number 0)
         foreach(line IN LISTS lines)
             math(EXPR number "${number} + 1")
-            if(line MATCHES "cpp-policy/\\.github/workflows/gate\\.ya?ml@([^ \t#]+)"
-               AND NOT CMAKE_MATCH_1 STREQUAL POLICY_COMMIT)
-                set(ref "${CMAKE_MATCH_1}")
+            if(line MATCHES "cpp-policy/\\.github/workflows/([a-z_-]+)\\.ya?ml@([^ \t#]+)"
+               AND NOT CMAKE_MATCH_2 STREQUAL POLICY_COMMIT)
+                set(called "${CMAKE_MATCH_1}")
+                set(ref "${CMAKE_MATCH_2}")
                 report("${workflow}" ${number}
-                    "calls cpp-policy's gate at '${ref}', but the build uses ${POLICY_COMMIT}; pin both to the same commit")
+                    "calls cpp-policy's ${called} at '${ref}', but the build uses ${POLICY_COMMIT}; pin both to the same commit")
             endif()
         endforeach()
     endforeach()

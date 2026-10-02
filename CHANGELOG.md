@@ -3,6 +3,53 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.27.0 (2026-10-02)
+
+A trial: instruction counts of the benchmark tests, recorded in CI
+(POLICY.md 14.2). Optional, and it checks nothing: a minor release.
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** none, unless the project joins the trial.
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.27.0`.
+2. To join the trial (ToneMatcher first; it needs the `benchmark` runner on
+   the repository), the owner adds to the CI workflow:
+
+   ```yaml
+     benchmark:
+       uses: luiserh1/cpp-policy/.github/workflows/benchmark.yml@<commit> # v0.27.0
+   ```
+
+   and the project has at least one nanobench benchmark (14.2).
+
+### Added
+
+- **`.github/workflows/benchmark.yml`,** a reusable workflow: on the runner
+  labelled `benchmark` it builds the release preset, runs the benchmark
+  tests, and keeps their output in the job's summary and as an artifact for
+  90 days. A failing test doesn't fail it (the gate decides), and where the
+  counters aren't readable it says so and passes. *Why:* the owner asked
+  whether CI is consistent enough to check performance. It isn't for time:
+  a job gets whatever processors are free. The server administrator
+  measured that instruction counts repeat to 0.001% between an idle and a
+  fully loaded machine, while time moved by a third. The owner chose to
+  open the counters on one labelled runner and to run a trial on one
+  project before any budget rule (2026-10-02).
+- **The audit and `upgrade.sh` treat every cpp-policy workflow a project
+  calls like the gate:** pinned to the commit the build uses, and moved on
+  upgrade (audit fixture `ci_pin_benchmark`). *Why:* a benchmark job at an
+  older commit than the build would measure with another release's rules.
+
+### Not tried yet
+
+The workflow can't run in cpp-policy's own CI: this repository is public and
+has no self-hosted runner. Its shell logic was tried here on real benchmark
+output with and without the counters' column; its first real run will be
+ToneMatcher's. POLICY.md 10 asks for a trial before a release, and here the
+release is what makes the trial possible, because the audit requires the
+call to be pinned to the build's commit.
+
 ## 0.26.5 (2026-10-02)
 
 ### Upgrading a project
