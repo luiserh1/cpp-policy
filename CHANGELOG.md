@@ -3,6 +3,31 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.26.5 (2026-10-02)
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** none. Text only.
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.26.5`.
+
+### Changed (POLICY.md 13.5)
+
+- **The operating system's peak is noisy by itself, not because a machine is
+  busy.** 13.5 said such a test "can fail on a busy machine" and called a CI
+  machine "busy" without evidence. It now carries the home server's
+  measurements (20 runs per condition of ToneMatcher's two tests): on Linux
+  the growth was 0% with every processor busy; on Windows the reading moves
+  in fixed steps, up to 7.7%, on an idle machine, and load doesn't make it
+  worse. *Why:* the server administrator measured it after the owner asked
+  whether CI fails because the server is busy, and found that none of 24
+  failed runs was caused by capacity. The wording here had helped spread
+  that explanation. The macOS reproduction in 13.5 stands: there, load did
+  change which of two levels a run landed on.
+- Load costs time (up to twice on Windows); a test near its time limit, or
+  any suspected environment problem, goes to whoever runs the machines with
+  the run's link.
+
 ## 0.26.4 (2026-10-02)
 
 ### Upgrading a project

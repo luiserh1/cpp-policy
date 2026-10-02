@@ -1332,9 +1332,26 @@ the end (528 MB on 92 images) while its `export` passed its test.
   | 14 busy processes, eight warm-up runs | 0.0% in 8 of 8 runs |
 
   The peak has two levels, depending on whether a freed block is reused or
-  a new one is taken. ToneMatcher's `diff` test grew 4% in every idle run
-  and 30.6% on a busy CI machine. Warm-up runs help but don't guarantee it:
-  with eight, that test still failed 1 run in 10 under load.
+  a new one is taken. ToneMatcher's `diff` test grew 4% in every idle run on
+  a Mac and 30.6% in a CI run. Warm-up runs help but don't guarantee it:
+  with eight, that test still failed 1 run in 10 on a loaded Mac.
+  - **The noise is the measure's own; don't blame the machine.** The home
+    server ran ToneMatcher's two operating-system tests 20 times per
+    condition, with the eight-run warm-up:
+
+    | System | Idle | Every processor busy |
+    |---|---|---|
+    | Linux | 0 to 1% | 0% in 20 of 20 (load average 84) |
+    | Windows | up to 7.7%, in fixed steps of about 3, 4.4 and 8% | up to 8.8% |
+
+    On Linux the reading didn't depend on load at all. On Windows it moves
+    in steps on an idle machine with nothing else running, and load doesn't
+    make it worse: a limit of 10% is then a thin margin. None of the 24
+    failed CI runs the server examined was caused by lack of capacity.
+  - Load does cost time: up to twice on the Windows machine with every
+    processor busy. A test near its time limit is a finding for whoever runs
+    the machines, with the run's link, like any suspected environment
+    problem.
 - **Where `peak_memory_bytes()` is used, the first reading comes after the
   warm-up, on every system.** A program's peak first rises while it settles:
   allocator pools, thread pools, caches, the operating system's buffers.
@@ -1383,8 +1400,8 @@ the end (528 MB on 92 images) while its `export` passed its test.
   show it.
 - With `peak_memory_bytes()` the peak may grow by **less than 10%**. Peak
   memory never goes down, so growth means something is kept per unit of
-  work. Such a test can fail on a busy machine without a leak, which is why
-  it is not the main test. Don't get used to rerunning it: a project whose
+  work. Such a test can fail without a leak, from the measure's own steps,
+  which is why it is not the main test. Don't get used to rerunning it: a project whose
   test fails that way and has no memory outside the C++ heap drops it.
 - Both measures come with benchmark tests, so projects need no OS code of
   their own. In builds with sanitizers, which have their own `operator new`,
