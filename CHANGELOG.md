@@ -3,6 +3,34 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.26.2 (2026-10-02)
+
+The shell scripts are now tested on Windows. Tests only: a patch release.
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** none. Nothing a project uses changed.
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.26.2`.
+
+### Tests
+
+- **`hooks/behavior` and `upgrade/behavior` run on Windows,** under the `sh`
+  that Git for Windows ships (found next to `git`), which is the shell git
+  runs hooks with there. They were skipped on Windows before.
+- **New `template/new_project_script`,** on every system: it runs
+  `tools/new-project.sh` itself on a throwaway copy of the policy tagged as
+  a release, and checks the pins, the vcpkg baseline, the enabled hooks, LF
+  line endings in the copied hooks, and both refusals (no release tag,
+  uncommitted changes). Only the CMake script behind it was tested before.
+
+*Why:* the owner asked whether the scripts work on every supported system.
+On Windows the hooks, `upgrade.sh` and `new-project.sh` rested on manual
+runs, and the last two had, as far as known, only ever been run on macOS.
+All three passed on Windows at the first CI run (36946376225), so no script
+needed a fix. They need Git for Windows' `sh`; none runs from PowerShell or
+`cmd` directly.
+
 ## 0.26.1 (2026-10-02)
 
 Three general points that were in the brief for a new project, moved into
