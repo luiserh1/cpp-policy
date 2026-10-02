@@ -3,6 +3,27 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.26.4 (2026-10-02)
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** none.
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.26.4`.
+
+### Fixed
+
+- **`tidy-files` (and so `pre-commit`) reported an optional read after
+  `REQUIRE` in a test header that isn't in a test source's folder,** while
+  the gate accepted it. 0.26.3 gave the test setting only to headers in the
+  same folder as a test source; `tests/support/x.hpp`, shared by sources in
+  `tests/integration/` and `tests/benchmark/`, was checked as program code.
+  A header is now test code anywhere under the top-level folder the test
+  sources are in, unless that folder is `src/`. The generated-project test
+  has such a header. *Why:* found by GalleryOrganizer on adopting 0.26.3;
+  the gate and the hook must agree, or a commit fails on code the gate
+  passes.
+
 ## 0.26.3 (2026-10-02)
 
 From the first session of a new project, GalleryOrganizer, created from

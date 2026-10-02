@@ -46,6 +46,8 @@ function(generate_and_check)
     step("${dest}" "git init" "${GIT_EXECUTABLE}" init --quiet)
     step("${dest}" "enabling the hooks" "${GIT_EXECUTABLE}" config core.hooksPath tools/hooks)
     file(COPY_FILE "${CMAKE_CURRENT_LIST_DIR}/test_benchmark.cpp" "${dest}/tests/test_benchmark.cpp")
+    file(MAKE_DIRECTORY "${dest}/tests/support")
+    file(COPY_FILE "${CMAKE_CURRENT_LIST_DIR}/test_support.hpp" "${dest}/tests/support/test_support.hpp")
     file(READ "${dest}/vcpkg.json" manifest)
     string(REPLACE "\"dependencies\": [" "\"dependencies\": [\n    {\"name\": \"nanobench\", \"default-features\": false, \"$reason\": \"speed benchmarks\"}," manifest "${manifest}")
     file(WRITE "${dest}/vcpkg.json" "${manifest}")
@@ -57,11 +59,12 @@ function(generate_and_check)
     step("${dest}" "building the project (clang-tidy, audit, format check)"
         "${CMAKE_COMMAND}" --build --preset ${PRESET})
     step("${dest}" "testing the project" "${CMAKE_CTEST_COMMAND}" --preset ${PRESET})
-    # tidy-files checks a test source as the build does: with the option test programs get.
-    step("${dest}" "checking a test file with tidy-files" sh tools/hooks/tidy-files
-        tests/test_benchmark.cpp)
-    if(NOT out MATCHES "tidy-files: OK \\(1 files\\)")
-        message(FATAL_ERROR "new_project: tidy-files didn't check the test file:\n${out}")
+    # tidy-files checks a test source, and a test header in another folder of tests/, as the
+    # build does: with the option test programs get.
+    step("${dest}" "checking the test files with tidy-files" sh tools/hooks/tidy-files
+        tests/test_benchmark.cpp tests/support/test_support.hpp)
+    if(NOT out MATCHES "tidy-files: OK \\(2 files\\)")
+        message(FATAL_ERROR "new_project: tidy-files didn't check the test files:\n${out}")
     endif()
 
     file(GLOB_RECURSE program "${dest}/build/${PRESET}/my_tool" "${dest}/build/${PRESET}/my_tool.exe")

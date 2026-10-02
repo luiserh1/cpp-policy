@@ -2,6 +2,7 @@
 // must be built (and checked by clang-tidy) in every build, and run in Release builds. The
 // project lists nanobench in vcpkg.json, so cpp_policy_add_tests() links it.
 #include "app/greeting.hpp"
+#include "support/test_support.hpp"
 
 #include <cpp_policy/heap_bytes.hpp>
 #include <cpp_policy/peak_memory.hpp>
@@ -58,7 +59,7 @@ TEST_CASE("a table of greetings") {
         const auto total = greeted(row);
         REQUIRE(total.has_value());
         REQUIRE(row.count > 0);
-        CHECK(*total >= row.at_least);
+        CHECK(test_support::required(total) >= row.at_least);
         CHECK(*total > 0);
         CHECK(row.name.empty());
         CHECK(row.what != nullptr);

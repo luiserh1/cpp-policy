@@ -1214,7 +1214,9 @@ Projects add it to `vcpkg.json` like any dependency (section 1.1).
   can't see that `REQUIRE` stops the test, so it reported every dereference
   that followed one. A test that reads an empty optional without a `REQUIRE`
   still fails loudly, because library hardening stops the program (7.2). The
-  check stays on everywhere else.
+  check stays on everywhere else. `tidy-files` treats as test code the test
+  programs' sources and every header under their top-level folder (`tests/`),
+  so shared test helpers live there, not under `src/`.
 - **A bug fix comes with a regression test** that fails without it (13.1).
 - **A port uses the original as its reference.** Its tests run the same
   inputs through the port and compare with what the original produced,
