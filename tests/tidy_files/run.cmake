@@ -87,7 +87,15 @@ expect_output("tidy-files: OK (0 files)" "no file must be checked")
 # A source this build doesn't compile.
 run(sh tools/hooks/tidy-files src/app/elsewhere.cpp)
 expect("code;EQUAL;0" "a source the build doesn't compile must be skipped, not fail")
-expect_output("not built on this system" "the skipped source must be reported")
+expect_output("src/app/elsewhere.cpp: NOT CHECKED" "the skipped source must be reported")
+expect_output("OK (0 files; 1 NOT CHECKED" "the summary must count the skipped source")
+
+# A source added since the build was configured: tidy-files configures again and checks it.
+file(COPY_FILE "${project}/src/app/good.cpp" "${project}/src/app/added.cpp")
+file(APPEND "${project}/CMakeLists.txt" "target_sources(app PRIVATE src/app/added.cpp)\n")
+run(sh tools/hooks/tidy-files src/app/added.cpp)
+expect("code;EQUAL;0" "a source added after configuring must be checked")
+expect_output("tidy-files: OK (1 files)" "the added source must be checked, not skipped")
 
 # pre-commit: the staged header with findings fails the commit's checks; unstaged, they pass.
 run(${git} add CMakeLists.txt .clang-tidy .clang-format CMakePresets.json .gitignore
@@ -96,8 +104,13 @@ run(sh tools/hooks/pre-commit)
 expect("NOT;code;EQUAL;0" "pre-commit must fail while bad.hpp is staged")
 expect_output("C-style casts" "pre-commit must show the finding in the staged header")
 run(${git} rm --cached --quiet src/app/bad.hpp)
+# A staged name with a space (a test asset) must reach tidy-files whole.
+file(WRITE "${project}/an asset.txt" "not C++\n")
+run(${git} add "an asset.txt" src/app/added.cpp)
 run(sh tools/hooks/pre-commit)
 expect("code;EQUAL;0" "pre-commit must pass once bad.hpp isn't staged")
-expect_output("tidy-files: OK" "pre-commit must run tidy-files on the staged files")
+expect_output("tidy-files: OK (3 files)" "pre-commit must run tidy-files on the staged files")
+string(FIND "${out}" "does not refer to an existing path" split)
+expect("split;EQUAL;-1" "a staged name with a space must not be split")
 
 message("tidy_files: OK")

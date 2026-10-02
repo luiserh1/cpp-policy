@@ -26,8 +26,13 @@ cmake --build --preset "$preset" --target policy-audit policy-format-check
 
 # clang-tidy on the staged files (tidy-files skips those that aren't C++), so findings turn up
 # at each commit rather than all at once at the gate. Deleted files aren't listed.
-staged=$(git diff --cached --name-only --diff-filter=ACMR)
+# quotePath off: git would otherwise write a name with special characters in quotes.
+staged=$(git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMR)
 if [ -n "$staged" ]; then
-    # Split on whitespace on purpose: file names are snake_case (POLICY.md 2.7), without spaces.
+    # One name per line, split only there and without expanding wildcards: source files have
+    # no spaces (POLICY.md 2.7), but a test asset may.
+    IFS='
+'
+    set -f
     sh tools/hooks/tidy-files $staged
 fi

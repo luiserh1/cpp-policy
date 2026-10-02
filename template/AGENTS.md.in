@@ -84,6 +84,9 @@ does the same for the staged files):
 sh tools/hooks/tidy-files <file>...
 ```
 
+It says "NOT CHECKED" for a file this build doesn't compile: for a new file,
+add it to `CMakeLists.txt` first.
+
 Run the full gate and make sure it passes:
 
 ```

@@ -330,3 +330,10 @@ if(APPLE)
                     "-DITEM=${item}" -P "${CMAKE_CURRENT_SOURCE_DIR}/probes/probe.cmake")
     endforeach()
 endif()
+
+# A defect in clang-tidy itself, on every system: the probe must still be reported.
+add_test(NAME waiting/w4_trailing_comma
+    COMMAND "${CMAKE_COMMAND}" "-DCLANG_TIDY=${CPP_POLICY_CLANG_TIDY_EXE}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/probes/tidy/w4_trailing_comma.cpp" -DITEM=W4
+            -DCHECK=readability-trailing-comma
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/probes/tidy_probe.cmake")

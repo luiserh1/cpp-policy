@@ -57,6 +57,12 @@ function(generate_and_check)
     step("${dest}" "building the project (clang-tidy, audit, format check)"
         "${CMAKE_COMMAND}" --build --preset ${PRESET})
     step("${dest}" "testing the project" "${CMAKE_CTEST_COMMAND}" --preset ${PRESET})
+    # tidy-files checks a test source as the build does: with the option test programs get.
+    step("${dest}" "checking a test file with tidy-files" sh tools/hooks/tidy-files
+        tests/test_benchmark.cpp)
+    if(NOT out MATCHES "tidy-files: OK \\(1 files\\)")
+        message(FATAL_ERROR "new_project: tidy-files didn't check the test file:\n${out}")
+    endif()
 
     file(GLOB_RECURSE program "${dest}/build/${PRESET}/my_tool" "${dest}/build/${PRESET}/my_tool.exe")
     if(NOT program)

@@ -332,6 +332,18 @@ Check each C++ file right after editing it with `sh tools/hooks/tidy-files
   color, a point, a size), written positionally in loops and tests, gets a
   `constexpr` constructor instead, so `Rgb{255, 0, 0}` stays short. A
   constructor makes the type a non-aggregate, which the check ignores.
+  - **Fields may be left out.** A field that isn't named takes its default
+    member initializer, or zero if it has none (an empty string, a null
+    pointer, a nested struct of zeros). That is a rule of the language, so it
+    holds at every optimization level: a `static_assert` on such a field
+    passes, and at `-O0` to `-O3` the fields read 0 where a plain
+    `Result r;` read garbage. The policy turns
+    `-Wmissing-designated-field-initializers` off for this (7.1). What that
+    gives up: when a field is added later, the places that build the struct
+    without naming it aren't reported.
+  - **Don't write `.member = {}` for a nested struct;** leave the field out.
+    clang-tidy reports the comma after it by mistake (Waiting W4, section
+    12), and `policy-format-fix` then never settles.
 - **Members that refer to another object**
   (`cppcoreguidelines-avoid-const-or-ref-data-members`). Reference members
   are rejected: they break assignment. The constructor takes a reference and
@@ -576,6 +588,12 @@ Always on, always errors: `-Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor
 -Wimplicit-fallthrough -Wzero-as-null-pointer-constant -Wextra-semi -Werror`.
 With `clang-cl`, `/W4` replaces `-Wall -Wextra` (in `clang-cl`, `-Wall` means
 `-Weverything`).
+
+One warning of `-Wextra` is off: `-Wmissing-designated-field-initializers`.
+It rejected `Options{.width = 4}` whenever another member had no default
+member initializer, and a class-type member (a `std::string`) may not have
+`{}` as one, because clang-tidy calls that redundant. Every field then had
+to be written out (section 2.10).
 
 ### 7.2 Standard library hardening
 
@@ -908,6 +926,9 @@ declared. Files directly in `src/` (`main.cpp`) are the top.
 - Functions are limited separately by clang-tidy: at most 80 lines, 6
   parameters and 4 levels of nesting (`readability-function-size`), and a
   cognitive complexity of 25 (`readability-function-cognitive-complexity`).
+  Code inside macros isn't counted. Each doctest `CHECK` added 3 at the top
+  level and 5 in a loop, so a table test with six assertions measured 65;
+  outside tests the policy allows almost no macros (2.4).
 
 *Enforcement:* the audit fails on any source file over 350 lines (the review
 threshold), outside excluded directories. The target of 250 is left to review.
@@ -1051,13 +1072,15 @@ the item resolves.
 Items are reviewed at every toolchain upgrade (LLVM releases a major version
 about every six months, section 10.1; CMake a minor one about every four). Where a compile
 can tell, a probe in the self-test does it for us: it fails, on purpose, the
-day the feature appears (`tests/probes/`).
+day the feature appears, or a tool's defect is fixed (`tests/probes/`).
 
 | Item | Wanted | Workaround today | Resolves when | Checked by |
 |---|---|---|---|---|
 | W1 | C++ modules and `import std` | `#include` (section 2.4); module scanning off (`CXX_SCAN_FOR_MODULES OFF` in `CppPolicy.cmake`) | CMake makes `import std` stable, clang-tidy handles modules, and `clang-cl` with the Microsoft library catches up | Hand, at each CMake and LLVM upgrade |
 | W2 | Time zones in libc++ on macOS (`std::chrono::zoned_time`, `current_zone`) | Local time through `localtime_r` / `localtime_s`, in a confined file | libc++ ships its time zone database on macOS. (libstdc++ already has it: verified with GCC 16 on Linux.) | Probe `waiting/w2_zoned_time` (macOS) |
 | W3 | Parallel algorithms (`std::execution::par`) in libc++ without `-fexperimental-library` | Not used; parallel computation isn't covered by the policy yet | libc++ makes them stable. (libstdc++ has them with GCC 16 on Linux, but only by linking TBB, a compiled dependency that section 1.1 would have to admit.) | Probe `waiting/w3_parallel_algorithms` (macOS) |
+
+| W4 | `readability-trailing-comma` without false reports | Leave a nested struct's field out of a designated initializer; never write `.member = {}` (section 2.10) | clang-tidy stops reporting the comma after an empty braced aggregate whose members have default member initializers. Seen in LLVM 23.1.1; its fix removes a comma the syntax needs when the element isn't last | Probe `waiting/w4_trailing_comma` (every system) |
 
 When an item resolves: remove its workarounds (search for `Waiting Wn`),
 delete its row and probe, and record the change in `CHANGELOG.md`.
@@ -1186,6 +1209,12 @@ Projects add it to `vcpkg.json` like any dependency (section 1.1).
   already rejects them).
 - **No skipped tests.** Registration refuses them: fix the test, or delete
   it and record the missing test in `ROADMAP.md`.
+- **`REQUIRE(value.has_value())` is the check before `*value`.** In test
+  programs clang-tidy's `bugprone-unchecked-optional-access` is off: it
+  can't see that `REQUIRE` stops the test, so it reported every dereference
+  that followed one. A test that reads an empty optional without a `REQUIRE`
+  still fails loudly, because library hardening stops the program (7.2). The
+  check stays on everywhere else.
 - **A bug fix comes with a regression test** that fails without it (13.1).
 - **A port uses the original as its reference.** Its tests run the same
   inputs through the port and compare with what the original produced,

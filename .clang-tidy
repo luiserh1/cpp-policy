@@ -60,7 +60,10 @@ CheckOptions:
   bugprone-exception-escape.IgnoredExceptions: 'bad_array_new_length'
   # Ignoring an error-carrying return value is a bug.
   bugprone-unused-return-value.CheckedReturnTypes: '::std::error_code;::std::error_condition;::std::errc;::std::expected'
-  # Function size (POLICY.md 11.3); cognitive complexity keeps its default of 25.
+  # Function size (POLICY.md 11.3); cognitive complexity keeps its default of 25. Code inside
+  # macros isn't counted: each doctest CHECK added 3 to 5, so a test with six assertions in a
+  # loop measured 65. Outside tests the policy allows almost no macros (POLICY.md 2.4).
+  readability-function-cognitive-complexity.IgnoreMacros: true
   readability-function-size.LineThreshold: 80
   readability-function-size.ParameterThreshold: 6
   readability-function-size.NestingThreshold: 4

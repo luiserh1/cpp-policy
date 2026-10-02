@@ -28,6 +28,8 @@ set(CPP_POLICY_CONFINED_DIRS "src/lowlevel" CACHE STRING
 set(CPP_POLICY_EXCLUDED_DIRS "build;out;.git;third_party;external;vcpkg_installed" CACHE STRING
     "Directories (relative to the project root) that the audit and format checks skip")
 set(CPP_POLICY_TEST_KINDS unit integration benchmark CACHE INTERNAL "Test kinds (POLICY.md 13)")
+set(CPP_POLICY_TEST_TIDY_CHECKS "--checks=-bugprone-unchecked-optional-access" CACHE INTERNAL
+    "clang-tidy option added for test programs (POLICY.md 13.4)")
 
 # ---------------------------------------------------------------------------
 # Toolchain verification
@@ -158,7 +160,10 @@ function(cpp_policy_apply target)
         -Wpedantic -Wshadow -Wnon-virtual-dtor -Wold-style-cast -Wcast-align -Wunused
         -Woverloaded-virtual -Wconversion -Wsign-conversion -Wnull-dereference
         -Wdouble-promotion -Wformat=2 -Wimplicit-fallthrough -Wzero-as-null-pointer-constant
-        -Wextra-semi -Werror)
+        -Wextra-semi -Werror
+        # A designated initializer may leave fields out: they take their default member
+        # initializer or zero, at every optimization level (POLICY.md 2.10).
+        -Wno-missing-designated-field-initializers)
     if(msvc_cli)
         list(PREPEND warnings /W4)
     else()
@@ -352,7 +357,9 @@ endfunction()
 function(_cpp_policy_check_options what options out_list)
     set(found ${${out_list}})
     foreach(option IN LISTS options)
-        if(option MATCHES "-Wno-|/wd[0-9]" OR option MATCHES "^[-/]w$" OR option STREQUAL "/W0")
+        if(option STREQUAL "-Wno-missing-designated-field-initializers")
+            # The policy's own (cpp_policy_apply, POLICY.md 2.10).
+        elseif(option MATCHES "-Wno-|/wd[0-9]" OR option MATCHES "^[-/]w$" OR option STREQUAL "/W0")
             list(APPEND found "${what} turns warnings off: ${option}")
         elseif(option MATCHES "^[-/](GS|guard:cf|sdl)-$"
                OR option MATCHES "^-fno-stack-protector$|^-fstack-protector$"
@@ -385,6 +392,13 @@ endfunction()
 # Runs once, after the whole project is configured (deferred by cpp_policy_add_checks).
 function(_cpp_policy_verify_targets)
     set(problems "")
+    # The test programs (cpp_policy_add_tests), which have one clang-tidy check fewer; their
+    # sources are written down for tidy-files, which checks files outside the build.
+    get_property(test_targets GLOBAL PROPERTY CPP_POLICY_TEST_TARGETS)
+    get_property(test_sources GLOBAL PROPERTY CPP_POLICY_TEST_SOURCES)
+    file(WRITE "${CMAKE_BINARY_DIR}/cpp_policy_tests.cmake"
+        "set(TEST_SOURCES [==[${test_sources}]==])\n"
+        "set(TEST_TIDY_CHECKS [==[${CPP_POLICY_TEST_TIDY_CHECKS}]==])\n")
     foreach(var IN ITEMS CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
                          CMAKE_CXX_FLAGS_RELWITHDEBINFO CMAKE_CXX_FLAGS_MINSIZEREL)
         separate_arguments(flags NATIVE_COMMAND "${${var}}")
@@ -418,7 +432,11 @@ function(_cpp_policy_verify_targets)
         if(CPP_POLICY_CLANG_TIDY)
             get_target_property(tidy ${target} CXX_CLANG_TIDY)
             _cpp_policy_tidy_config(config)
-            if(NOT tidy STREQUAL "${CPP_POLICY_CLANG_TIDY_EXE};--config-file=${config}")
+            set(expected "${CPP_POLICY_CLANG_TIDY_EXE};--config-file=${config}")
+            if(target IN_LIST test_targets)
+                list(APPEND expected "${CPP_POLICY_TEST_TIDY_CHECKS}")
+            endif()
+            if(NOT tidy STREQUAL "${expected}")
                 list(APPEND problems "target '${target}' changes CXX_CLANG_TIDY")
             endif()
         endif()
@@ -755,6 +773,20 @@ function(cpp_policy_add_tests kind module)
         endif()
     endif()
     cpp_policy_apply(${target})
+    # In a test, REQUIRE(value.has_value()) is the check before *value, but clang-tidy can't
+    # see that REQUIRE stops the test, so it reports every such dereference. Library hardening
+    # stops the program on an empty optional anyway (POLICY.md 13.4). tidy-files gives these
+    # sources the same option (cpp_policy_tests.cmake, written with the target checks).
+    set_property(GLOBAL APPEND PROPERTY CPP_POLICY_TEST_TARGETS ${target})
+    foreach(source IN LISTS arg_SOURCES)
+        cmake_path(ABSOLUTE_PATH source BASE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" NORMALIZE)
+        set_property(GLOBAL APPEND PROPERTY CPP_POLICY_TEST_SOURCES "${source}")
+    endforeach()
+    if(CPP_POLICY_CLANG_TIDY)
+        get_target_property(tidy ${target} CXX_CLANG_TIDY)
+        set_target_properties(${target} PROPERTIES CXX_CLANG_TIDY
+            "${tidy};${CPP_POLICY_TEST_TIDY_CHECKS}")
+    endif()
     if(kind STREQUAL "benchmark" AND (CPP_POLICY_SANITIZERS OR CPP_POLICY_THREAD_SANITIZER))
         return()
     endif()

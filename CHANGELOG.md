@@ -3,6 +3,67 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.26.3 (2026-10-02)
+
+From the first session of a new project, GalleryOrganizer, created from
+v0.26.1: two defects and four points of friction, all reproduced. Rules are
+only loosened, so nothing that passed fails: a patch release.
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** none. The upgrade copies the new `.clang-tidy`
+and hooks.
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.26.3`.
+
+### Fixed
+
+- **`pre-commit` split staged file names on spaces.** A staged test asset
+  named `quoted make.jpg` reached `tidy-files` as two names. It now splits on
+  newlines only, and asks git for unquoted names.
+- **`tidy-files` skipped files added since the build was configured,** said
+  "not built on this system", and ended `OK`. It now configures the build
+  again, once, before deciding. A file that still isn't compiled is reported
+  as "NOT CHECKED" and counted in the summary.
+
+### Changed
+
+- **A designated initializer may leave fields out** (POLICY.md 2.10, 7.1):
+  `-Wmissing-designated-field-initializers` is off. *Why:* three rules made
+  some structs impossible to initialize. A class-type member may not have
+  `{}` as its default (clang-tidy calls it redundant); leaving it out was
+  then an error; and writing `.member = {}` for a nested struct hits the
+  clang-tidy defect below. Omitted fields are initialized by the language at
+  every optimization level, which the owner asked about and which was
+  checked with a `static_assert` and at `-O0` to `-O3`. The owner chose it
+  (2026-10-02), knowing that a field added later is no longer reported where
+  the struct is built.
+- **Cognitive complexity doesn't count code inside macros** (11.3;
+  `IgnoreMacros` in `.clang-tidy`). *Why:* each doctest `CHECK` added 3 to 5,
+  so a table loop with two `REQUIRE`s and six `CHECK`s measured 65 against a
+  limit of 25, and the form 13.4 asks for needed a helper per row. Measured
+  here: the same test passes with the option. The owner chose it.
+- **In test programs, `bugprone-unchecked-optional-access` is off** (13.4).
+  `cpp_policy_add_tests()` adds the option, and `tidy-files` gives test
+  sources the same. *Why:* `REQUIRE(value.has_value())` followed by `*value`
+  was still reported, since clang-tidy can't see that `REQUIRE` stops the
+  test. Library hardening stops a test that reads an empty optional. The
+  owner chose it over documenting a workaround.
+
+### Waiting on the toolchain
+
+- **W4 (POLICY.md 12), new:** clang-tidy's `readability-trailing-comma`
+  reports the comma after an empty braced aggregate (`.inner = {},`) whose
+  members have default member initializers as a trailing comma. In the
+  middle of a list its fix removes a comma the syntax needs; at the end,
+  `policy-format-fix` never settles. Workaround: leave the field out. Probe
+  `waiting/w4_trailing_comma`, on every system.
+
+### Also
+
+- `new-project.sh`'s closing text says that the size budget and the layer
+  table in `AGENTS.md` are the sample's and need the owner.
+
 ## 0.26.2 (2026-10-02)
 
 The shell scripts are now tested on Windows. Tests only: a patch release.
