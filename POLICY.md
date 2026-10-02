@@ -718,6 +718,16 @@ as `#pragma once` and suppressions, have fixtures in `tests/audit/`.
   Claude Code (v2.1.277 or later) reads `AGENTS.md` directly, but only when no
   `CLAUDE.md` exists, so adding one would hide `AGENTS.md` from it. Agent
   settings deny creating `CLAUDE.md`.
+- **A new project is created with `tools/new-project.sh`** (README,
+  "Starting a new project"), never by writing its build files by hand. The
+  generator gives it the pinned release, the copied policy files, the git
+  hooks, the layers, the tests, a size budget, `ROADMAP.md` and `AGENTS.md`;
+  the audit compares several of those with the release's, so a hand-written
+  setup fails it. That holds for a port too: generate the project, then
+  bring the code in.
+- **A rule that seems wrong or impossible for a project is reported, not
+  worked around.** The agent stops and writes what the rule prevents, for
+  the owner to take to cpp-policy. Three rules of 13.5 changed that way.
 - Agents check each C++ file they edit with `sh tools/hooks/tidy-files
   <file>...`, and must run the gate (`cmake --workflow --preset check`,
   section 8) before declaring work complete.
@@ -1177,6 +1187,13 @@ Projects add it to `vcpkg.json` like any dependency (section 1.1).
 - **No skipped tests.** Registration refuses them: fix the test, or delete
   it and record the missing test in `ROADMAP.md`.
 - **A bug fix comes with a regression test** that fails without it (13.1).
+- **A port uses the original as its reference.** Its tests run the same
+  inputs through the port and compare with what the original produced,
+  saved with the tests and with a note of how it was made (the original's
+  version and the command). Where the results may differ, the test states
+  the tolerance and why. ToneMatcher's Gaussian blur is compared exactly
+  with scipy's float32 output, which caught differences a "looks right"
+  test would not.
 
 *Enforcement:* the helper, registration and configuration check the names,
 labels, suites, skipped tests and time limits. The rest of 13.4 relies on
@@ -1492,6 +1509,33 @@ Single-threaded by default. Threads for work that must be concurrent (a
 server's connections) follow section 2.8. Threads for speed need a
 measurement first (14.2), and wait for libc++'s parallel algorithms where
 those would do (W3 in section 12). This section will grow when they arrive.
+
+### 15.6 The interface between a backend and its frontends
+
+A program with more than one frontend (a command line and a window, or
+later a phone) has three parts, each one or more layers (11.1): the backend,
+which does the work and holds the dependencies (11.6); the interface, which
+is what a user can do; and the frontends, which only present it.
+
+- **Plain data in and out:** the interface's functions take and return
+  `struct`s of section 15.1, standard-library types, and nothing from a
+  third-party library. With `SOURCES_ONLY` (11.6) the audit enforces the
+  last part.
+- **Errors are values** (`std::expected`, section 3). No exception crosses
+  the interface: the backend catches what its dependencies throw and returns
+  it as an error.
+- **It offers what a user can do, not what the backend contains.** One
+  function per task ("match these tones"), not one per backend function. An
+  interface that passes everything through hides nothing.
+- **No second copy of the types.** The backend uses the interface's
+  `struct`s directly wherever it can. A parallel set of types with
+  conversions doubles every change.
+- **Frontends hold no logic.** Validation, defaults and formatting that two
+  frontends would both need live behind the interface. Behaviour is tested
+  once, at the interface, without any frontend.
+- An interface written this way can also be called from another language,
+  which is what a phone frontend needs. Building for iOS and Android is not
+  covered by this policy yet.
 
 *Enforcement:* the `struct`/`class` split by clang-tidy; the rest relies on
 review (section 8.1).

@@ -3,6 +3,35 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.26.1 (2026-10-02)
+
+Three general points that were in the brief for a new project, moved into
+the policy. Text only: a patch release.
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** none.
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.26.1`.
+
+### Added
+
+- **15.6, the interface between a backend and its frontends:** plain data in
+  and out, errors as values and no exception crossing it, one function per
+  thing a user can do, no second copy of the types, no logic in frontends.
+- **13.4, a port uses the original as its reference:** tests compare with
+  the original's saved output on the same inputs.
+- **9, a new project is created with `tools/new-project.sh`,** never by
+  hand; and a rule that seems wrong for a project is reported to the owner
+  for cpp-policy, not worked around.
+
+*Why:* the owner is starting a port with a backend and several frontends in
+a new conversation, and asked whether what the brief had to spell out should
+be in the policy. These are true of any project, so a conversation that
+reads the policy now gets them without being told. What is specific to that
+project (which frontends, in what order, the first milestone) stays in its
+brief. Building for iOS and Android stays out until it has been tried.
+
 ## 0.26.0 (2026-10-02)
 
 A dependency's headers can be kept in the modules that use it

@@ -65,6 +65,7 @@ in this project's own code or tests.
   failures print both values.
 - A fix for a bug comes with a test that fails without it, in
   `TEST_SUITE("regression")`.
+- In a port, tests compare with the original's output on the same inputs.
 - No sleeps, no skipped tests, no state shared between test cases.
 - The release workflow checks each program's size budget
   (`cpp_policy_size_budget()` in `CMakeLists.txt`). Never raise a budget
@@ -104,5 +105,5 @@ Formatting problems: `cmake --build --preset check --target policy-format-fix`.
 - "Fix" a toolchain error by changing the build. If the compiler check fails,
   report it: the machine's LLVM installation or `PATH` needs fixing.
 
-If a rule seems impossible to satisfy, stop and explain why instead of
-working around it.
+If a rule seems wrong or impossible to satisfy, stop and explain what it
+prevents instead of working around it. The owner takes it to cpp-policy.
