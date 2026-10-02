@@ -5,7 +5,9 @@
 #
 # - configure warns while core.hooksPath is not set, and stops warning once it is;
 # - pre-push runs the gate on a clean working folder and refuses a dirty one;
-# - pre-commit warns about unstaged changes and still runs its checks.
+# - pre-commit warns about unstaged changes and still runs its checks;
+# - commit-msg accepts and rejects messages by its rules.
+# On Windows the scripts run under the sh of Git for Windows, as git runs them there.
 # A stub `cmake` on PATH stands in for the real gate, so only the hooks' own logic runs.
 
 cmake_minimum_required(VERSION 3.29)
@@ -17,6 +19,24 @@ find_package(Git REQUIRED)
 foreach(variable IN ITEMS GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY)
     unset(ENV{${variable}})
 endforeach()
+
+# The shell that runs the scripts. On Windows it is the one Git for Windows ships and runs
+# hooks with, found next to git; another sh on PATH (a different toolkit's) would test
+# something users don't run.
+if(CMAKE_HOST_WIN32)
+    cmake_path(GET GIT_EXECUTABLE PARENT_PATH git_bin)
+    find_program(SH_EXECUTABLE sh
+        HINTS "${git_bin}/../bin" "${git_bin}/../usr/bin" "${git_bin}/../../usr/bin"
+              "${git_bin}/../../bin"
+        NO_DEFAULT_PATH REQUIRED)
+else()
+    find_program(SH_EXECUTABLE sh REQUIRED)
+endif()
+# The throwaway repositories keep the line endings the test writes, whatever this machine's
+# git configuration converts (Git for Windows defaults to CRLF on checkout).
+set(ENV{GIT_CONFIG_COUNT} 1)
+set(ENV{GIT_CONFIG_KEY_0} core.autocrlf)
+set(ENV{GIT_CONFIG_VALUE_0} false)
 
 set(repo "${WORK}/repo")
 file(REMOVE_RECURSE "${WORK}")
@@ -63,7 +83,18 @@ run(${configure})
 string(FIND "${out}" "git hooks are not enabled" found)
 expect("code;EQUAL;0;AND;found;EQUAL;-1" "configure must not warn once core.hooksPath is set")
 
-set(with_stub "${CMAKE_COMMAND}" -E env "PATH=${WORK}/stub:$ENV{PATH}" sh)
+# Runs a script with the stubs first on PATH. The shell adds the folder itself: its PATH is
+# separated by ":" on every system, and under Git for Windows `pwd` gives the folder in the
+# form that PATH needs (/c/..., not C:/...). No ";" in the command: it would split the list.
+set(with_stub "${SH_EXECUTABLE}" -c
+    "PATH=\"$(cd \"$1\" && pwd):$PATH\" && export PATH && shift && exec sh \"$@\"" with-stub
+    "${WORK}/stub")
+# Git for Windows' own uname makes the hooks choose win-check.
+if(CMAKE_HOST_WIN32)
+    set(preset win-check)
+else()
+    set(preset check)
+endif()
 
 run(${with_stub} tools/hooks/pre-push)
 string(FIND "${out}" "stub cmake --workflow" found)
@@ -76,13 +107,14 @@ expect("NOT;code;EQUAL;0;AND;found;GREATER;-1" "pre-push must refuse a working f
 
 run(${with_stub} tools/hooks/pre-commit)
 string(FIND "${out}" "unstaged changes" warned)
-string(FIND "${out}" "stub cmake --build --preset check " checked)
+string(FIND "${out}" "stub cmake --build --preset ${preset} " checked)
 expect("code;EQUAL;0;AND;warned;GREATER;-1;AND;checked;GREATER;-1"
     "pre-commit must warn about unstaged changes and still run its checks")
 
 # Under Git for Windows, uname reports MINGW64_NT-...; both hooks must then use the
 # win-check preset, which the `check` preset's condition disables there. A stub uname
-# stands in for that shell, so the case is covered on every platform.
+# stands in for that shell, so the case is covered on every platform; on Windows the runs
+# above already had the real one.
 file(WRITE "${WORK}/stub/uname" "#!/bin/sh\necho MINGW64_NT-10.0-19045\n")
 file(CHMOD "${WORK}/stub/uname" PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE)
 run(${with_stub} tools/hooks/pre-commit)
@@ -97,7 +129,7 @@ expect("code;EQUAL;0;AND;found;GREATER;-1" "pre-push must use the win-check pres
 # commit-msg: one message per rule. Each case is "accept" or "reject" and a message.
 function(check_message verdict text what)
     file(WRITE "${WORK}/message.txt" "${text}")
-    run(sh tools/hooks/commit-msg "${WORK}/message.txt")
+    run("${SH_EXECUTABLE}" tools/hooks/commit-msg "${WORK}/message.txt")
     if(verdict STREQUAL "accept")
         expect("code;EQUAL;0" "commit-msg must accept ${what}")
     else()

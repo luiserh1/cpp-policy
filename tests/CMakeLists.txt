@@ -269,25 +269,31 @@ foreach(case IN LISTS bypass_cases)
     set_tests_properties(bypass/${name} PROPERTIES PASS_REGULAR_EXPRESSION "${expect}")
 endforeach()
 
-# --- Git hooks: run in a throwaway repository with a stub gate (they are POSIX shell scripts;
-# Git for Windows runs them with its own sh, which this test doesn't cover).
-if(NOT WIN32)
-    add_test(NAME hooks/behavior
-        COMMAND "${CMAKE_COMMAND}" "-DPOLICY_ROOT=${CPP_POLICY_ROOT}"
-                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/hooks" "-DCXX=${CMAKE_CXX_COMPILER}"
-                "-DMAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}" -P "${CMAKE_CURRENT_SOURCE_DIR}/hooks/run.cmake")
-    # Always run as if from a hook in a linked worktree: GIT_DIR points elsewhere (a decoy in
-    # the build folder), and the test must still act only on its throwaway repository.
-    set_tests_properties(hooks/behavior PROPERTIES
-        ENVIRONMENT "GIT_DIR=${CMAKE_CURRENT_BINARY_DIR}/hooks_decoy.git")
+# --- Git hooks: run in a throwaway repository with a stub gate. They are POSIX shell scripts;
+# on Windows the test runs them with the sh of Git for Windows, as git does there.
+add_test(NAME hooks/behavior
+    COMMAND "${CMAKE_COMMAND}" "-DPOLICY_ROOT=${CPP_POLICY_ROOT}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/hooks" "-DCXX=${CMAKE_CXX_COMPILER}"
+            "-DMAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}" -P "${CMAKE_CURRENT_SOURCE_DIR}/hooks/run.cmake")
+# Always run as if from a hook in a linked worktree: GIT_DIR points elsewhere (a decoy in
+# the build folder), and the test must still act only on its throwaway repository.
+set_tests_properties(hooks/behavior PROPERTIES
+    ENVIRONMENT "GIT_DIR=${CMAKE_CURRENT_BINARY_DIR}/hooks_decoy.git")
 
-    # tools/upgrade.sh against a fake cpp-policy with two releases (same GIT_DIR decoy).
-    add_test(NAME upgrade/behavior
-        COMMAND "${CMAKE_COMMAND}" "-DPOLICY_ROOT=${CPP_POLICY_ROOT}"
-                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/upgrade" -P "${CMAKE_CURRENT_SOURCE_DIR}/upgrade/run.cmake")
-    set_tests_properties(upgrade/behavior PROPERTIES
-        ENVIRONMENT "GIT_DIR=${CMAKE_CURRENT_BINARY_DIR}/upgrade_decoy.git")
-endif()
+# tools/upgrade.sh against a fake cpp-policy with two releases (same GIT_DIR decoy).
+add_test(NAME upgrade/behavior
+    COMMAND "${CMAKE_COMMAND}" "-DPOLICY_ROOT=${CPP_POLICY_ROOT}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/upgrade" -P "${CMAKE_CURRENT_SOURCE_DIR}/upgrade/run.cmake")
+set_tests_properties(upgrade/behavior PROPERTIES
+    ENVIRONMENT "GIT_DIR=${CMAKE_CURRENT_BINARY_DIR}/upgrade_decoy.git")
+
+# tools/new-project.sh itself, on a throwaway copy of the policy tagged as a release.
+add_test(NAME template/new_project_script
+    COMMAND "${CMAKE_COMMAND}" "-DPOLICY_ROOT=${CPP_POLICY_ROOT}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/new_project_script"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/new_project/script.cmake")
+set_tests_properties(template/new_project_script PROPERTIES
+    ENVIRONMENT "GIT_DIR=${CMAKE_CURRENT_BINARY_DIR}/new_project_script_decoy.git")
 
 # --- Dependency fixtures: each directory has a vcpkg.json, optionally a fake vcpkg install
 # tree (installed/<triplet>/share/<port>/vcpkg.spdx.json), and expect.txt, a regex the

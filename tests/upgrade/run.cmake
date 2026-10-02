@@ -8,7 +8,8 @@
 #   v0.15.0 with an include of tools/vcpkg/setup.cmake;
 # - it refuses a working folder with uncommitted changes, an unknown tag, and vcpkg lines it
 #   doesn't know, changing nothing.
-# The gate isn't run (--no-gate): that needs a real project.
+# The gate isn't run (--no-gate): that needs a real project. On Windows the script runs under
+# the sh of Git for Windows.
 
 cmake_minimum_required(VERSION 3.29)
 find_package(Git REQUIRED)
@@ -17,6 +18,24 @@ find_package(Git REQUIRED)
 foreach(variable IN ITEMS GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY)
     unset(ENV{${variable}})
 endforeach()
+
+# The shell that runs the scripts. On Windows it is the one Git for Windows ships and runs
+# hooks with, found next to git; another sh on PATH (a different toolkit's) would test
+# something users don't run.
+if(CMAKE_HOST_WIN32)
+    cmake_path(GET GIT_EXECUTABLE PARENT_PATH git_bin)
+    find_program(SH_EXECUTABLE sh
+        HINTS "${git_bin}/../bin" "${git_bin}/../usr/bin" "${git_bin}/../../usr/bin"
+              "${git_bin}/../../bin"
+        NO_DEFAULT_PATH REQUIRED)
+else()
+    find_program(SH_EXECUTABLE sh REQUIRED)
+endif()
+# The throwaway repositories keep the line endings the test writes, whatever this machine's
+# git configuration converts (Git for Windows defaults to CRLF on checkout).
+set(ENV{GIT_CONFIG_COUNT} 1)
+set(ENV{GIT_CONFIG_KEY_0} core.autocrlf)
+set(ENV{GIT_CONFIG_VALUE_0} false)
 
 # Named cpp-policy: the script finds the pin by that name in GIT_REPOSITORY.
 set(policy "${WORK}/cpp-policy")
@@ -116,7 +135,7 @@ run("${project}" ${git} add --all)
 run("${project}" ${git} commit --quiet -m init)
 expect("code;EQUAL;0" "could not create the fake project")
 
-set(upgrade sh "${POLICY_ROOT}/tools/upgrade.sh")
+set(upgrade "${SH_EXECUTABLE}" "${POLICY_ROOT}/tools/upgrade.sh")
 
 # Refused: uncommitted changes.
 file(APPEND "${project}/CMakeLists.txt" "# local edit\n")
@@ -170,8 +189,11 @@ foreach(name IN ITEMS .clang-tidy .clang-format CMakePresets.json tools/hooks/pr
     set(wanted "# ${name} of 2.0.0\n")
     expect("content;STREQUAL;wanted" "${name} must be v2.0.0's copy")
 endforeach()
-execute_process(COMMAND test -x "${project}/tools/hooks/pre-push" RESULT_VARIABLE code)
-expect("code;EQUAL;0" "the copied hooks must be executable")
+# Windows has no executable bit: Git for Windows runs a hook whatever its mode.
+if(NOT CMAKE_HOST_WIN32)
+    execute_process(COMMAND test -x "${project}/tools/hooks/pre-push" RESULT_VARIABLE code)
+    expect("code;EQUAL;0" "the copied hooks must be executable")
+endif()
 file(READ "${project}/tools/hooks/commit-msg" content)
 set(wanted "# commit-msg of 2.0.0\n")
 expect("content;STREQUAL;wanted" "a hook the release adds must be copied")
