@@ -650,6 +650,14 @@ The git hooks come from cpp-policy (`tools/hooks/`); projects copy them
 unchanged and enable them once per clone with `git config core.hooksPath
 tools/hooks`. Configuration warns while a clone hasn't done so.
 
+In CI, a run that a newer push to the same branch made obsolete is
+cancelled (`gate.yml`): stopped on a branch; on the default branch the run
+in progress finishes and only runs still waiting are dropped; never for a
+tag. A cancelled run is neither a pass nor a failure, and no rule needs
+every pushed commit to have a result: pre-push ran the gate before the
+push, and a release is tagged on the commit whose run is green
+(section 10).
+
 Every layer works the same for any agent and for people: they are commands
 and git hooks, and `AGENTS.md` says when to run them. An agent with a hook
 system of its own may call `tidy-files` from it after each edit, but the

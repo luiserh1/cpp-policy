@@ -43,6 +43,16 @@ on:
 permissions:
   contents: read
 
+# A newer push makes an older run of the same branch obsolete. On the default branch the run
+# in progress always finishes, and only runs still waiting behind it are replaced by the
+# newest; on any other branch the older run is stopped. Each tag is a ref of its own, so a
+# release's run is never cancelled. The group is evaluated for the calling workflow: its name
+# starts with this workflow's, so that two cpp-policy workflows called from one CI file
+# don't share a group and cancel each other.
+concurrency:
+  group: cpp-policy-gate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != format('refs/heads/{0}', github.event.repository.default_branch) }}
+
 env:
   LLVM_VERSION: 23.1.2
   LLVM_MAJOR: 23

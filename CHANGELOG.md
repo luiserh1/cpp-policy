@@ -3,10 +3,11 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
-## 0.27.0 (2026-10-02)
+## 0.27.0 (2026-10-07)
 
 A trial: instruction counts of the benchmark tests, recorded in CI
-(POLICY.md 14.2). Optional, and it checks nothing: a minor release.
+(POLICY.md 14.2). Optional, and it checks nothing: a minor release. CI also
+cancels runs that a newer push made obsolete.
 
 ### Upgrading a project
 
@@ -41,9 +42,27 @@ A trial: instruction counts of the benchmark tests, recorded in CI
   upgrade (audit fixture `ci_pin_benchmark`). *Why:* a benchmark job at an
   older commit than the build would measure with another release's rules.
 
+### Changed
+
+- **CI cancels runs that a newer push made obsolete** (`gate.yml`;
+  POLICY.md 8). On a branch the older run is stopped. On the default branch
+  the run in progress finishes, and runs still waiting behind it are
+  replaced by the newest. A tag's run is never cancelled. `benchmark.yml`
+  does the same on branches and measures every commit of the default
+  branch. Projects get it with this upgrade, with no change to their own
+  workflow. *Why:* asked by the owner through the server administrator. The
+  home server is now off part of the time; pushes queue up, and when it
+  came back the runners worked through every queued commit in order, old
+  ones included. The rule lives in `gate.yml`, where a group is evaluated
+  for the calling workflow, so each cpp-policy workflow has a group name of
+  its own. Tried on cpp-policy's CI with two quick pushes to a branch
+  (runs 37605998535 and 37606149110): the first was cancelled and the
+  second ran. The owner chose both the place and the behaviour
+  (2026-10-07).
+
 ### Not tried yet
 
-The workflow can't run in cpp-policy's own CI: this repository is public and
+The benchmark workflow can't run in cpp-policy's own CI: this repository is public and
 has no self-hosted runner. Its shell logic was tried here on real benchmark
 output with and without the counters' column; its first real run will be
 ToneMatcher's. POLICY.md 10 asks for a trial before a release, and here the

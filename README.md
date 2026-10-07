@@ -169,6 +169,12 @@ build uses. Move both in the same commit when upgrading.
 repositories; private ones spend the account's Actions minutes, and a macOS
 minute costs about ten Linux ones (Windows about two).
 
+A newer push makes an older run of the same branch obsolete, and the gate
+cancels it: on a branch the older run is stopped; on the default branch the
+run in progress finishes and only runs still waiting behind it are dropped.
+A tag's run is never cancelled. Projects need nothing in their own workflow
+for this.
+
 ### Your own machine as a runner
 
 `self_hosted: '["macos"]'` runs the macOS jobs on your own Mac instead
