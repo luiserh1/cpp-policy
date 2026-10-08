@@ -1,0 +1,1 @@
+set ASAN_OPTIONS=detect_leaks=0.*sanitizer options aren.t a test.s to set

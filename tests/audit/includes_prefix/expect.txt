@@ -1,0 +1,1 @@
+src/gui/panel.cpp:2: error: includes <imgui_stdlib.h>, which only these modules may include: window.*cpp-policy audit: 1 violation

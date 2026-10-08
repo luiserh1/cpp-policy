@@ -211,6 +211,14 @@
       "configurePreset": "release"
     },
     {
+      "name": "check-first",
+      "configurePreset": "check",
+      "targets": [
+        "policy-audit",
+        "policy-format-check"
+      ]
+    },
+    {
       "name": "check",
       "configurePreset": "check",
       "targets": [
@@ -238,6 +246,14 @@
     {
       "name": "win-release",
       "configurePreset": "win-release"
+    },
+    {
+      "name": "win-check-first",
+      "configurePreset": "win-check",
+      "targets": [
+        "policy-audit",
+        "policy-format-check"
+      ]
     },
     {
       "name": "win-check",
@@ -381,6 +397,10 @@
         },
         {
           "type": "build",
+          "name": "check-first"
+        },
+        {
+          "type": "build",
           "name": "check"
         },
         {
@@ -446,6 +466,10 @@
         {
           "type": "configure",
           "name": "win-check"
+        },
+        {
+          "type": "build",
+          "name": "win-check-first"
         },
         {
           "type": "build",

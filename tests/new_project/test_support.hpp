@@ -15,4 +15,6 @@ inline std::size_t required(const std::optional<std::size_t>& value) {
     return *value;
 }
 
+[[nodiscard]] std::size_t required_twice(const std::optional<std::size_t>& value);
+
 } // namespace test_support

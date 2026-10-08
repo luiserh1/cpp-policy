@@ -51,8 +51,17 @@ function(generate_and_check)
     file(READ "${dest}/vcpkg.json" manifest)
     string(REPLACE "\"dependencies\": [" "\"dependencies\": [\n    {\"name\": \"nanobench\", \"default-features\": false, \"$reason\": \"speed benchmarks\"}," manifest "${manifest}")
     file(WRITE "${dest}/vcpkg.json" "${manifest}")
+    # A library of test helpers, declared as test code: its source reads an optional after
+    # REQUIRE, which the build and tidy-files must both accept (POLICY.md 13.4).
+    file(COPY_FILE "${CMAKE_CURRENT_LIST_DIR}/test_support.cpp" "${dest}/tests/support/test_support.cpp")
     file(APPEND "${dest}/tests/CMakeLists.txt"
-        "cpp_policy_add_tests(benchmark app SOURCES test_benchmark.cpp LIBRARIES my_tool_core)\n")
+        "add_library(my_tool_test_support STATIC support/test_support.cpp)\n"
+        "target_link_libraries(my_tool_test_support PUBLIC doctest::doctest)\n"
+        "target_compile_definitions(my_tool_test_support PUBLIC DOCTEST_CONFIG_USE_STD_HEADERS)\n"
+        "cpp_policy_apply(my_tool_test_support)\n"
+        "cpp_policy_test_support(my_tool_test_support)\n"
+        "cpp_policy_add_tests(benchmark app SOURCES test_benchmark.cpp\n"
+        "    LIBRARIES my_tool_core my_tool_test_support)\n")
 
     step("${dest}" "configuring the project"
         "${CMAKE_COMMAND}" --preset ${PRESET} "-DFETCHCONTENT_SOURCE_DIR_CPP_POLICY=${POLICY_ROOT}")
@@ -62,8 +71,8 @@ function(generate_and_check)
     # tidy-files checks a test source, and a test header in another folder of tests/, as the
     # build does: with the option test programs get.
     step("${dest}" "checking the test files with tidy-files" sh tools/hooks/tidy-files
-        tests/test_benchmark.cpp tests/support/test_support.hpp)
-    if(NOT out MATCHES "tidy-files: OK \\(2 files\\)")
+        tests/test_benchmark.cpp tests/support/test_support.hpp tests/support/test_support.cpp)
+    if(NOT out MATCHES "tidy-files: OK \\(3 files\\)")
         message(FATAL_ERROR "new_project: tidy-files didn't check the test files:\n${out}")
     endif()
 

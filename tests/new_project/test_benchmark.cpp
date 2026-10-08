@@ -60,7 +60,7 @@ TEST_CASE("a table of greetings") {
         REQUIRE(total.has_value());
         REQUIRE(row.count > 0);
         CHECK(test_support::required(total) >= row.at_least);
-        CHECK(*total > 0);
+        CHECK(test_support::required_twice(total) > 0);
         CHECK(row.name.empty());
         CHECK(row.what != nullptr);
         CHECK(row.at_least > 0);

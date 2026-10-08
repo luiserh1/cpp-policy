@@ -494,6 +494,13 @@ function(_cpp_policy_verify_tests)
         if(NOT CMAKE_MATCH_1 IN_LIST labels)
             list(APPEND problems "test '${test}' doesn't have the label '${CMAKE_MATCH_1}'")
         endif()
+        get_property(environment TEST "${test}" DIRECTORY "${dir}" PROPERTY ENVIRONMENT)
+        foreach(variable IN LISTS environment)
+            if(variable MATCHES "^(ASAN|LSAN|UBSAN|TSAN|MSAN)_OPTIONS=")
+                list(APPEND problems "test '${test}' sets ${variable}: sanitizer options "
+                    "aren't a test's to set (POLICY.md 5)")
+            endif()
+        endforeach()
     endforeach()
     if(problems)
         list(JOIN problems "\n  " problem_list)
@@ -567,7 +574,13 @@ function(_cpp_policy_commit out)
     if(NOT Git_FOUND)
         return()
     endif()
-    execute_process(COMMAND "${GIT_EXECUTABLE}" rev-parse --show-toplevel HEAD
+    # Git exports GIT_DIR (and GIT_WORK_TREE, GIT_INDEX_FILE) to hooks. In a linked worktree
+    # GIT_DIR names the project's repository, and git would answer with the project's commit
+    # instead of the policy's when pre-commit configures the build.
+    execute_process(
+        COMMAND "${CMAKE_COMMAND}" -E env --unset=GIT_DIR --unset=GIT_WORK_TREE
+                --unset=GIT_INDEX_FILE --unset=GIT_COMMON_DIR --unset=GIT_OBJECT_DIRECTORY
+                "${GIT_EXECUTABLE}" rev-parse --show-toplevel HEAD
         WORKING_DIRECTORY "${CPP_POLICY_ROOT}"
         RESULT_VARIABLE failed OUTPUT_VARIABLE output
         OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
@@ -631,7 +644,9 @@ endfunction()
 
 # ---------------------------------------------------------------------------
 # Dependencies kept in their modules (POLICY.md 11.6): the headers named may be included only
-# from the modules after TO. A name ending in "/" stands for every header under it.
+# from the modules after TO. A name ending in "/" stands for every header under it, and one
+# ending in "*" for every header whose name starts so (a library whose headers are in no
+# folder of their own: imgui*).
 #   cpp_policy_confine_includes(httplib.h TO server)
 #   cpp_policy_confine_includes(nlohmann/ zlib.h TO backend SOURCES_ONLY)
 # With SOURCES_ONLY, only those modules' source files may include them, not their headers, so
@@ -642,7 +657,7 @@ function(cpp_policy_confine_includes)
         message(FATAL_ERROR
             "cpp-policy: call cpp_policy_confine_includes() before cpp_policy_add_checks()")
     endif()
-    set(usage "cpp_policy_confine_includes(<header or directory/>... TO <module>... [SOURCES_ONLY])")
+    set(usage "cpp_policy_confine_includes(<header, directory/ or prefix*>... TO <module>... [SOURCES_ONLY])")
     set(headers "")
     set(modules "")
     set(sources_only "")
@@ -653,9 +668,9 @@ function(cpp_policy_confine_includes)
         elseif(argument STREQUAL "SOURCES_ONLY" AND reading STREQUAL "modules")
             set(sources_only "sources")
         elseif(reading STREQUAL "headers")
-            if(NOT argument MATCHES "^[A-Za-z0-9_+.-]+(/[A-Za-z0-9_+.-]+)*/?$")
-                message(FATAL_ERROR "cpp-policy: '${argument}' isn't a header name or a "
-                                    "directory ending in '/': ${usage}")
+            if(NOT argument MATCHES "^[A-Za-z0-9_+.-]+(/[A-Za-z0-9_+.-]+)*[/*]?$")
+                message(FATAL_ERROR "cpp-policy: '${argument}' isn't a header name, a "
+                                    "directory ending in '/' or a prefix ending in '*': ${usage}")
             endif()
             list(APPEND headers "${argument}")
         elseif(NOT argument MATCHES "^[a-z0-9_]+$")
@@ -700,12 +715,41 @@ function(_cpp_policy_testing_library)
 endfunction()
 
 function(cpp_policy_add_tests kind module)
-    cmake_parse_arguments(PARSE_ARGV 2 arg "" "TIMEOUT" "SOURCES;LIBRARIES;ENVIRONMENT")
+    cmake_parse_arguments(PARSE_ARGV 2 arg "" "TIMEOUT;NO_LEAK_CHECK"
+        "SOURCES;LIBRARIES;ENVIRONMENT")
     set(usage "cpp_policy_add_tests(<kind> <module> SOURCES <file>... [LIBRARIES <target>...] "
-              "[TIMEOUT <seconds>] [ENVIRONMENT <VAR=value>...])")
+              "[TIMEOUT <seconds>] [ENVIRONMENT <VAR=value>...] [NO_LEAK_CHECK <reason>])")
     string(JOIN "" usage ${usage})
     if(arg_UNPARSED_ARGUMENTS OR NOT arg_SOURCES)
         message(FATAL_ERROR "cpp-policy: usage: ${usage}")
+    endif()
+    # The sanitizers' options are the presets'. A test that set its own could switch a check
+    # off where nothing shows it (POLICY.md 5).
+    foreach(variable IN LISTS arg_ENVIRONMENT)
+        if(variable MATCHES "^(ASAN|LSAN|UBSAN|TSAN|MSAN)_OPTIONS=")
+            message(FATAL_ERROR "cpp-policy: ${kind} tests for '${module}' set ${variable}: "
+                "sanitizer options aren't a test's to set. Where LeakSanitizer reports what "
+                "the operating system keeps (a window on macOS), use NO_LEAK_CHECK \"<reason>\" "
+                "(POLICY.md 5)")
+        endif()
+    endforeach()
+    if(DEFINED arg_NO_LEAK_CHECK)
+        if(kind STREQUAL "unit")
+            message(FATAL_ERROR "cpp-policy: NO_LEAK_CHECK isn't for unit tests: a test that "
+                "needs the operating system's windows is an integration test (POLICY.md 5, 13.1)")
+        endif()
+        string(STRIP "${arg_NO_LEAK_CHECK}" leak_reason)
+        string(LENGTH "${leak_reason}" reason_length)
+        if(reason_length LESS 20)
+            message(FATAL_ERROR "cpp-policy: NO_LEAK_CHECK needs its reason, in a sentence: "
+                "what reports the leaks, and that none is the project's (POLICY.md 5)")
+        endif()
+        # Shown at every configure, so that it is never switched off unseen.
+        message(NOTICE "cpp-policy: LeakSanitizer is OFF for the ${kind} tests of '${module}': "
+            "${leak_reason}")
+        # After the presets' own ASAN_OPTIONS: a test's environment replaces the variable.
+        list(APPEND arg_ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0")
+        set_property(GLOBAL APPEND PROPERTY CPP_POLICY_NO_LEAK_CHECK "${kind}/${module}")
     endif()
     if(NOT kind IN_LIST CPP_POLICY_TEST_KINDS)
         message(FATAL_ERROR "cpp-policy: test kind '${kind}' isn't one of: ${CPP_POLICY_TEST_KINDS}")
@@ -813,6 +857,43 @@ function(cpp_policy_add_tests kind module)
 endfunction()
 
 # ---------------------------------------------------------------------------
+# Code that only tests use, in a target of its own (helpers shared by several test programs):
+#   add_library(test_support STATIC tests/support/scene.cpp)
+#   cpp_policy_apply(test_support)
+#   cpp_policy_test_support(test_support)
+# Its sources are then checked as test code, by the build and by tidy-files alike
+# (POLICY.md 13.4). Call it after cpp_policy_apply().
+# ---------------------------------------------------------------------------
+function(cpp_policy_test_support)
+    foreach(target IN LISTS ARGN)
+        if(NOT TARGET ${target})
+            message(FATAL_ERROR "cpp-policy: cpp_policy_test_support(): no target '${target}'")
+        endif()
+        get_target_property(applied ${target} CPP_POLICY_APPLIED)
+        if(NOT applied)
+            message(FATAL_ERROR "cpp-policy: call cpp_policy_apply(${target}) before "
+                "cpp_policy_test_support(${target})")
+        endif()
+        get_property(known GLOBAL PROPERTY CPP_POLICY_TEST_TARGETS)
+        if(target IN_LIST known)
+            continue()
+        endif()
+        set_property(GLOBAL APPEND PROPERTY CPP_POLICY_TEST_TARGETS ${target})
+        get_target_property(sources ${target} SOURCES)
+        get_target_property(source_dir ${target} SOURCE_DIR)
+        foreach(source IN LISTS sources)
+            cmake_path(ABSOLUTE_PATH source BASE_DIRECTORY "${source_dir}" NORMALIZE)
+            set_property(GLOBAL APPEND PROPERTY CPP_POLICY_TEST_SOURCES "${source}")
+        endforeach()
+        if(CPP_POLICY_CLANG_TIDY)
+            get_target_property(tidy ${target} CXX_CLANG_TIDY)
+            set_target_properties(${target} PROPERTIES CXX_CLANG_TIDY
+                "${tidy};${CPP_POLICY_TEST_TIDY_CHECKS}")
+        endif()
+    endforeach()
+endfunction()
+
+# ---------------------------------------------------------------------------
 # Size budgets (POLICY.md 13.5): the most a program may weigh, stripped, on each system.
 #   cpp_policy_size_budget(my_tool MACOS 109568 LINUX 93184 WINDOWS 285696)
 # In Release builds without sanitizers it adds the test benchmark/size/<program>, which
@@ -908,6 +989,6 @@ function(cpp_policy_add_checks)
         VERBATIM)
     add_custom_target(policy-format-fix
         COMMAND "${CMAKE_COMMAND}" -DCONFIG=${config} -DMODE=fix -P "${scripts}/format.cmake"
-        COMMENT "cpp-policy: formatting sources and fixing trailing commas"
+        COMMENT "cpp-policy: formatting sources"
         VERBATIM)
 endfunction()

@@ -86,6 +86,20 @@ expect("code;EQUAL;0;AND;found;EQUAL;-1" "configure must not warn once core.hook
 # Runs a script with the stubs first on PATH. The shell adds the folder itself: its PATH is
 # separated by ":" on every system, and under Git for Windows `pwd` gives the folder in the
 # form that PATH needs (/c/..., not C:/...). No ";" in the command: it would split the list.
+# In a hook of a linked worktree git exports GIT_DIR, naming the project's repository. The
+# policy's commit, which the audit compares the CI pins with, must still be the policy's.
+execute_process(COMMAND "${GIT_EXECUTABLE}" rev-parse --show-toplevel HEAD
+    WORKING_DIRECTORY "${POLICY_ROOT}" RESULT_VARIABLE not_a_checkout
+    OUTPUT_VARIABLE policy_git OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+if(NOT not_a_checkout)
+    string(REGEX REPLACE "^.*\n" "" policy_commit "${policy_git}")
+    run("${CMAKE_COMMAND}" -E env "GIT_DIR=${repo}/.git" ${configure})
+    file(STRINGS "${WORK}/build/cpp_policy_config.cmake" pinned REGEX "^set\\(POLICY_COMMIT ")
+    string(FIND "${pinned}" "${policy_commit}" found)
+    expect("code;EQUAL;0;AND;found;GREATER;-1"
+        "with GIT_DIR set, configure must still record the policy's own commit: ${pinned}")
+endif()
+
 set(with_stub "${SH_EXECUTABLE}" -c
     "PATH=\"$(cd \"$1\" && pwd):$PATH\" && export PATH && shift && exec sh \"$@\"" with-stub
     "${WORK}/stub")

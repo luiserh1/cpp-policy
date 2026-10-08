@@ -1,65 +1,63 @@
-# policy-format-fix, checked on a throwaway project whose braced lists need trailing commas.
+# policy-format-fix, checked on a throwaway project.
 #
-#   cmake -DPOLICY_ROOT=<dir> -DWORK=<dir> -DCLANG_FORMAT=<exe> -DCLANG_TIDY=<exe> -P run.cmake
+#   cmake -DPOLICY_ROOT=<dir> -DWORK=<dir> -DCLANG_FORMAT=<exe> -DCXX=<compiler> -P run.cmake
 #
-# One list is on a single line too long for the column limit: it needs its comma only after
-# clang-format has split it, the case that took projects several rounds by hand. Afterwards
-# both the format check and readability-trailing-comma must pass, in one run of the fix.
+# It formats, and nothing else: the code must still compile afterwards. Until v0.27.0 it also
+# let clang-tidy fix trailing commas, and that fix removed the comma after an empty braced
+# value (Waiting W4, POLICY.md 12): `f(1, Options{}, 2)` became `f(1, Options{} 2)`. The file
+# below has the three shapes that broke. With FILES, only the named file is touched.
 
 cmake_minimum_required(VERSION 3.29)
 
 file(REMOVE_RECURSE "${WORK}")
-file(MAKE_DIRECTORY "${WORK}/src" "${WORK}/build")
+file(MAKE_DIRECTORY "${WORK}/src")
 
-# No standard headers: the compile command below is the only setup clang-tidy gets.
-file(WRITE "${WORK}/src/table.hpp"
-    "#pragma once\n"
-    "struct Entry { int key; int value; };\n"
-    "inline constexpr Entry first_entries[] = {{.key = 1, .value = 10}, {.key = 2, .value = 20}, {.key = 3, .value = 30}};\n")
 file(WRITE "${WORK}/src/table.cpp"
-    "#include \"table.hpp\"\n"
+    "struct Options { int width{}; };\n"
+    "int f(int a, Options options, int b) { return a + options.width + b; }\n"
+    "int g(const Options& shown = {}, int more = 0) { return shown.width + more; }\n"
     "int lookup(int index) {\n"
-    "    const int weights[] = {\n"
-    "        100,\n"
-    "        200\n"
-    "    };\n"
-    "    const int small[] = {1, 2,};\n"
-    "    return weights[index] + small[index] + first_entries[index].value;\n"
+    "    const Options two[] = {Options{}, Options{.width = 1}};\n"
+    "        return f(1, Options{}, 2)+g()+two[index].width;\n"
     "}\n")
-file(WRITE "${WORK}/build/compile_commands.json"
-    "[{\"directory\": \"${WORK}/build\",\n"
-    "  \"command\": \"clang++ -std=c++23 -c ${WORK}/src/table.cpp\",\n"
-    "  \"file\": \"${WORK}/src/table.cpp\"}]\n")
+file(WRITE "${WORK}/src/other.cpp" "int   untouched( )   { return 0; }\n")
 set(config "${WORK}/config.cmake")
 file(WRITE "${config}"
     "set(SOURCE_DIR [==[${WORK}/src]==])\n"
     "set(POLICY_ROOT [==[${POLICY_ROOT}]==])\n"
     "set(EXCLUDED_DIRS [==[]==])\n"
-    "set(CLANG_FORMAT [==[${CLANG_FORMAT}]==])\n"
-    "set(CLANG_TIDY [==[${CLANG_TIDY}]==])\n"
-    "set(BUILD_DIR [==[${WORK}/build]==])\n")
+    "set(CLANG_FORMAT [==[${CLANG_FORMAT}]==])\n")
 
 set(format "${POLICY_ROOT}/cmake/scripts/format.cmake")
-execute_process(COMMAND "${CMAKE_COMMAND}" -DCONFIG=${config} -DMODE=fix -P "${format}"
+file(READ "${WORK}/src/other.cpp" other_before)
+execute_process(COMMAND "${CMAKE_COMMAND}" -DCONFIG=${config} -DMODE=fix -DFILES=table.cpp
+        -P "${format}"
     RESULT_VARIABLE code OUTPUT_VARIABLE out ERROR_VARIABLE err)
 if(NOT code EQUAL 0)
     message(FATAL_ERROR "format_fix: the fix failed\n${out}${err}")
 endif()
+file(READ "${WORK}/src/other.cpp" other_after)
+if(NOT other_after STREQUAL other_before)
+    message(FATAL_ERROR "format_fix: with FILES=table.cpp, other.cpp was changed too")
+endif()
 
-execute_process(COMMAND "${CMAKE_COMMAND}" -DCONFIG=${config} -DMODE=check -P "${format}"
+execute_process(COMMAND "${CMAKE_COMMAND}" -DCONFIG=${config} -DMODE=check -DFILES=table.cpp
+        -P "${format}"
     RESULT_VARIABLE code OUTPUT_VARIABLE out ERROR_VARIABLE err)
 if(NOT code EQUAL 0)
     message(FATAL_ERROR "format_fix: badly formatted after the fix\n${out}${err}")
 endif()
+execute_process(COMMAND "${CMAKE_COMMAND}" -DCONFIG=${config} -DMODE=check -P "${format}"
+    RESULT_VARIABLE code OUTPUT_QUIET ERROR_QUIET)
+if(code EQUAL 0)
+    message(FATAL_ERROR "format_fix: the check of every file must still report other.cpp")
+endif()
 
-execute_process(
-    COMMAND "${CLANG_TIDY}" "--config-file=${POLICY_ROOT}/.clang-tidy"
-            "--checks=-*,readability-trailing-comma" --quiet -p "${WORK}/build" "${WORK}/src/table.cpp"
+execute_process(COMMAND "${CXX}" -std=c++23 -fsyntax-only "${WORK}/src/table.cpp"
     RESULT_VARIABLE code OUTPUT_VARIABLE out ERROR_VARIABLE err)
 if(NOT code EQUAL 0)
-    file(READ "${WORK}/src/table.hpp" header)
     file(READ "${WORK}/src/table.cpp" source)
-    message(FATAL_ERROR "format_fix: trailing commas still wrong after one fix\n${out}${err}\n"
-                        "--- table.hpp ---\n${header}--- table.cpp ---\n${source}")
+    message(FATAL_ERROR "format_fix: the code doesn't compile after the fix\n${out}${err}\n"
+                        "--- table.cpp ---\n${source}")
 endif()
 message("format_fix: OK")

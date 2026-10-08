@@ -97,6 +97,61 @@ run(sh tools/hooks/tidy-files src/app/added.cpp)
 expect("code;EQUAL;0" "a source added after configuring must be checked")
 expect_output("tidy-files: OK (1 files)" "the added source must be checked, not skipped")
 
+# A header is checked through a source that includes it, with that source's flags: this one
+# needs -I that only the build knows, and has a finding of its own.
+file(MAKE_DIRECTORY "${project}/include_root/shared" "${project}/src/app")
+file(WRITE "${project}/include_root/shared/limits.hpp"
+    "#pragma once\n\nnamespace shared {\n\ninline constexpr int limit = 4;\n\n} // namespace shared\n")
+file(WRITE "${project}/src/app/panel.hpp"
+    "#pragma once\n\n#include \"shared/limits.hpp\"\n\nnamespace widgets {\n\n"
+    "inline int clamp(double value) {\n    return (int)value + shared::limit;\n}\n\n"
+    "[[nodiscard]] int panel();\n\n} // namespace widgets\n")
+file(WRITE "${project}/src/app/panel.cpp"
+    "#include \"app/panel.hpp\"\n\nnamespace widgets {\n\nint panel() {\n"
+    "    return clamp(1.0);\n}\n\n} // namespace widgets\n")
+file(APPEND "${project}/CMakeLists.txt"
+    "add_library(panels OBJECT src/app/panel.cpp)\n"
+    "target_include_directories(panels PRIVATE src include_root)\n"
+    "cpp_policy_apply(panels)\n")
+# The new source makes tidy-files configure again; it shows the header's finding too.
+run(sh tools/hooks/tidy-files src/app/panel.cpp)
+expect_output("C-style casts" "the source must be found after configuring again")
+run(sh tools/hooks/tidy-files src/app/panel.hpp)
+expect("NOT;code;EQUAL;0" "the header's finding must fail tidy-files")
+expect_output("C-style casts" "the header's own finding must be shown")
+string(FIND "${out}" "file not found" missing)
+expect("missing;EQUAL;-1" "the header must be checked with the including source's flags")
+file(WRITE "${project}/src/app/panel.hpp"
+    "#pragma once\n\n#include \"shared/limits.hpp\"\n\nnamespace widgets {\n\n"
+    "inline int clamp(int value) {\n    return value + shared::limit;\n}\n\n"
+    "[[nodiscard]] int panel();\n\n} // namespace widgets\n")
+file(WRITE "${project}/src/app/panel.cpp"
+    "#include \"app/panel.hpp\"\n\nnamespace widgets {\n\nint panel() {\n"
+    "    return clamp(1);\n}\n\n} // namespace widgets\n")
+run(sh tools/hooks/tidy-files src/app/panel.hpp)
+expect("code;EQUAL;0" "the corrected header must pass")
+expect_output("tidy-files: OK (1 files)" "the corrected header must be checked")
+
+# The format and the audit's rules about one file are reported too, before the gate would.
+file(WRITE "${project}/src/app/untidy.cpp"
+    "#include \"app/panel.hpp\"\n\nnamespace widgets {\n\nint   untidy( )   {\n"
+    "    try {\n        return clamp(2);\n    } catch (...) {\n        return 0;\n    }\n}\n\n} // namespace widgets\n")
+file(APPEND "${project}/CMakeLists.txt" "target_sources(panels PRIVATE src/app/untidy.cpp)\n")
+run(sh tools/hooks/tidy-files src/app/untidy.cpp)
+expect("NOT;code;EQUAL;0" "a badly formatted file must fail tidy-files")
+expect_output("the format" "the format fault must be reported")
+expect_output("boundary" "the audit's rule about catch (...) must be reported")
+run(sh tools/hooks/tidy-files --format src/app/untidy.cpp)
+expect("code;EQUAL;0" "tidy-files --format must format the file")
+run(sh tools/hooks/tidy-files src/app/untidy.cpp)
+string(FIND "${out}" "the format" still)
+expect("still;EQUAL;-1" "after --format only the audit's rule must be left")
+expect_output("boundary" "the audit's rule must still be reported")
+file(REMOVE "${project}/src/app/untidy.cpp")
+file(READ "${project}/CMakeLists.txt" lists)
+string(REPLACE "target_sources(panels PRIVATE src/app/untidy.cpp)\n" "" lists "${lists}")
+file(WRITE "${project}/CMakeLists.txt" "${lists}")
+
 # pre-commit: the staged header with findings fails the commit's checks; unstaged, they pass.
 run(${git} add CMakeLists.txt .clang-tidy .clang-format CMakePresets.json .gitignore
     .gitattributes tools src/app/good.hpp src/app/good.cpp src/app/bad.hpp)

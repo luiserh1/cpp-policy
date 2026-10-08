@@ -3,6 +3,106 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.28.0 (2026-10-08)
+
+From Alfar's report: a project built in four days by unattended agents on
+v0.26.5, with measurements of what the policy cost. This release fixes the
+defects it found and makes the quick check say what the gate will. One
+change can make a passing project fail (sanitizer options in a test's
+environment), so it is a minor release.
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** only for a project that sets a sanitizer's
+options in a test's environment (Alfar does): see step 2.
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.28.0`. It copies
+   the new `.clang-tidy`, `CMakePresets.json` and hooks.
+2. `ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0"` on a test program is now
+   refused. Replace it with `NO_LEAK_CHECK "<reason>"` (POLICY.md 5).
+3. Optional: `cpp_policy_test_support(<target>)` for a library of test
+   helpers; `imgui*` in `cpp_policy_confine_includes()` in place of a list
+   of header names.
+4. Optional, for the owner: replace the layer table in `AGENTS.md` with the
+   template's "Layers" section, which points to `cpp_policy_layers()`.
+5. Code written round the old rules still passes: named values in place of
+   `Type{}`, test files split at 350 lines.
+
+### Fixed
+
+- **`policy-format-fix` broke code.** It let clang-tidy apply
+  `readability-trailing-comma`'s fixes, and that check takes the comma after
+  an empty braced value for a trailing one: `f(1, Options{}, 2)` became
+  `f(1, Options{} 2)`, and the same in a default argument and in an array.
+  Alfar lost at least a dozen builds to it. 0.26.3 recorded the defect (W4)
+  too narrowly, as `.member = {}` only, and left the fixer applying the fix.
+  The check is now off and the fixer only formats (see "Changed").
+- **The pre-commit check refused code the gate accepted.**
+  - A header was checked on its own with the flags of a "similar" source,
+    which could lack an include path. It is now checked through a source of
+    the build that includes it, with that source's flags and checks, and
+    only the header's findings shown.
+  - A library of test helpers was test code for the hook and program code
+    for the build. `cpp_policy_test_support(<target>)` declares it, for
+    both.
+- **In a git worktree, the audit's CI pin check failed inside pre-commit.**
+  Git exports `GIT_DIR` to hooks, and the policy's own commit was then read
+  from the project's repository.
+- **LeakSanitizer could be switched off unseen,** through a test's
+  `ENVIRONMENT`. Sanitizer options there are now rejected at configuration
+  (bypass fixtures `test_sanitizer_options`, `test_plain_sanitizer_options`).
+
+### Changed
+
+- **`readability-trailing-comma` is off until LLVM fixes it** (W4; the probe
+  now uses the call-argument shape). `policy-format-fix` is clang-format
+  only: seconds where it took 6 minutes at Alfar's 640 files. The owner
+  chose this over keeping the check without its fixer (2026-10-08).
+- **`tidy-files` reports what the gate will say about the files named,
+  without the tests:** the format, the audit's rules about one file (length,
+  suppressions, `// boundary:`, test-case names) and clang-tidy.
+  `tidy-files --format <file>...` formats them. *Why:* in Alfar 8 of 38 gate
+  runs were lost to faults that have nothing to do with behaviour and were
+  reported only at the end of a build of several minutes.
+- **The gate runs the audit and the format check before compiling**
+  (`check-first`, a step of the `check` workflow). Nothing is removed.
+- **Test sources, under `tests/`, may have 500 lines** (POLICY.md 11.3);
+  product code keeps 350. `tidy-files` says so from 50 lines before either
+  limit. The owner chose it: about a third of Alfar's forced splits were
+  test files.
+- **Test-case names are read from the source text** by the audit and
+  `tidy-files`, with the allowed characters in the message. They were found
+  only when the test program registered its tests, after compiling and
+  linking: 11 times in Alfar, each a rebuild.
+- **`AGENTS.md` has no layer table** (template; POLICY.md 11.1). It points to
+  `cpp_policy_layers()`, which the audit enforces, and to `README.md`, which
+  agents may edit. In Alfar the table was wrong for 59 hours, and an agent
+  avoided creating a module because it needed a line there. The owner chose
+  it.
+
+### Added
+
+- **`NO_LEAK_CHECK "<reason>"` in `cpp_policy_add_tests()`** (POLICY.md 5),
+  for a test program that opens a window: LeakSanitizer reports what the
+  operating system keeps for the life of the process. Every configure
+  prints that it is off, and why; it is refused for unit tests. *Why:* this
+  was the one rule Alfar could not meet. Entries in `lsan.supp` by library
+  would also hide a project's own leak under a callback, so the honest
+  option is a switch that shows.
+- **A prefix in `cpp_policy_confine_includes()`** (`imgui*`), for a library
+  whose headers are in no folder of their own.
+- POLICY.md 2.8: a condition variable needs `std::unique_lock`. 2.10: flag
+  enumerations of a C library under `bugprone-signed-bitwise`.
+
+### Not in this release
+
+The rest of Alfar's report needs measurements or the owner's decisions, and
+comes next: the cost of the tests under the sanitizers (one process per
+test case, run one at a time), a launcher for the gate that keeps the
+machine awake and takes a lock, budgets in unattended runs, sharing code
+between projects, and MPL-2.0, which the owner left open until a project
+needs it.
+
 ## 0.27.0 (2026-10-07)
 
 A trial: instruction counts of the benchmark tests, recorded in CI

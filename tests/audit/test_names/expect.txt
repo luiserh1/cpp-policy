@@ -1,0 +1,1 @@
+tests/unit/names.cpp:5: error: test case "a comma, which the filter splits on": use only letters.*tests/unit/names.cpp:7: error: test case "a star \* in a fixture.s test".*tests/unit/names.cpp:9: error: test case " a space at the start".*cpp-policy audit: 3 violation

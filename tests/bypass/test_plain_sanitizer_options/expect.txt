@@ -1,0 +1,1 @@
+test .integration/app/starts. sets LSAN_OPTIONS=detect_leaks=0

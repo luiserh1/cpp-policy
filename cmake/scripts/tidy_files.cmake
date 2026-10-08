@@ -1,5 +1,7 @@
-# clang-tidy on chosen files, with the policy's configuration (POLICY.md 8): the quick check
-# after an edit, and pre-commit's check of the staged files. tools/hooks/tidy-files runs it.
+# What the gate will say about chosen files, without the tests (POLICY.md 8): the format
+# check, the audit's rules about one file (length, suppressions, `// boundary:`, test-case
+# names) and clang-tidy with the policy's configuration. The quick check after an edit, and
+# pre-commit's check of the staged files. tools/hooks/tidy-files runs it.
 #
 #   cmake -DCONFIG=<build>/cpp_policy_config.cmake "-DFILES=a.cpp;b.hpp" -P tidy_files.cmake
 #
@@ -9,9 +11,11 @@
 # A source file this build doesn't compile is first looked for again after configuring once
 # more (a file added since the last configure). If it still isn't compiled (another platform's)
 # it is skipped with a note and counted in the summary: it can't be parsed here, and CI checks
-# it on its own system. Headers are checked on their own,
-# with the compile flags of a similar source file (clang-tidy infers them). Exits with an error
-# if any file has findings; the findings are printed as the build prints them.
+# it on its own system. A header is checked through a source of this build that includes it,
+# with that source's own compile flags and only the header's findings shown: that is how the
+# build sees it. A header no source includes directly is checked on its own, with the flags
+# of a similar source file (clang-tidy infers them). Exits with an error if any file has
+# findings; the findings are printed as the build prints them.
 
 cmake_minimum_required(VERSION 3.29)
 include("${CMAKE_CURRENT_LIST_DIR}/source_files.cmake")
@@ -85,9 +89,67 @@ foreach(glob IN LISTS CPP_POLICY_SOURCE_GLOBS)
     list(APPEND extensions "${extension}")
 endforeach()
 
+# A source of this build that includes the header directly: the include's text must be the
+# end of the header's path, so that another module's header of the same name doesn't count.
+function(including_source header out)
+    set(${out} "" PARENT_SCOPE)
+    cmake_path(GET header FILENAME name)
+    string(REGEX REPLACE "([][+.*()^$?|\\\\])" "\\\\\\1" name_regex "${name}")
+    foreach(source IN LISTS compiled)
+        if(NOT EXISTS "${source}")
+            continue()
+        endif()
+        file(STRINGS "${source}" includes REGEX "^[ \t]*#[ \t]*include[ \t]*\"([^\"]*/)?${name_regex}\"")
+        foreach(line IN LISTS includes)
+            if(line MATCHES "\"([^\"]+)\"")
+                set(included "${CMAKE_MATCH_1}")
+                string(REGEX REPLACE "^(\\.\\./|\\./)+" "" included "${included}")
+                string(LENGTH "${header}" header_length)
+                string(LENGTH "/${included}" included_length)
+                if(header_length GREATER included_length)
+                    math(EXPR start "${header_length} - ${included_length}")
+                    string(SUBSTRING "${header}" ${start} -1 tail)
+                    if(tail STREQUAL "/${included}")
+                        set(${out} "${source}" PARENT_SCOPE)
+                        return()
+                    endif()
+                endif()
+            endif()
+        endforeach()
+    endforeach()
+endfunction()
+
 set(checked 0)
 set(skipped 0)
 set(failed "")
+set(other_failures "")
+
+# The checks that need no compiler first: they take a second, and the build would report
+# them only at its end.
+execute_process(
+    COMMAND "${CMAKE_COMMAND}" "-DCONFIG=${CONFIG}" "-DFILES=${FILES}" -DMODE=check
+            -P "${CMAKE_CURRENT_LIST_DIR}/format.cmake"
+    WORKING_DIRECTORY "${SOURCE_DIR}"
+    RESULT_VARIABLE result OUTPUT_QUIET ERROR_VARIABLE format_output)
+if(NOT result EQUAL 0)
+    message("${format_output}")
+    list(APPEND other_failures
+        "the format (fix it with: sh tools/hooks/tidy-files --format <file>...)")
+endif()
+execute_process(
+    COMMAND "${CMAKE_COMMAND}" "-DCONFIG=${CONFIG}" "-DFILES=${FILES}"
+            -P "${CMAKE_CURRENT_LIST_DIR}/audit_suppressions.cmake"
+    WORKING_DIRECTORY "${SOURCE_DIR}"
+    RESULT_VARIABLE result OUTPUT_QUIET ERROR_VARIABLE audit_output)
+# The audit prints its notes (a file near its length limit) there too.
+string(REGEX REPLACE "(^|\n)cpp-policy audit: OK[^\n]*\n?" "\\1" audit_output "${audit_output}")
+if(NOT audit_output STREQUAL "")
+    message("${audit_output}")
+endif()
+if(NOT result EQUAL 0)
+    list(APPEND other_failures "the audit's rules")
+endif()
+
 foreach(file IN LISTS FILES)
     file(REAL_PATH "${file}" path BASE_DIRECTORY "${SOURCE_DIR}")
     cmake_path(GET path EXTENSION LAST_ONLY extension)
@@ -140,9 +202,23 @@ foreach(file IN LISTS FILES)
             endif()
         endforeach()
     endif()
+    set(target "${path}")
+    set(only "")
+    if(NOT extension MATCHES "^\\.(cpp|cc|cxx)$")
+        including_source("${path}" through)
+        if(through)
+            # As the build sees the header: in that source, with its flags and its checks.
+            set(target "${through}")
+            set(only "--line-filter=[{\"name\":\"${path}\"}]")
+            set(test_option "")
+            if(through IN_LIST test_sources)
+                set(test_option ${TEST_TIDY_CHECKS})
+            endif()
+        endif()
+    endif()
     execute_process(
-        COMMAND "${CLANG_TIDY}" "--config-file=${POLICY_ROOT}/.clang-tidy" ${test_option} --quiet
-                -p "${BUILD_DIR}" "${path}"
+        COMMAND "${CLANG_TIDY}" "--config-file=${POLICY_ROOT}/.clang-tidy" ${test_option} ${only}
+                --quiet -p "${BUILD_DIR}" "${target}"
         WORKING_DIRECTORY "${SOURCE_DIR}"
         RESULT_VARIABLE result)
     math(EXPR checked "${checked} + 1")
@@ -151,9 +227,16 @@ foreach(file IN LISTS FILES)
     endif()
 endforeach()
 
-if(failed)
-    list(JOIN failed "\n  " failed_list)
-    message(FATAL_ERROR "tidy-files: clang-tidy findings in:\n  ${failed_list}")
+if(failed OR other_failures)
+    set(summary "")
+    if(failed)
+        list(JOIN failed "\n  " failed_list)
+        string(APPEND summary "\nclang-tidy findings in:\n  ${failed_list}")
+    endif()
+    foreach(failure IN LISTS other_failures)
+        string(APPEND summary "\n${failure}: see above")
+    endforeach()
+    message(FATAL_ERROR "tidy-files: FAILED${summary}")
 endif()
 if(skipped GREATER 0)
     message("tidy-files: OK (${checked} files; ${skipped} NOT CHECKED, listed above)")

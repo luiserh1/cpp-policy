@@ -1,15 +1,24 @@
 #!/bin/sh
-# cpp-policy tidy-files: clang-tidy on the given files, with the policy's configuration
-# (POLICY.md 8). Run it from the project's root after editing C++ files, whoever edits them:
+# cpp-policy tidy-files: what the gate will say about the given files, without the tests:
+# the format, the audit's rules about one file (length, suppressions, test-case names) and
+# clang-tidy, with the policy's configuration (POLICY.md 8). Run it from the project's root
+# after editing C++ files, whoever edits them:
 #
 #   sh tools/hooks/tidy-files src/server/local_server.cpp src/server/local_server.hpp
+#   sh tools/hooks/tidy-files --format src/server/local_server.cpp     # formats them instead
 #
 # A few seconds per file, instead of the whole gate. pre-commit runs it on the staged files.
 # Copy unchanged into the project's tools/hooks/ (git runs only files named after its hooks).
 set -e
 
+# --format: format the given files instead of checking them.
+format=no
+if [ "${1:-}" = --format ]; then
+    format=yes
+    shift
+fi
 if [ $# -eq 0 ]; then
-    echo "usage: sh tools/hooks/tidy-files <file>..." >&2
+    echo "usage: sh tools/hooks/tidy-files [--format] <file>..." >&2
     exit 2
 fi
 
@@ -28,4 +37,7 @@ policy=$(sed -n 's/^set(POLICY_ROOT \[==\[\(.*\)\]==\])$/\1/p' "$config")
 
 # CMake lists are separated by ";".
 files=$(printf '%s;' "$@")
+if [ "$format" = yes ]; then
+    exec cmake "-DCONFIG=$config" "-DFILES=${files%;}" -DMODE=fix -P "$policy/cmake/scripts/format.cmake"
+fi
 cmake "-DCONFIG=$config" "-DFILES=${files%;}" -P "$policy/cmake/scripts/tidy_files.cmake"

@@ -107,11 +107,11 @@ foreach(fixture IN LISTS format_fixtures)
                 "--style=file:${CPP_POLICY_ROOT}/.clang-format" "${fixture}")
 endforeach()
 
-# --- policy-format-fix: one run must leave formatting and trailing commas both right
-add_test(NAME format/fix_trailing_commas
+# --- policy-format-fix: it formats, and the code still compiles (Waiting W4)
+add_test(NAME format/fix
     COMMAND "${CMAKE_COMMAND}" "-DPOLICY_ROOT=${CPP_POLICY_ROOT}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/format_fix"
-            "-DCLANG_FORMAT=${CPP_POLICY_CLANG_FORMAT_EXE}" "-DCLANG_TIDY=${CPP_POLICY_CLANG_TIDY_EXE}"
+            "-DCLANG_FORMAT=${CPP_POLICY_CLANG_FORMAT_EXE}" "-DCXX=${CMAKE_CXX_COMPILER}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/format_fix/run.cmake")
 
 # --- Check build presets: a failing file mustn't stop the build (one run reports everything)

@@ -31,18 +31,17 @@ https://github.com/luiserh1/cpp-policy/blob/main/POLICY.md).
 
 ## Layers
 
-`src/` is split into layers. A file may include headers from its own layer or
-a lower one, never a higher one, and always from the `src/` root
-(`#include "app/greeting.hpp"`):
+`src/` is split into modules, one folder each, grouped into layers. A file
+may include headers from its own layer or a lower one, never a higher one,
+and always from the `src/` root (`#include "<module>/<header>.hpp"`).
 
-| Layer | Modules | Contents |
-|---|---|---|
-| 3 (top) | `main.cpp` | Program boundary: wires everything together |
-| 2 | `app/` | The program's logic |
-| 1 (bottom) | `lowlevel/` | Confined OS code; includes no other project module |
-
-A new module goes in `cpp_policy_layers()` in `CMakeLists.txt` and in this
-table; the owner edits this file.
+- **The layers are declared in `cpp_policy_layers()` in `CMakeLists.txt`**,
+  from the lowest up. That call is what the audit enforces, so it is always
+  right; read it there.
+- `README.md` says what each module is for. Keep it up to date in the commit
+  that adds or changes a module.
+- A new module: add it to `cpp_policy_layers()` and to `README.md`. Neither
+  needs the owner.
 
 ## Planned work
 
@@ -84,8 +83,10 @@ does the same for the staged files):
 sh tools/hooks/tidy-files <file>...
 ```
 
-It says "NOT CHECKED" for a file this build doesn't compile: for a new file,
-add it to `CMakeLists.txt` first.
+It reports what the gate will say about those files, without the tests: the
+format, the file's length, suppressions and `// boundary:` comments,
+test-case names, and clang-tidy. It says "NOT CHECKED" for a file this build
+doesn't compile: for a new file, add it to `CMakeLists.txt` first.
 
 Run the full gate and make sure it passes:
 
@@ -94,7 +95,11 @@ cmake --workflow --preset check        # macOS / Linux
 cmake --workflow --preset win-check    # Windows
 ```
 
-Formatting problems: `cmake --build --preset check --target policy-format-fix`.
+Formatting problems: `sh tools/hooks/tidy-files --format <file>...` (or every
+file: `cmake --build --preset check --target policy-format-fix`).
+
+To check a commit message before the hooks run:
+`sh tools/hooks/commit-msg <file with the message>`.
 
 ## Never
 

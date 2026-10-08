@@ -292,6 +292,8 @@ Rules:
 - Don't call code you don't control (callbacks, another object's virtual
   functions) while holding a lock; that is how deadlocks start. When two locks
   are needed, take them together with one `std::scoped_lock`.
+- A condition variable needs `std::unique_lock`: it unlocks while waiting,
+  which `std::scoped_lock` can't. That is the one place for it.
 - **Every thread function catches all exceptions at its top.** An exception
   that escapes a thread ends the program through `std::terminate`; `main`'s
   handlers never see it. Store it (`std::exception_ptr`) and rethrow it where
@@ -314,9 +316,9 @@ only `NOLINT` comments (which clang-format doesn't wrap, section 5) and text
 embedded in the code go past 100. 80 would rewrap about one line in nine;
 120 is too wide for side-by-side diffs and phone screens.
 
-`cmake --build --preset check --target policy-format-fix` formats every
-source and fixes trailing commas (section 2.10), which clang-tidy ties to the
-layout.
+`sh tools/hooks/tidy-files --format <file>...` formats the files named, and
+`cmake --build --preset check --target policy-format-fix` every source. Both
+only format: neither changes what the code says.
 
 ### 2.10 Idioms clang-tidy leads to
 
@@ -341,9 +343,6 @@ Check each C++ file right after editing it with `sh tools/hooks/tidy-files
     `-Wmissing-designated-field-initializers` off for this (7.1). What that
     gives up: when a field is added later, the places that build the struct
     without naming it aren't reported.
-  - **Don't write `.member = {}` for a nested struct;** leave the field out.
-    clang-tidy reports the comma after it by mistake (Waiting W4, section
-    12), and `policy-format-fix` then never settles.
 - **Members that refer to another object**
   (`cppcoreguidelines-avoid-const-or-ref-data-members`). Reference members
   are rejected: they break assignment. The constructor takes a reference and
@@ -361,13 +360,15 @@ Check each C++ file right after editing it with `sh tools/hooks/tidy-files
   const char* const end = std::to_address(text.end());
   const auto [last, error] = std::from_chars(std::to_address(text.begin()), end, value);
   ```
-- **Trailing commas** (`readability-trailing-comma`). A braced list on
-  several lines ends with a comma; one on a single line doesn't. clang-format
-  decides which lists span several lines, and a trailing comma keeps a list
-  one element per line, so the commas depend on the formatting.
-  `policy-format-fix` settles both in one run: it formats, lets clang-tidy fix
-  the commas in the files this build compiles, and formats again. An array of
-  structs is written `{ T{...}, T{...}, }` rather than with double braces.
+- **Trailing commas aren't checked** (Waiting W4, section 12).
+  `readability-trailing-comma` is off: it takes the comma after an empty
+  braced value (`f(a, Options{}, b)`) for a trailing one, and its fix removes
+  it. clang-format still decides the layout, and a trailing comma still
+  keeps a list one element per line; write one where that reads better.
+- **Flag enumerations of a C library** (`bugprone-signed-bitwise`).
+  `FlagA | FlagB` on a plain C `enum` is refused, because its type is
+  signed. The cast to unsigned belongs with the library, in the confined
+  module that wraps it (section 4): one helper there, not a cast at each use.
 - **Smaller ones:** `enum class E : std::uint8_t` for small enums
   (`performance-enum-size`); parentheses around a product added to something
   (`(y * width) + x`, `readability-math-missing-parentheses`); `reserve()`
@@ -471,6 +472,22 @@ Rules, enforced by the suppression audit (the `policy-audit` target,
    system or the sanitizer runtime, never project or library code, and says
    how it was shown to be false; the self-test reproduces it. Projects can't
    add their own.
+6. **A test doesn't set a sanitizer's options.** `ASAN_OPTIONS`,
+   `LSAN_OPTIONS` and the like in a test's environment are rejected at
+   configuration: `detect_leaks=0` there switched a check off where nothing
+   showed it.
+   - The one case with a way through: a test program that opens a window.
+     On macOS, LeakSanitizer then reports what AppKit and CoreFoundation
+     keep for the life of the process (Alfar: 949 reports, 3.5 MB, none from
+     the project, GLFW or Dear ImGui). Suppressing those by library would
+     also hide a leak of the project's own under a callback, so they aren't
+     in `lsan.supp`.
+   - Such a program is declared with
+     `cpp_policy_add_tests(integration <module> … NO_LEAK_CHECK "<reason>")`.
+     Every configure prints that LeakSanitizer is off for it, and why. Not
+     for unit tests. AddressSanitizer and UndefinedBehaviorSanitizer stay
+     on. What is lost: a leak in the code those tests run, so keep them to
+     what needs the window.
 
 **Third-party code.** clang-tidy ignores headers under `/_deps/`,
 `/vcpkg_installed/`, `/third_party/` and `/external/`, except for one kind of
@@ -640,7 +657,7 @@ function table, plus lld-link's ASLR and no-execute defaults
 | Layer | When | What |
 |---|---|---|
 | Editor (clangd) | While typing | clang-tidy diagnostics, formatting |
-| `tools/hooks/tidy-files` | After editing C++ files, run by whoever edited them (agent or person) | clang-tidy on those files, a few seconds each |
+| `tools/hooks/tidy-files` | After editing C++ files, run by whoever edited them (agent or person) | What the gate will say about those files, without the tests: the format, the audit's rules about one file (length, suppressions, `// boundary:`, test-case names) and clang-tidy, a few seconds each. A header is checked through a source that includes it, with that source's flags |
 | Git pre-commit | On commit | Suppression audit, format check, and clang-tidy on the staged C++ files (`tidy-files`); warns when files have unstaged changes, since it checks the working folder |
 | Git commit-msg | On commit | The message follows section 8.2 |
 | Git pre-push | On push | The full gate (below); refuses to run with uncommitted changes, so it tests exactly what is pushed |
@@ -664,8 +681,9 @@ system of its own may call `tidy-files` from it after each edit, but the
 policy relies on nothing agent-specific.
 
 The gate is `cmake --workflow --preset check` (`win-check` on Windows):
-configure, build with clang-tidy, audit, format check, and tests under
-sanitizers. It is the only definition of "passes the policy". Every other
+configure, the audit and the format check (first: they take seconds, and a
+fault in them shouldn't wait for the compiler), build with clang-tidy, and
+tests under sanitizers. It is the only definition of "passes the policy". Every other
 layer is a faster subset of it.
 
 A passing gate proves the policy on the system that ran it, with that
@@ -882,7 +900,10 @@ project"), which lays it out this way from the first commit.
 - Source code is split into modules, one directory each under `src/`
   (for example `src/message/`, `src/server/`).
 - Each project groups its modules into **layers** and documents them in its
-  `README.md` (and `AGENTS.md`), from lowest to highest.
+  `README.md`, from lowest to highest. `AGENTS.md` points to
+  `cpp_policy_layers()` and to the README; it has no table of its own,
+  because only the owner edits that file and a table there goes stale
+  (in Alfar it was wrong for 59 hours).
 - Dependencies point **one way only**: a module may include headers from its
   own layer's modules or from lower layers, never from higher ones.
 - `src/lowlevel/` (section 4) is always the lowest layer: it may not include
@@ -928,9 +949,17 @@ declared. Files directly in `src/` (`main.cpp`) are the top.
 |---|---|---|
 | Target | ≤ 250 | Normal size |
 | Review | > 350 | Split by responsibility before adding more |
+| Review, test sources (under `tests/`) | > 500 | The same |
 
 - When a new feature would push a file past the target, split the file by
   responsibility first, then add the feature.
+- A test source may be longer because it is mostly tables of cases and
+  expected text; its length doesn't mean mixed responsibilities. In Alfar
+  about a third of the splits the limit forced were of test files, and four
+  full builds stopped on tests alone. The limits on functions are the same
+  everywhere.
+- `tidy-files` reports a file's length after an edit, and says so from 50
+  lines before the limit, so the split comes before the next feature.
 - Functions are limited separately by clang-tidy: at most 80 lines, 6
   parameters and 4 levels of nesting (`readability-function-size`), and a
   cognitive complexity of 25 (`readability-function-cognitive-complexity`).
@@ -1052,7 +1081,9 @@ that module.
   cpp_policy_confine_includes(nlohmann/ zlib.h TO backend SOURCES_ONLY)
   ```
 
-  A name ending in `/` stands for every header under it.
+  A name ending in `/` stands for every header under it, and one ending in
+  `*` for every header whose name starts so: `imgui*` covers a library whose
+  headers are in no folder of their own, and those a later version adds.
 - **`SOURCES_ONLY`** allows the include only in those modules' source files,
   not in their headers. A header that includes the library passes it on to
   every file that includes that header, in any module. With `SOURCES_ONLY`
@@ -1088,7 +1119,7 @@ day the feature appears, or a tool's defect is fixed (`tests/probes/`).
 | W2 | Time zones in libc++ on macOS (`std::chrono::zoned_time`, `current_zone`) | Local time through `localtime_r` / `localtime_s`, in a confined file | libc++ ships its time zone database on macOS. (libstdc++ already has it: verified with GCC 16 on Linux.) | Probe `waiting/w2_zoned_time` (macOS) |
 | W3 | Parallel algorithms (`std::execution::par`) in libc++ without `-fexperimental-library` | Not used; parallel computation isn't covered by the policy yet | libc++ makes them stable. (libstdc++ has them with GCC 16 on Linux, but only by linking TBB, a compiled dependency that section 1.1 would have to admit.) | Probe `waiting/w3_parallel_algorithms` (macOS) |
 
-| W4 | `readability-trailing-comma` without false reports | Leave a nested struct's field out of a designated initializer; never write `.member = {}` (section 2.10) | clang-tidy stops reporting the comma after an empty braced aggregate whose members have default member initializers. Seen in LLVM 23.1.1; its fix removes a comma the syntax needs when the element isn't last | Probe `waiting/w4_trailing_comma` (every system) |
+| W4 | `readability-trailing-comma`, and `policy-format-fix` settling the commas with it | The check is off (`.clang-tidy`), and the fixer only formats (`format.cmake`) | clang-tidy stops reporting the comma after an empty braced value (`f(a, T{}, b)`, `= {}` as a default argument, `{T{}, T{}}`, `.member = {},`) whose type has default member initializers. Seen in LLVM 23.1.1 and 23.1.2; its fix removes a comma the syntax needs | Probe `waiting/w4_trailing_comma` (every system) |
 
 When an item resolves: remove its workarounds (search for `Waiting Wn`),
 delete its row and probe, and record the change in `CHANGELOG.md`.
@@ -1142,7 +1173,9 @@ cpp_policy_add_tests(integration server SOURCES test_server.cpp LIBRARIES sls_co
 - **Registration checks the tests after every build,** and the build fails
   on any of these:
   - a skipped test case;
-  - a name outside those characters, or two names that differ only in case;
+  - a name outside those characters, or two names that differ only in case
+    (the audit and `tidy-files` also read the names from the source text, so
+    a bad one is reported before the program is compiled);
   - a doctest suite other than `regression`;
   - a program with no tests.
 - **A test that isn't a doctest program** is added with `add_test()`, named
@@ -1222,9 +1255,14 @@ Projects add it to `vcpkg.json` like any dependency (section 1.1).
   can't see that `REQUIRE` stops the test, so it reported every dereference
   that followed one. A test that reads an empty optional without a `REQUIRE`
   still fails loudly, because library hardening stops the program (7.2). The
-  check stays on everywhere else. `tidy-files` treats as test code the test
-  programs' sources and every header under their top-level folder (`tests/`),
-  so shared test helpers live there, not under `src/`.
+  check stays on everywhere else.
+  - A library of test helpers is declared with
+    `cpp_policy_test_support(<target>)`, after `cpp_policy_apply()`: its
+    sources are then test code for the build and for `tidy-files` alike.
+  - `tidy-files` checks a test header through a source that includes it. One
+    that no source includes directly counts as test code when it is under
+    the tests' top-level folder (`tests/`), so shared helpers live there,
+    not under `src/`.
 - **A bug fix comes with a regression test** that fails without it (13.1).
 - **A port uses the original as its reference.** Its tests run the same
   inputs through the port and compare with what the original produced,

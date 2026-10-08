@@ -27,7 +27,8 @@ Checks: >
   -modernize-use-nodiscard,
   -modernize-use-trailing-return-type,
   -portability-avoid-pragma-once,
-  -readability-identifier-length
+  -readability-identifier-length,
+  -readability-trailing-comma
 
 # Rationale for the disabled checks:
 #   easily-swappable-parameters     flags most functions with two same-typed params
@@ -42,6 +43,9 @@ Checks: >
 #   use-trailing-return-type        style preference, not safety
 #   avoid-pragma-once               POLICY.md mandates #pragma once
 #   identifier-length               flags i, x, id...
+#   trailing-comma                  Waiting W4 (POLICY.md 12): it reports the comma after an
+#                                   empty braced value as a trailing one, and its fix removes
+#                                   a comma the syntax needs
 
 WarningsAsErrors: '*'
 HeaderFilterRegex: '.*'

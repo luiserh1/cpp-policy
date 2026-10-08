@@ -11,7 +11,10 @@
 #   - has no reason in a trailing comment: `#pragma ... ignored "-Wx" // reason`.
 # Fails if any `clang-format off` has no reason: `// clang-format off: reason`.
 # Fails if a header (.h .hpp .hh .hxx) lacks `#pragma once` or uses an include guard.
-# Fails if a file has more than 350 lines (POLICY.md 11.3).
+# Fails if a file has more than 350 lines, or 500 under tests/ (POLICY.md 11.3).
+# Fails if a test case under tests/ has a character in its name that doctest's filter or the
+# XML listing treats specially (POLICY.md 13.2).
+# With FILES, checks only those files, and only the rules about one file.
 # Fails if an #include in src/ points to a higher layer (LAYERS, from cpp_policy_layers()),
 # uses a relative path, or leaves a confined module; if src/ has two or more modules and
 # no layers; or if a module is in no layer (POLICY.md 11.1).
@@ -38,7 +41,27 @@ macro(report file line message)
 endmacro()
 
 cpp_policy_collect_sources("${SOURCE_DIR}" "${EXCLUDED_DIRS}" files)
+# A source file may have 350 lines; a test source, under tests/, 500: it is mostly tables of
+# cases and expected text, and its length doesn't mean mixed responsibilities (POLICY.md 11.3).
 set(max_file_lines 350)
+set(max_test_file_lines 500)
+
+# With FILES (a list of paths), only the rules about one file are checked, and only for
+# those of the project's sources: tidy-files uses it for the files just edited. The rules
+# about the project as a whole (layers declared, policy files, CI pins) are the build's.
+set(per_file FALSE)
+set(checked_files "${files}")
+if(DEFINED FILES)
+    set(per_file TRUE)
+    set(checked_files "")
+    foreach(file IN LISTS FILES)
+        file(REAL_PATH "${file}" path BASE_DIRECTORY "${SOURCE_DIR}")
+        file(RELATIVE_PATH relative "${SOURCE_DIR}" "${path}")
+        if(relative IN_LIST files)
+            list(APPEND checked_files "${relative}")
+        endif()
+    endforeach()
+endif()
 
 # Layers (POLICY.md 11.1). LAYERS lists the layers from the lowest up; each is a
 # comma-separated list of modules (directories under src/). layer_of_<module> is its number.
@@ -72,18 +95,18 @@ foreach(entry IN LISTS CONFINED_INCLUDES)
     list(GET parts 1 entry_modules)
     string(REPLACE "," ";" entry_modules "${entry_modules}")
     foreach(module IN LISTS entry_modules)
-        if(NOT module IN_LIST modules)
+        if(NOT module IN_LIST modules AND NOT per_file)
             report("src/${module}" 1
                 "cpp_policy_confine_includes() names module '${module}', which src/ doesn't have (POLICY.md 11.6)")
         endif()
     endforeach()
 endforeach()
-if(LAYERS STREQUAL "" AND module_count GREATER 1)
+if(LAYERS STREQUAL "" AND module_count GREATER 1 AND NOT per_file)
     string(REPLACE ";" ", " module_names "${modules}")
     report("CMakeLists.txt" 1
         "src/ has ${module_count} modules (${module_names}) but no layers; declare them from the lowest up with cpp_policy_layers() (POLICY.md 11.1)")
 endif()
-if(NOT LAYERS STREQUAL "")
+if(NOT LAYERS STREQUAL "" AND NOT per_file)
     foreach(module IN LISTS modules)
         if(NOT DEFINED layer_of_${module})
             report("src/${module}" 1 "module '${module}' is in no layer; add it to cpp_policy_layers() (POLICY.md 11.1)")
@@ -91,8 +114,12 @@ if(NOT LAYERS STREQUAL "")
     endforeach()
 endif()
 
-foreach(file IN LISTS files)
+foreach(file IN LISTS checked_files)
     cpp_policy_in_dirs("${file}" "${CONFINED_DIRS}" confined)
+    set(file_lines_limit ${max_file_lines})
+    if(file MATCHES "^tests/")
+        set(file_lines_limit ${max_test_file_lines})
+    endif()
     cpp_policy_read_lines("${SOURCE_DIR}/${file}" lines)
     set(number 0)
     set(has_pragma_once FALSE)
@@ -199,6 +226,14 @@ foreach(file IN LISTS files)
                     string(SUBSTRING "${included}" 0 ${header_length} start)
                     if(included STREQUAL header OR (header MATCHES "/$" AND start STREQUAL header))
                         set(matches TRUE)
+                    elseif(header MATCHES "^(.*)\\*$")
+                        # A prefix: every header whose name starts so.
+                        set(prefix "${CMAKE_MATCH_1}")
+                        string(LENGTH "${prefix}" prefix_length)
+                        string(SUBSTRING "${included}" 0 ${prefix_length} start)
+                        if(start STREQUAL prefix)
+                            set(matches TRUE)
+                        endif()
                     endif()
                 endforeach()
                 if(matches AND NOT own IN_LIST entry_module_list)
@@ -209,6 +244,20 @@ foreach(file IN LISTS files)
                         "includes <${included}> in a header; only source files of ${entry_modules} may include it (POLICY.md 11.6)")
                 endif()
             endforeach()
+        endif()
+
+        # A test case's name, read here so that a bad one is found before the test program
+        # is compiled and linked: the registration of the tests applies the same rule
+        # (doctest_tests.cmake, POLICY.md 13.2). A placeholder for ";" or "\\" has a "<",
+        # which the rule refuses like the character itself.
+        if(file MATCHES "^tests/"
+           AND line MATCHES "^[ \t]*(TEST_CASE|TEST_CASE_FIXTURE|TEST_CASE_TEMPLATE|SCENARIO)[ \t]*\\([^\"]*\"([^\"]*)\"")
+            set(test_name "${CMAKE_MATCH_2}")
+            if(NOT test_name MATCHES "^[A-Za-z0-9_'.:()+=-]([A-Za-z0-9 _'.:()+=-]*[A-Za-z0-9_'.:()+=-])?$")
+                string(REPLACE "<SEMI>" "<a semicolon>" shown "${test_name}")
+                report("${file}" ${number}
+                    "test case \"${shown}\": use only letters, digits, spaces and ' . : ( ) + = - _ in a name, with no space at either end (POLICY.md 13.2)")
+            endif()
         endif()
 
         # Constructs allowed only with a reason on the same line (POLICY.md 3). Only the code
@@ -239,10 +288,16 @@ foreach(file IN LISTS files)
             math(EXPR line_count "${line_count} - 1")
         endif()
     endif()
-    if(line_count GREATER max_file_lines)
-        math(EXPR first_over "${max_file_lines} + 1")
+    if(line_count GREATER file_lines_limit)
+        math(EXPR first_over "${file_lines_limit} + 1")
         report("${file}" ${first_over}
-            "${line_count} lines, over the limit of ${max_file_lines}; split the file by responsibility (POLICY.md 11.3)")
+            "${line_count} lines, over the limit of ${file_lines_limit}; split the file by responsibility (POLICY.md 11.3)")
+    elseif(per_file)
+        # After an edit, say so while the split is still cheap: before the next feature.
+        math(EXPR left "${file_lines_limit} - ${line_count}")
+        if(left LESS 50)
+            message("${file}: note: ${line_count} lines, ${left} left before the limit of ${file_lines_limit}; split it before adding to it (POLICY.md 11.3)")
+        endif()
     endif()
 
     if(file MATCHES "\\.(h|hpp|hh|hxx)$")
@@ -269,7 +324,7 @@ endforeach()
 # REAL_PATH, not NORMAL_PATH: POLICY_ROOT may end in a slash, SOURCE_DIR doesn't.
 file(REAL_PATH "${SOURCE_DIR}" source_norm)
 file(REAL_PATH "${POLICY_ROOT}" policy_norm)
-if(CHECK_PROJECT_FILES AND NOT source_norm STREQUAL policy_norm)
+if(CHECK_PROJECT_FILES AND NOT per_file AND NOT source_norm STREQUAL policy_norm)
     set(policy_files .clang-tidy .clang-format CMakePresets.json tools/hooks/pre-commit
                      tools/hooks/pre-push tools/hooks/commit-msg tools/hooks/tidy-files)
     # A project that uses vcpkg loads it through the policy's files (POLICY.md 1.1); an edited
@@ -294,7 +349,7 @@ endif()
 
 # The policy's .gitignore and .gitattributes are the required minimum: a project's copies
 # must contain every line of them (comments and blank lines aside) and may add their own.
-if(CHECK_PROJECT_FILES)
+if(CHECK_PROJECT_FILES AND NOT per_file)
     foreach(name IN ITEMS .gitignore .gitattributes)
         if(NOT EXISTS "${SOURCE_DIR}/${name}")
             report("${name}" 1 "missing; start from cpp-policy's copy (${POLICY_ROOT}/${name})")
@@ -315,7 +370,7 @@ endif()
 # A project's CI must run the same policy as its build: the reusable workflows it calls
 # (cpp-policy/.github/workflows/gate.yml@<ref>, benchmark.yml@<ref>) must be pinned to the commit the build uses
 # (POLICY.md 8). A tag or branch name fails too: it can move.
-if(POLICY_COMMIT AND NOT source_norm STREQUAL policy_norm)
+if(POLICY_COMMIT AND NOT per_file AND NOT source_norm STREQUAL policy_norm)
     file(GLOB workflows RELATIVE "${SOURCE_DIR}"
         "${SOURCE_DIR}/.github/workflows/*.yml" "${SOURCE_DIR}/.github/workflows/*.yaml")
     foreach(workflow IN LISTS workflows)
@@ -334,7 +389,7 @@ if(POLICY_COMMIT AND NOT source_norm STREQUAL policy_norm)
     endforeach()
 endif()
 
-list(LENGTH files count)
+list(LENGTH checked_files count)
 if(errors GREATER 0)
     message(FATAL_ERROR "cpp-policy audit: ${errors} violation(s) in ${count} file(s)")
 endif()
