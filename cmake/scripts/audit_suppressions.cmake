@@ -14,6 +14,9 @@
 # Fails if a file has more than 350 lines, or 500 under tests/ (POLICY.md 11.3).
 # Fails if a test case under tests/ has a character in its name that doctest's filter or the
 # XML listing treats specially (POLICY.md 13.2).
+# Fails if a file of the library a project offers (LIBRARY, in lib/<name>/<module>/) includes
+# anything of the program, a higher layer of the library, or its own headers by another name
+# than "<name>/<module>/<header>" (POLICY.md 11.7).
 # With FILES, checks only those files, and only the rules about one file.
 # Fails if an #include in src/ points to a higher layer (LAYERS, from cpp_policy_layers()),
 # uses a relative path, or leaves a confined module; if src/ has two or more modules and
@@ -85,6 +88,51 @@ foreach(layer IN LISTS LAYERS)
 endforeach()
 list(LENGTH modules module_count)
 
+# The library a project offers (POLICY.md 11.7): LIBRARY is its name, LIBRARY_LAYERS its
+# layers, like LAYERS. Its modules are the folders under lib/<name>/, and for the rules
+# about dependencies' headers they are called <name>/<module>.
+if(NOT DEFINED LIBRARY)
+    set(LIBRARY "")
+endif()
+if(NOT DEFINED LIBRARY_LAYERS)
+    set(LIBRARY_LAYERS "")
+endif()
+set(library_modules "")
+set(all_modules "${modules}")
+if(NOT LIBRARY STREQUAL "")
+    foreach(file IN LISTS files)
+        if(file MATCHES "^lib/${LIBRARY}/([^/]+)/")
+            list(APPEND library_modules "${CMAKE_MATCH_1}")
+            list(APPEND all_modules "${LIBRARY}/${CMAKE_MATCH_1}")
+        elseif(file MATCHES "^lib/" AND NOT per_file)
+            report("${file}" 1
+                "lib/ holds the library's modules only, as lib/${LIBRARY}/<module>/<file> (POLICY.md 11.7)")
+        endif()
+    endforeach()
+    list(REMOVE_DUPLICATES library_modules)
+    list(REMOVE_DUPLICATES all_modules)
+    set(layer_number 0)
+    foreach(layer IN LISTS LIBRARY_LAYERS)
+        math(EXPR layer_number "${layer_number} + 1")
+        string(REPLACE "," ";" layer_modules "${layer}")
+        foreach(module IN LISTS layer_modules)
+            set(library_layer_of_${module} ${layer_number})
+        endforeach()
+    endforeach()
+    if(NOT per_file)
+        foreach(module IN LISTS library_modules)
+            if(NOT DEFINED library_layer_of_${module})
+                report("lib/${LIBRARY}/${module}" 1
+                    "module '${module}' is in none of the library's layers; add it to cpp_policy_library() (POLICY.md 11.7)")
+            endif()
+        endforeach()
+        if(LIBRARY IN_LIST modules)
+            report("src/${LIBRARY}" 1
+                "a module of the program has the library's name, so \"${LIBRARY}/...\" would mean two things (POLICY.md 11.7)")
+        endif()
+    endif()
+endif()
+
 # Dependencies kept in their modules (POLICY.md 11.6). Each entry of CONFINED_INCLUDES is
 # "<headers>|<modules>|<sources or empty>", the first two comma-separated.
 if(NOT DEFINED CONFINED_INCLUDES)
@@ -95,9 +143,9 @@ foreach(entry IN LISTS CONFINED_INCLUDES)
     list(GET parts 1 entry_modules)
     string(REPLACE "," ";" entry_modules "${entry_modules}")
     foreach(module IN LISTS entry_modules)
-        if(NOT module IN_LIST modules AND NOT per_file)
+        if(NOT module IN_LIST all_modules AND NOT per_file)
             report("src/${module}" 1
-                "cpp_policy_confine_includes() names module '${module}', which src/ doesn't have (POLICY.md 11.6)")
+                "cpp_policy_confine_includes() names module '${module}', which the project doesn't have (POLICY.md 11.6)")
         endif()
     endforeach()
 endforeach()
@@ -206,11 +254,13 @@ foreach(file IN LISTS checked_files)
         endif()
 
         # A dependency's headers stay in the modules it is confined to (POLICY.md 11.6).
-        if(NOT CONFINED_INCLUDES STREQUAL "" AND file MATCHES "^src/"
+        if(NOT CONFINED_INCLUDES STREQUAL "" AND file MATCHES "^(src|lib)/"
            AND line MATCHES "^[ \t]*#[ \t]*include[ \t]*[<\"]([^>\"]+)[>\"]")
             set(included "${CMAKE_MATCH_1}")
             set(own "")
             if(file MATCHES "^src/([^/]+)/")
+                set(own "${CMAKE_MATCH_1}")
+            elseif(file MATCHES "^lib/([^/]+/[^/]+)/")
                 set(own "${CMAKE_MATCH_1}")
             endif()
             # Several lines may name one header: each allows some modules, in any file or in
@@ -278,6 +328,34 @@ foreach(file IN LISTS checked_files)
                 string(REPLACE "<SEMI>" "<a semicolon>" shown "${test_name}")
                 report("${file}" ${number}
                     "test case \"${shown}\": use only letters, digits, spaces and ' . : ( ) + = - _ in a name, with no space at either end (POLICY.md 13.2)")
+            endif()
+        endif()
+
+        # A library's files include the library's headers by their full name, never the
+        # program's, and keep the library's own layers (POLICY.md 11.7).
+        if(NOT LIBRARY STREQUAL "" AND file MATCHES "^lib/${LIBRARY}/([^/]+)/"
+           AND line MATCHES "^[ \t]*#[ \t]*include[ \t]*\"([^\"]+)\"")
+            set(included "${CMAKE_MATCH_1}")
+            string(REGEX MATCH "^lib/${LIBRARY}/([^/]+)/" _ "${file}")
+            set(own "${CMAKE_MATCH_1}")
+            if(included MATCHES "^\\.\\.?/" OR included MATCHES "/\\.\\./")
+                report("${file}" ${number}
+                    "includes \"${included}\" by a relative path; write it from the library's root: \"${LIBRARY}/module/header\"")
+            elseif(NOT included MATCHES "^${LIBRARY}/([^/]+)/")
+                report("${file}" ${number}
+                    "includes \"${included}\": the library's code includes only its own headers, as \"${LIBRARY}/<module>/<header>\", and nothing of the program in src/ (POLICY.md 11.7)")
+            else()
+                set(target "${CMAKE_MATCH_1}")
+                cpp_policy_in_dirs("${file}" "${CONFINED_DIRS}" own_confined)
+                if(NOT target STREQUAL own AND own_confined)
+                    report("${file}" ${number}
+                        "lib/${LIBRARY}/${own} is confined: it may include only its own headers, not \"${included}\"")
+                elseif(NOT target STREQUAL own AND DEFINED library_layer_of_${own}
+                       AND DEFINED library_layer_of_${target}
+                       AND library_layer_of_${target} GREATER library_layer_of_${own})
+                    report("${file}" ${number}
+                        "includes \"${included}\" from a higher layer: '${own}' is layer ${library_layer_of_${own}} of the library, '${target}' is layer ${library_layer_of_${target}} (POLICY.md 11.7)")
+                endif()
             endif()
         endif()
 

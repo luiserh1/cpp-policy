@@ -3,7 +3,7 @@
 Open work on cpp-policy itself: what comes next, and why. What's done is in
 `CHANGELOG.md`, with the reasons; items are removed from here in the commit
 that resolves them. The layout is the one POLICY.md 11.5 gives projects; no
-version is in progress. The next is release A of "Libraries", below.
+version is in progress.
 
 Until 2026-09-28 these lived in SimpleLocalServer's `PENDING.md`, the
 project that piloted the policy. Numbers like #38 refer to the issues found
@@ -11,21 +11,16 @@ in the walkthroughs of that time.
 
 ## Later
 
-### Libraries: one policy project used by another
+### Libraries, release B
 
-Asked by Alfar (2026-10-09), with ToneMatcher as the library and Alfar as
-its user. The owner approved the plan the same day: a library's code in
-`lib/<name>/<module>/` with its name in every include; `library.cmake` with
-`cpp_policy_library()`; `cpp_policy_use_library()` for the user; the library
-built in the user's build as a dependency, with a floor on its policy
-version.
+Release A (0.30.0) gave a project a library and another project its use
+(POLICY.md 11.7). What follows is shaped by the first real use,
+ToneMatcher's library in Alfar:
 
-- [ ] **Release A:** the layout, the two functions, the audit's rules for
-      `lib/`, and a library and a user of it in cpp-policy's own tests, on
-      every system. ToneMatcher can start after it.
-- [ ] **Release B,** shaped by that first real use: `upgrade.sh` for a
-      library's pin, test helpers offered by a library, the credential a
-      private repository needs in CI.
+- [ ] `upgrade.sh` moves a library's pin as it moves cpp-policy's.
+- [ ] A library offers test helpers, declared as test code.
+- [ ] The credential a private repository needs to be fetched in CI.
+- [ ] What that first use found awkward in the two functions.
 
 ### From Alfar's report, not yet designed
 

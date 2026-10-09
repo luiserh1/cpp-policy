@@ -1118,6 +1118,95 @@ that module.
 with `SOURCES_ONLY` from any header. It also fails if a line names a module
 that `src/` doesn't have. That every dependency has a line relies on review.
 
+### 11.7 A library used by other projects
+
+A project may offer a library, with or without programs of its own, and
+another policy project may use it. Both keep their gates, and no code is
+copied. ToneMatcher's library and Alfar are the first pair; before this,
+Alfar carried 37 copied files that diverged from their source within two
+days.
+
+**In the project that offers it**
+
+- **The library's code is in `lib/<name>/<module>/`,** and every include of
+  it is written `"<name>/<module>/<header>.hpp"`, in the library's own code
+  too. The program's modules stay in `src/`.
+  - *Why a root of its own, and the name in every include:* a header of the
+    library includes other headers of the library. Written as
+    `"lowlevel/process.hpp"`, it would need the library's source root on the
+    user's include path, where the user's own `lowlevel/` and `app/` are.
+    And that root can't be `src/`, which also holds the program's modules.
+- **`library.cmake`, at the repository's root, declares it** and nothing
+  else: `find_package()` for what it links, and one call.
+
+  ```cmake
+  cpp_policy_library(tonematcher
+      LAYER lowlevel
+      LAYER image naming parse
+      SOURCES lowlevel/process.cpp image/image.cpp naming/pieces.cpp parse/numbers.cpp
+      DEPENDENCIES zlib
+      LINK ZLIB::ZLIB)
+  ```
+
+  The project's `CMakeLists.txt` includes that file; so does a user. vcpkg,
+  tests, checks and programs stay in `CMakeLists.txt`, which a user never
+  runs.
+- **The library has layers of its own** (`LAYER`, from the lowest up), and
+  its `lowlevel` module is a confined area (section 4). The program's
+  layers, in `cpp_policy_layers()`, are all above it.
+- **The library doesn't include the program.** A dependency's headers are
+  confined to its modules as `<name>/<module>` (11.6).
+- A project offers one library. Its tests are the project's tests.
+- **A release of the library is a tag on a commit whose CI was green on
+  every system.** A user compiles the library's code for systems it may
+  never build on itself, and the library's CI is the only place that code
+  met a compiler. A change that alters a result on purpose says so first in
+  `CHANGELOG.md`.
+
+**In the project that uses it**
+
+```cmake
+cpp_policy_use_library(tonematcher
+    GIT_REPOSITORY https://github.com/luiserh1/ToneMatcher.git
+    GIT_TAG        <commit>)   # v0.4.0
+target_link_libraries(app_core PRIVATE tonematcher::tonematcher)
+cpp_policy_confine_includes(tonematcher/ TO textures)
+```
+
+- **A release, pinned by commit,** with the version in a comment, like
+  cpp-policy's own pin (section 10).
+- **The library is built in this project's build, as a dependency.** It gets
+  this build's compiler, standard, hardening and sanitizers, which must be
+  the same in everything linked together. It doesn't get this project's
+  warnings as errors, clang-tidy, audit or format check: its own gate
+  checked it, and this project can't edit it.
+- **A floor.** Configuration fails if the library's project pins a
+  cpp-policy older than the floor this release sets (v0.30.0, the first
+  with libraries). The floor rises when a release makes a rule that older
+  code can't be trusted to meet.
+- **The library is below every layer of this project.** Which modules may
+  include it is this project's choice, with the rule for any dependency
+  (11.6).
+- **Its packages don't travel:** vcpkg doesn't read a manifest through a
+  fetch. This project's `vcpkg.json` lists each package the library needs,
+  with its reason, and configuration fails if one is missing.
+- **Its code counts in this project's budgets** (13.5): each program's size
+  and memory. When a release of the library takes a program past a budget,
+  the commit that moves the pin raises it, with the owner's approval and
+  the library named as the reason.
+
+**Not supported yet:** a project that is only a library; a library that
+uses a library; marking some of a library's headers private; test helpers
+offered by a library; a private repository fetched in CI, which needs a
+credential.
+
+*Enforcement:* the audit rejects, in the library's project, an include from
+`lib/` of anything but `"<name>/<module>/…"`, an include of a higher layer
+of the library, and a module of `lib/` in no layer. Configuration rejects,
+in the user's project, a pin that isn't a commit, a library below the floor
+and a missing package. That a release was green on every system relies on
+review.
+
 ## 12. Waiting on the toolchain
 
 Some decisions work around features the toolchain doesn't provide yet. Each

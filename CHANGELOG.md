@@ -3,6 +3,70 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.30.0 (2026-10-09)
+
+One policy project used as a library by another (POLICY.md 11.7, new):
+release A of the plan the owner approved. New and optional: a minor release.
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** none, unless the project is to offer a library
+or use one.
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.30.0`.
+2. To offer a library: move its modules to `lib/<name>/<module>/`, write
+   their includes as `"<name>/<module>/<header>.hpp"`, declare it in
+   `library.cmake` with `cpp_policy_library()`, and include that file from
+   `CMakeLists.txt` before `cpp_policy_add_checks()`.
+3. To use one: `cpp_policy_use_library(<name> GIT_REPOSITORY … GIT_TAG
+   <commit>)`, link `<name>::<name>`, list its packages in `vcpkg.json`, and
+   say which modules may include it with
+   `cpp_policy_confine_includes(<name>/ TO …)`.
+
+### Added
+
+- **`cpp_policy_library()`:** a library in `lib/<name>/<module>/`, with
+  layers of its own, declared in `library.cmake`. The audit holds its
+  layers and refuses an include from it into `src/` (fixtures `library_ok`,
+  `library_rules`).
+- **`cpp_policy_use_library()`:** fetches a library's repository at a
+  pinned commit, includes only its `library.cmake`, and builds it in this
+  build as a dependency: this build's compiler, standard, hardening and
+  sanitizers; not its warnings as errors, clang-tidy, audit or format.
+  Configuration fails for a library checked with a cpp-policy below the
+  floor (v0.30.0) and for a package the library needs that `vcpkg.json`
+  doesn't list.
+- **`cpp_policy_confine_includes()` takes `<library>/<module>`** as a
+  module, for the library's own dependencies.
+- **Self-test `library/used_by_another_project`:** a library project with a
+  program, and a user whose modules have the library's names (`lowlevel`,
+  `app`). Each passes its build with clang-tidy, its audit and its format
+  check; the user's test calls the library. The user's gate must fail for
+  a module that isn't allowed to include the library, a missing package and
+  a library below the floor; the library's, for an include of the program.
+
+*Why:* asked by Alfar (2026-10-09). The owner decided that ToneMatcher's
+work will be available inside Alfar with no code copied and no third
+repository, so ToneMatcher builds a library and its program over it. Alfar
+carried 37 copied files, edited within two days. The layout was the one
+decision without an alternative: a library header that included
+`"lowlevel/process.hpp"` would need the library's root on the user's
+include path, beside the user's own `lowlevel/`. The owner approved the
+layout, and the library as a dependency with a floor in its user's build.
+
+### Not in this release (release B)
+
+Shaped by the first real use, ToneMatcher's library in Alfar: `upgrade.sh`
+for a library's pin, test helpers offered by a library, and the credential
+a private repository needs to be fetched in CI. Until then a user moves the
+pin by hand, and a project whose CI can't fetch the library's repository
+runs that part of its gate where it can.
+
+### Not tried on a real project yet
+
+The self-test's library has two modules and no real dependency. Fetching
+was tried through `FETCHCONTENT_SOURCE_DIR`, not from a remote repository.
+
 ## 0.29.0 (2026-10-09)
 
 The gate costs less time for the same checks: the second release from

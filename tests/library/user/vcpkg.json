@@ -1,0 +1,6 @@
+{
+  "name": "user-project",
+  "dependencies": [
+    { "name": "zlib", "default-features": false, "$reason": "Needed by the geometry library" }
+  ]
+}

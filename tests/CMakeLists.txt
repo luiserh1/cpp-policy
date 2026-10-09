@@ -287,6 +287,21 @@ add_test(NAME upgrade/behavior
 set_tests_properties(upgrade/behavior PROPERTIES
     ENVIRONMENT "GIT_DIR=${CMAKE_CURRENT_BINARY_DIR}/upgrade_decoy.git")
 
+# --- One policy project used as a library by another (POLICY.md 11.7): both pass their gates,
+# and the user's fails when it should. With clang-tidy, so only where the gate runs it.
+if(CPP_POLICY_CLANG_TIDY)
+    add_test(NAME library/used_by_another_project
+        COMMAND "${CMAKE_COMMAND}" "-DPOLICY_ROOT=${CPP_POLICY_ROOT}"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/library" "-DCXX=${CMAKE_CXX_COMPILER}"
+                "-DMAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}" "-DBUILD_TYPE=${CMAKE_BUILD_TYPE}"
+                "-DSANITIZERS=${CPP_POLICY_SANITIZERS}"
+                "-DTHREAD_SANITIZER=${CPP_POLICY_THREAD_SANITIZER}"
+                "-DHARDENING=${CPP_POLICY_HARDENING}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/library/run.cmake")
+    set_tests_properties(library/used_by_another_project PROPERTIES TIMEOUT 300
+        ENVIRONMENT "GIT_DIR=${CMAKE_CURRENT_BINARY_DIR}/library_decoy.git")
+endif()
+
 # tools/new-project.sh itself, on a throwaway copy of the policy tagged as a release.
 add_test(NAME template/new_project_script
     COMMAND "${CMAKE_COMMAND}" "-DPOLICY_ROOT=${CPP_POLICY_ROOT}"

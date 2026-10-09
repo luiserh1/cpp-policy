@@ -127,6 +127,11 @@ function(cpp_policy_apply target)
     _cpp_policy_verify_toolchain()
     # Checked at the end of configuration (_cpp_policy_verify_targets).
     set_target_properties(${target} PROPERTIES CPP_POLICY_APPLIED TRUE)
+    # Another project's library, built here (cpp_policy_use_library, POLICY.md 11.7): it gets
+    # this build's standard, hardening and sanitizers, which must be the same in everything
+    # that is linked together, but not its warnings as errors or its clang-tidy. The
+    # library's own gate checked the code; this project can't edit it.
+    get_target_property(as_dependency ${target} CPP_POLICY_LIBRARY_DEPENDENCY)
 
     # "clang-cl" uses the MSVC command-line syntax.
     if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
@@ -169,7 +174,9 @@ function(cpp_policy_apply target)
     else()
         list(PREPEND warnings -Wall -Wextra)
     endif()
-    target_compile_options(${target} PRIVATE ${warnings})
+    if(NOT as_dependency)
+        target_compile_options(${target} PRIVATE ${warnings})
+    endif()
 
     # Exceptions and RTTI.
     if(NOT CPP_POLICY_EXCEPTIONS)
@@ -249,7 +256,7 @@ function(cpp_policy_apply target)
     endif()
 
     # clang-tidy always uses the policy's configuration, whatever .clang-tidy the project has.
-    if(CPP_POLICY_CLANG_TIDY)
+    if(CPP_POLICY_CLANG_TIDY AND NOT as_dependency)
         _cpp_policy_tidy_config(config)
         set_target_properties(${target} PROPERTIES CXX_CLANG_TIDY
             "${CPP_POLICY_CLANG_TIDY_EXE};--config-file=${config}")
@@ -429,7 +436,8 @@ function(_cpp_policy_verify_targets)
                     problems)
             endif()
         endforeach()
-        if(CPP_POLICY_CLANG_TIDY)
+        get_target_property(as_dependency ${target} CPP_POLICY_LIBRARY_DEPENDENCY)
+        if(CPP_POLICY_CLANG_TIDY AND NOT as_dependency)
             get_target_property(tidy ${target} CXX_CLANG_TIDY)
             _cpp_policy_tidy_config(config)
             set(expected "${CPP_POLICY_CLANG_TIDY_EXE};--config-file=${config}")
@@ -643,6 +651,254 @@ function(cpp_policy_layers)
 endfunction()
 
 # ---------------------------------------------------------------------------
+# A library that other policy projects use (POLICY.md 11.7). Its code is in
+# lib/<name>/<module>/, next to this call's file, and every include of it is written
+# "<name>/<module>/<header>". The call goes in library.cmake at the repository's root, which
+# the project's CMakeLists.txt includes and which a user's cpp_policy_use_library() includes
+# too, so that file holds nothing but what defines the library: find_package() for what it
+# links, its list of sources, and this call.
+#   cpp_policy_library(tonematcher
+#       LAYER lowlevel
+#       LAYER image naming
+#       SOURCES lowlevel/process.cpp image/image.cpp naming/pieces.cpp
+#       DEPENDENCIES zlib
+#       LINK ZLIB::ZLIB)
+# LAYER: the library's modules from the lowest layer up, as in cpp_policy_layers(); the audit
+# holds them, and refuses an include from the library into src/. SOURCES: relative to
+# lib/<name>/. DEPENDENCIES: the vcpkg packages it needs, which a user's vcpkg.json must
+# list. LINK: the targets it links, PUBLIC. It defines <name> and the alias <name>::<name>.
+# ---------------------------------------------------------------------------
+set(CPP_POLICY_LIBRARY_FLOOR 0.30.0 CACHE INTERNAL
+    "The oldest cpp-policy release a library may pin for this release to use it (POLICY.md 11.7)")
+
+function(cpp_policy_library name)
+    set(usage "cpp_policy_library(<name> LAYER <module>... [LAYER <module>...]... "
+              "SOURCES <file>... [DEPENDENCIES <vcpkg package>...] [LINK <target>...])")
+    string(JOIN "" usage ${usage})
+    if(NOT name MATCHES "^[a-z][a-z0-9_]*$")
+        message(FATAL_ERROR "cpp-policy: a library's name is lower case letters, digits and "
+            "'_' ('${name}'): it is a folder under lib/ and the start of every include")
+    endif()
+    # The layers, as cpp_policy_layers() reads them; then the other lists.
+    set(layers "")
+    set(current "")
+    set(modules "")
+    set(sources "")
+    set(dependencies "")
+    set(link "")
+    set(reading "")
+    foreach(argument IN LISTS ARGN)
+        if(argument STREQUAL "LAYER")
+            if(reading STREQUAL "layer" AND current STREQUAL "")
+                message(FATAL_ERROR "cpp-policy: cpp_policy_library() has an empty LAYER")
+            endif()
+            if(NOT current STREQUAL "")
+                list(APPEND layers "${current}")
+            endif()
+            set(current "")
+            set(reading layer)
+        elseif(argument MATCHES "^(SOURCES|DEPENDENCIES|LINK)$")
+            string(TOLOWER "${argument}" reading)
+        elseif(reading STREQUAL "layer")
+            if(NOT argument MATCHES "^[a-z0-9_]+$")
+                message(FATAL_ERROR "cpp-policy: '${argument}' isn't a module name (a folder "
+                    "under lib/${name}/)")
+            elseif(argument IN_LIST modules)
+                message(FATAL_ERROR "cpp-policy: module '${argument}' is in more than one layer")
+            endif()
+            list(APPEND modules "${argument}")
+            if(current STREQUAL "")
+                set(current "${argument}")
+            else()
+                string(APPEND current ",${argument}")
+            endif()
+        elseif(reading STREQUAL "sources")
+            list(APPEND sources "${argument}")
+        elseif(reading STREQUAL "dependencies")
+            list(APPEND dependencies "${argument}")
+        elseif(reading STREQUAL "link")
+            list(APPEND link "${argument}")
+        else()
+            message(FATAL_ERROR "cpp-policy: usage: ${usage}")
+        endif()
+    endforeach()
+    if(NOT current STREQUAL "")
+        list(APPEND layers "${current}")
+    endif()
+    if(layers STREQUAL "" OR sources STREQUAL "")
+        message(FATAL_ERROR "cpp-policy: usage: ${usage}")
+    endif()
+    if(TARGET ${name})
+        message(FATAL_ERROR "cpp-policy: there is already a target '${name}'; a library is "
+            "declared once")
+    endif()
+
+    # This call's file, not this function's: library.cmake, wherever it was fetched to.
+    set(root "${CMAKE_CURRENT_LIST_DIR}")
+    set(files "")
+    foreach(source IN LISTS sources)
+        if(NOT source MATCHES "^([a-z0-9_]+)/" OR NOT CMAKE_MATCH_1 IN_LIST modules)
+            message(FATAL_ERROR "cpp-policy: library '${name}': source '${source}' isn't in one "
+                "of its modules (${modules}); SOURCES are relative to lib/${name}/")
+        endif()
+        list(APPEND files "${root}/lib/${name}/${source}")
+    endforeach()
+
+    add_library(${name} STATIC ${files})
+    add_library(${name}::${name} ALIAS ${name})
+    if(link)
+        target_link_libraries(${name} PUBLIC ${link})
+    endif()
+    get_property(used GLOBAL PROPERTY _CPP_POLICY_USING_LIBRARY)
+    if(used)
+        # For the user its headers are a dependency's: the user's warnings as errors and
+        # clang-tidy don't apply inside them, whatever folder they were fetched to.
+        target_include_directories(${name} SYSTEM PUBLIC "${root}/lib")
+    else()
+        target_include_directories(${name} PUBLIC "${root}/lib")
+    endif()
+    if(used)
+        # In a user's build (cpp_policy_use_library).
+        if(NOT used STREQUAL name)
+            message(FATAL_ERROR "cpp-policy: cpp_policy_use_library(${used}) fetched a library "
+                "that calls itself '${name}'")
+        endif()
+        set_target_properties(${name} PROPERTIES CPP_POLICY_LIBRARY_DEPENDENCY TRUE)
+        set_property(GLOBAL PROPERTY _CPP_POLICY_USED_DEPENDENCIES "${dependencies}")
+    else()
+        # In the library's own project: checked like the rest of it.
+        get_property(own GLOBAL PROPERTY CPP_POLICY_LIBRARY)
+        if(own)
+            message(FATAL_ERROR "cpp-policy: a project offers one library ('${own}' is "
+                "declared already)")
+        endif()
+        if(TARGET policy-audit)
+            message(FATAL_ERROR
+                "cpp-policy: include library.cmake before cpp_policy_add_checks()")
+        endif()
+        set_property(GLOBAL PROPERTY CPP_POLICY_LIBRARY "${name}")
+        set_property(GLOBAL PROPERTY CPP_POLICY_LIBRARY_LAYERS "${layers}")
+    endif()
+    cpp_policy_apply(${name})
+endfunction()
+
+# ---------------------------------------------------------------------------
+# Uses another policy project's library (POLICY.md 11.7): fetches its repository at a pinned
+# commit and includes its library.cmake, nothing else of it.
+#   cpp_policy_use_library(tonematcher
+#       GIT_REPOSITORY https://github.com/luiserh1/ToneMatcher.git
+#       GIT_TAG        0123456789abcdef0123456789abcdef01234567)   # v0.4.0
+#   target_link_libraries(app_core PRIVATE tonematcher::tonematcher)
+# The library is compiled in this build, with this build's compiler, standard, hardening and
+# sanitizers, and isn't checked again: no warnings as errors, no clang-tidy, no audit. Its
+# own gate did that. Configuration fails if the library's project pins a cpp-policy older
+# than CPP_POLICY_LIBRARY_FLOOR, or if this project's vcpkg.json lacks a package the library
+# needs. Which modules may include it: cpp_policy_confine_includes(<name>/ TO <module>...).
+# ---------------------------------------------------------------------------
+function(cpp_policy_use_library name)
+    cmake_parse_arguments(PARSE_ARGV 1 arg "" "GIT_REPOSITORY;GIT_TAG" "")
+    set(usage "cpp_policy_use_library(<name> GIT_REPOSITORY <url> GIT_TAG <commit>)")
+    if(arg_UNPARSED_ARGUMENTS OR NOT arg_GIT_REPOSITORY OR NOT arg_GIT_TAG)
+        message(FATAL_ERROR "cpp-policy: usage: ${usage}")
+    endif()
+    string(LENGTH "${arg_GIT_TAG}" tag_length)
+    if(NOT arg_GIT_TAG MATCHES "^[0-9a-f]+$" OR NOT tag_length EQUAL 40)
+        message(FATAL_ERROR "cpp-policy: cpp_policy_use_library(${name}): GIT_TAG must be a "
+            "commit (40 hexadecimal digits), with the release in a comment beside it: a tag "
+            "can be moved to other code later (POLICY.md 10)")
+    endif()
+    if(TARGET ${name})
+        message(FATAL_ERROR "cpp-policy: there is already a target '${name}'")
+    endif()
+    include(FetchContent)
+    # SOURCE_SUBDIR names a folder that isn't there, so that the repository is fetched and
+    # its CMakeLists.txt isn't run: that file is the library's own project (vcpkg, tests,
+    # checks, programs), and only library.cmake is for others.
+    FetchContent_Declare(${name}
+        GIT_REPOSITORY "${arg_GIT_REPOSITORY}"
+        GIT_TAG "${arg_GIT_TAG}"
+        SOURCE_SUBDIR cpp-policy-fetches-only)
+    FetchContent_MakeAvailable(${name})
+    set(source "${${name}_SOURCE_DIR}")
+    if(NOT EXISTS "${source}/library.cmake")
+        message(FATAL_ERROR "cpp-policy: ${arg_GIT_REPOSITORY} at ${arg_GIT_TAG} has no "
+            "library.cmake: that project doesn't offer a library (POLICY.md 11.7)")
+    endif()
+
+    # The cpp-policy release the library's own gate ran: the comment beside its pin.
+    set(release "")
+    if(EXISTS "${source}/CMakeLists.txt")
+        file(STRINGS "${source}/CMakeLists.txt" lines)
+        set(after_repository FALSE)
+        foreach(line IN LISTS lines)
+            if(line MATCHES "GIT_REPOSITORY.*cpp-policy")
+                set(after_repository TRUE)
+            endif()
+            if(after_repository AND line MATCHES "GIT_TAG[ \t]+[0-9a-f]+.*#[ \t]*v([0-9]+\\.[0-9]+\\.[0-9]+)")
+                set(release "${CMAKE_MATCH_1}")
+                break()
+            endif()
+        endforeach()
+    endif()
+    if(release STREQUAL "")
+        message(FATAL_ERROR "cpp-policy: library '${name}': its CMakeLists.txt doesn't pin "
+            "cpp-policy by commit with the release in a comment (GIT_TAG <commit> # v1.2.3), "
+            "so the release that checked it isn't known")
+    elseif(release VERSION_LESS CPP_POLICY_LIBRARY_FLOOR)
+        message(FATAL_ERROR "cpp-policy: library '${name}' was checked with cpp-policy "
+            "v${release}; this release uses libraries checked with "
+            "v${CPP_POLICY_LIBRARY_FLOOR} or later. Pin a newer release of the library "
+            "(POLICY.md 11.7)")
+    endif()
+
+    set_property(GLOBAL PROPERTY _CPP_POLICY_USING_LIBRARY "${name}")
+    set_property(GLOBAL PROPERTY _CPP_POLICY_USED_DEPENDENCIES "")
+    include("${source}/library.cmake")
+    set_property(GLOBAL PROPERTY _CPP_POLICY_USING_LIBRARY "")
+    if(NOT TARGET ${name})
+        message(FATAL_ERROR "cpp-policy: ${source}/library.cmake didn't declare the library "
+            "'${name}' with cpp_policy_library()")
+    endif()
+
+    # vcpkg manifests don't travel through FetchContent: this project lists what the library
+    # needs, each with its reason (POLICY.md 1.1).
+    get_property(needed GLOBAL PROPERTY _CPP_POLICY_USED_DEPENDENCIES)
+    if(needed)
+        set(listed "")
+        if(EXISTS "${CMAKE_SOURCE_DIR}/vcpkg.json")
+            file(READ "${CMAKE_SOURCE_DIR}/vcpkg.json" manifest)
+            string(JSON count ERROR_VARIABLE none LENGTH "${manifest}" dependencies)
+            if(NOT none AND count GREATER 0)
+                math(EXPR last "${count} - 1")
+                foreach(index RANGE ${last})
+                    string(JSON kind TYPE "${manifest}" dependencies ${index})
+                    if(kind STREQUAL "OBJECT")
+                        string(JSON package ERROR_VARIABLE none GET "${manifest}" dependencies
+                            ${index} name)
+                    else()
+                        string(JSON package GET "${manifest}" dependencies ${index})
+                    endif()
+                    list(APPEND listed "${package}")
+                endforeach()
+            endif()
+        endif()
+        set(missing "")
+        foreach(package IN LISTS needed)
+            if(NOT package IN_LIST listed)
+                list(APPEND missing "${package}")
+            endif()
+        endforeach()
+        if(missing)
+            list(JOIN missing ", " missing)
+            message(FATAL_ERROR "cpp-policy: library '${name}' needs these packages, which "
+                "this project's vcpkg.json doesn't list: ${missing} (POLICY.md 11.7)")
+        endif()
+    endif()
+    message(STATUS "cpp-policy: using library '${name}' at ${arg_GIT_TAG} "
+        "(checked with cpp-policy v${release})")
+endfunction()
+
+# ---------------------------------------------------------------------------
 # Dependencies kept in their modules (POLICY.md 11.6): the headers named may be included only
 # from the modules after TO. A name ending in "/" stands for every header under it, and one
 # ending in "*" for every header whose name starts so (a library whose headers are in no
@@ -673,9 +929,9 @@ function(cpp_policy_confine_includes)
                                     "directory ending in '/' or a prefix ending in '*': ${usage}")
             endif()
             list(APPEND headers "${argument}")
-        elseif(NOT argument MATCHES "^[a-z0-9_]+$")
+        elseif(NOT argument MATCHES "^[a-z0-9_]+(/[a-z0-9_]+)?$")
             message(FATAL_ERROR "cpp-policy: '${argument}' isn't a module name (a directory "
-                                "under src/): ${usage}")
+                                "under src/, or <library>/<module> for one under lib/): ${usage}")
         else()
             list(APPEND modules "${argument}")
         endif()
@@ -966,15 +1222,24 @@ function(cpp_policy_add_checks)
     _cpp_policy_commit(policy_commit)
     get_property(layers GLOBAL PROPERTY CPP_POLICY_LAYERS)
     get_property(confined_includes GLOBAL PROPERTY CPP_POLICY_CONFINED_INCLUDES)
+    get_property(library GLOBAL PROPERTY CPP_POLICY_LIBRARY)
+    get_property(library_layers GLOBAL PROPERTY CPP_POLICY_LIBRARY_LAYERS)
+    # A library's lowlevel module is a confined area like src/lowlevel (POLICY.md 4).
+    set(confined_dirs "${CPP_POLICY_CONFINED_DIRS}")
+    if(library)
+        list(APPEND confined_dirs "lib/${library}/lowlevel")
+    endif()
     set(config "${CMAKE_BINARY_DIR}/cpp_policy_config.cmake")
     file(WRITE "${config}"
         "set(SOURCE_DIR [==[${CMAKE_SOURCE_DIR}]==])\n"
         "set(POLICY_ROOT [==[${CPP_POLICY_ROOT}]==])\n"
         "set(POLICY_COMMIT [==[${policy_commit}]==])\n"
-        "set(CONFINED_DIRS [==[${CPP_POLICY_CONFINED_DIRS}]==])\n"
+        "set(CONFINED_DIRS [==[${confined_dirs}]==])\n"
         "set(EXCLUDED_DIRS [==[${CPP_POLICY_EXCLUDED_DIRS}]==])\n"
         "set(LAYERS [==[${layers}]==])\n"
         "set(CONFINED_INCLUDES [==[${confined_includes}]==])\n"
+        "set(LIBRARY [==[${library}]==])\n"
+        "set(LIBRARY_LAYERS [==[${library_layers}]==])\n"
         "set(CLANG_FORMAT [==[${CPP_POLICY_CLANG_FORMAT_EXE}]==])\n"
         "set(CLANG_TIDY [==[${CPP_POLICY_CLANG_TIDY_EXE}]==])\n"
         "set(BUILD_DIR [==[${CMAKE_BINARY_DIR}]==])\n")
