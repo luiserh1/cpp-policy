@@ -1002,7 +1002,7 @@ in cpp-policy's `CHANGELOG.md`, and git history has every upgrade commit.
 SimpleLocalServer's changelog had about 170 lines of "Upgraded to
 cpp-policy vX" over nine upgrades that changed nothing in `src/`.
 
- `ROADMAP.md` has up to three parts,
+`ROADMAP.md` has up to three parts,
 in this order:
 
 ```markdown
