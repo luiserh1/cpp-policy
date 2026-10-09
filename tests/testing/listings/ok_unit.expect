@@ -1,0 +1,1 @@
+^add_test\(\[==\[unit/app/all test cases\]==\] [^\n]* --no-intro=true --no-version=true\)\nset_tests_properties\([^\n]*LABELS \[==\[unit.regression\]==\] TIMEOUT 10 [^\n]*ENVIRONMENT \[==\[A=1.B=2\]==\]\)\n$

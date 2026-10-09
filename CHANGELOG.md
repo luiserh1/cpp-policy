@@ -3,6 +3,84 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.29.0 (2026-10-09)
+
+The gate costs less time for the same checks: the second release from
+Alfar's report. How unit tests reach CTest changes, so scripts that select a
+unit test case by its CTest name need changing: a minor release.
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** none for the code. The upgrade copies the new
+hooks, including `tools/hooks/gate`.
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.29.0`.
+2. Run the gate with `sh tools/hooks/gate` from now on. A project's own
+   launcher (Alfar's `out/gate`) can go.
+3. A module's unit tests are now one CTest test, `unit/<module>/all test
+   cases`. `ctest -R "unit/<module>/<case>"` no longer finds a case; run the
+   program with `--test-case="<name>"`. Integration and benchmark tests are
+   unchanged.
+4. Optional: a second `cpp_policy_confine_includes()` line for a header
+   another line names; zlib's allocator (POLICY.md 13.5).
+
+### Changed
+
+- **A module's unit tests run in one process** (POLICY.md 13.2), as one
+  CTest test. *Why:* Alfar's gate grew from under a minute to eight as its
+  tests grew to 1,500, and the time was processes, not tests. Measured here
+  on 1,505 unit test cases in 10 programs, under the sanitizers:
+
+  | How they run | Time |
+  |---|---|
+  | A process per test case, one at a time (until now) | 311 s |
+  | A process per test case, ten at a time | 77 s |
+  | A process per program | 2 s |
+
+  A process costs about 0.2 s there, 0.12 s of it LeakSanitizer's check at
+  exit. Unit tests may share no state, so separate processes protected
+  nothing. A failure still names its test case, file and line; after a
+  crash the later cases of that program don't run until it is fixed.
+  Integration and benchmark tests keep a process per case. The owner chose
+  it over running cases in parallel, which changes the decision of 0.19.0
+  (one CTest test per test case) for unit tests (2026-10-09).
+- **A module's unit tests have 60 seconds together,** where each case had
+  10. The owner chose it: 10 for a whole program could fail on a busy
+  machine. That a unit test takes well under a second stays a rule for
+  review.
+
+### Added
+
+- **`tools/hooks/gate`, the gate's launcher** (POLICY.md 8): one gate at a
+  time on the machine, the machine kept awake (macOS and Linux), one last
+  line `gate: passed` or `gate: FAILED`, and the workflow's own exit code.
+  pre-push runs the gate through it. *Why:* each is from Alfar. Four agents
+  ran four gates at once, 25 minutes each where one takes 5. A Mac that
+  slept made tests time out: about 2.5 hours lost, and a merge committed
+  after a failing gate because the exit code read was another command's.
+  Alfar had written its own launcher; three projects on one machine would
+  each have written one.
+
+### Fixed
+
+- **Two `cpp_policy_confine_includes()` lines for one header rejected each
+  other** (found by Alfar; a defect since 0.26.0). They now add up, each
+  with its own `SOURCES_ONLY` (audit fixture `includes_two_lines`).
+
+### Documentation
+
+- POLICY.md 13.5: a C library that takes an allocator (zlib's `zalloc`) is
+  given one that uses `operator new`, so the heap test counts its memory
+  and the operating-system test isn't needed. Suggested to ToneMatcher,
+  whose two such tests failed four times without finding a leak.
+- `ROADMAP.md`: this release, and what comes after it (libraries).
+
+### Not tried on a real project yet
+
+The times above are from a generated project with trivial tests. Alfar's
+own gate, before and after, is this release's validation and is asked of
+Alfar.
+
 ## 0.28.0 (2026-10-08)
 
 From Alfar's report: a project built in four days by unattended agents on

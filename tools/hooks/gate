@@ -1,0 +1,73 @@
+#!/bin/sh
+# cpp-policy gate: runs the gate (POLICY.md 8) the way an unattended run needs it:
+#
+#   sh tools/hooks/gate            # the check workflow (win-check on Windows)
+#   sh tools/hooks/gate release    # another workflow
+#
+# - One gate at a time on the machine. Several agents, each in a folder of its own, share its
+#   processors: four gates at once took 25 minutes each where one alone takes 5. A second
+#   gate waits for the first.
+# - The machine stays awake while it runs (macOS and Linux). A test that sleeps with the
+#   machine passes its time limit and is reported as failed.
+# - It ends with one line, "gate: passed" or "gate: FAILED", and returns the workflow's own
+#   exit code, so that a command chained after it can't hide the result.
+# pre-push runs it. Copy unchanged into the project's tools/hooks/ (git runs only files named
+# after its hooks).
+set -u
+
+if [ $# -gt 1 ]; then
+    echo "usage: sh tools/hooks/gate [workflow preset]" >&2
+    exit 2
+fi
+# The check presets are per platform, as in the other hooks.
+windows=no
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*) windows=yes ;;
+esac
+preset=${1:-check}
+if [ "$windows" = yes ]; then
+    case $preset in
+        win-*) ;;
+        *) preset=win-$preset ;;
+    esac
+fi
+
+# The lock is a folder: mkdir either creates it or fails, on every system. It holds the
+# process number of its owner, so that a lock left by a gate that was killed is taken over.
+lock=${CPP_POLICY_GATE_LOCK:-/tmp/cpp-policy-gate-$(id -u).lock}
+waited=0
+while ! mkdir "$lock" 2>/dev/null; do
+    owner=$(cat "$lock/pid" 2>/dev/null || true)
+    if [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; then
+        echo "gate: the gate that held the lock (process $owner) is gone; taking it over"
+        rm -rf "$lock"
+        continue
+    fi
+    if [ $((waited % 60)) -eq 0 ]; then
+        echo "gate: another gate is running on this machine (process ${owner:-unknown}); waiting"
+    fi
+    sleep 2
+    waited=$((waited + 2))
+done
+echo $$ >"$lock/pid"
+trap 'rm -rf "$lock"' EXIT
+trap 'exit 130' INT TERM HUP
+
+# Keep the machine awake for as long as the workflow runs.
+if command -v caffeinate >/dev/null 2>&1; then
+    caffeinate -s -i cmake --workflow --preset "$preset"
+elif command -v systemd-inhibit >/dev/null 2>&1 &&
+    systemd-inhibit --what=sleep:idle --who=cpp-policy --why="the gate is running" true 2>/dev/null; then
+    systemd-inhibit --what=sleep:idle --who=cpp-policy --why="the gate is running" \
+        cmake --workflow --preset "$preset"
+else
+    cmake --workflow --preset "$preset"
+fi
+code=$?
+
+if [ $code -eq 0 ]; then
+    echo "gate: passed ($preset)"
+else
+    echo "gate: FAILED ($preset, exit code $code)"
+fi
+exit $code

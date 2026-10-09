@@ -12,7 +12,7 @@ Dependencies come from vcpkg (`vcpkg.json`, pinned by its
 `builtin-baseline`); set `VCPKG_ROOT` before configuring.
 
 ```
-cmake --workflow --preset check        # the gate: build, clang-tidy, audit, format, tests
+sh tools/hooks/gate                    # the gate: audit, format, build with clang-tidy, tests
 cmake --workflow --preset unit         # quick: no clang-tidy, -O1, unit tests only
 cmake --workflow --preset release      # optimized build, size budget, benchmarks
 ```

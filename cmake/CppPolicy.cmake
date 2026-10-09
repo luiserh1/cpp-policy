@@ -696,7 +696,8 @@ endfunction()
 #                        TIMEOUT 30 ENVIRONMENT "HELPER=$<TARGET_FILE:helper>")
 # The program is test_<kind>_<module>, with doctest's main() from cpp-policy. After each build,
 # every test case becomes a CTest test named <kind>/<module>/<test case> and labelled with
-# its kind (scripts/doctest_tests.cmake). Unit tests have 10 seconds; integration and
+# its kind; a unit program is one CTest test that runs all its cases in one process
+# (scripts/doctest_tests.cmake). A unit program has 60 seconds; integration and
 # benchmark tests 60, or TIMEOUT. Benchmark programs also get cpp_policy::peak_heap_bytes()
 # and peak_memory_bytes(), and nanobench when the project uses it, and are built everywhere (so clang-tidy checks them)
 # but run only in builds without sanitizers, which distort memory and time.
@@ -759,10 +760,10 @@ function(cpp_policy_add_tests kind module)
     endif()
     if(kind STREQUAL "unit")
         if(DEFINED arg_TIMEOUT)
-            message(FATAL_ERROR "cpp-policy: unit tests have a fixed limit of 10 seconds; a "
-                "slower test is an integration test (POLICY.md 13)")
+            message(FATAL_ERROR "cpp-policy: a module's unit tests have a fixed limit of 60 "
+                "seconds together; a slow test is an integration test (POLICY.md 13)")
         endif()
-        set(timeout 10)
+        set(timeout 60)
     elseif(DEFINED arg_TIMEOUT)
         if(NOT arg_TIMEOUT MATCHES "^[1-9][0-9]*$" OR arg_TIMEOUT GREATER 60)
             message(FATAL_ERROR "cpp-policy: TIMEOUT is 1 to 60 seconds, the presets' limit")

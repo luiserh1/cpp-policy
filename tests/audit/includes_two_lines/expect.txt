@@ -1,0 +1,1 @@
+src/gui/panel.cpp:2: error: includes <nlohmann/json.hpp>, which only these modules may include: settings,inputs.*src/inputs/read.hpp:3: error: includes <nlohmann/json.hpp> in a header; only source files of inputs may include it.*cpp-policy audit: 2 violation

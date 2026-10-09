@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doctest binary="t" version="2.5.3">
+  <TestCase name="a name is greeted" filename="test_app.cpp" line="3" skipped="false"/>
+  <TestCase name="a bug that doesn&apos;t come back" testsuite="regression" filename="test_app.cpp" line="9" skipped="false"/>
+  <TestCase name="U+202E (a bidi override) is escaped" filename="test_app.cpp" line="15" skipped="false"/>
+  <OverallResultsTestCases unskipped="1"/>
+</doctest>

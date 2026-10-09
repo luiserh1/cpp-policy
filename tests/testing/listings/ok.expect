@@ -1,1 +1,1 @@
-add_test\(\[==\[unit/app/a bug that doesn.t come back\]==\][^\n]*--test-case=a bug that doesn.t come back\]==\][^\n]*\nset_tests_properties\([^\n]*LABELS \[==\[unit.regression\]==\] TIMEOUT 10 [^\n]*ENVIRONMENT \[==\[A=1.B=2\]==\]
+add_test\(\[==\[integration/app/a bug that doesn.t come back\]==\][^\n]*--test-case=a bug that doesn.t come back\]==\][^\n]*\nset_tests_properties\([^\n]*LABELS \[==\[integration.regression\]==\] TIMEOUT 10 [^\n]*ENVIRONMENT \[==\[A=1.B=2\]==\]

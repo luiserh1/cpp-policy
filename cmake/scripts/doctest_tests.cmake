@@ -5,8 +5,12 @@
 #         [-DENVIRONMENT=<VAR=value;...>] -DWORKING_DIR=<dir> -DCTEST_FILE=<file>
 #         -P doctest_tests.cmake
 #
-# Each test case becomes the CTest test <kind>/<module>/<test case>, labelled with its kind,
-# and also "regression" when the case is in doctest's "regression" suite. The script fails,
+# Each integration or benchmark test case becomes the CTest test <kind>/<module>/<test case>,
+# labelled with its kind, and also "regression" when the case is in doctest's "regression"
+# suite. A unit program is one CTest test, <kind>/<module>/all test cases, which runs every
+# case in one process: a process under the sanitizers takes about 0.2 s to start and to check
+# for leaks, which was nearly all of the time 1,500 unit tests took, and unit tests share no
+# state that separate processes would protect (POLICY.md 13.2). The script fails,
 # and with it the build, on a skipped test case, a name doctest can't select exactly, two
 # names that differ only in case, a suite other than "regression", or a program with no
 # tests. The self-test passes LISTING_FILE instead of EXECUTABLE: a saved listing.
@@ -40,6 +44,7 @@ string(REGEX MATCHALL "<TestCase [^\n]*/>" cases "${listing}")
 set(problems "")
 set(seen "")
 set(script "")
+set(unit_labels "${KIND}")
 foreach(case IN LISTS cases)
     string(REGEX MATCH " name=\"([^\"]*)\"" _ "${case}")
     set(name "${CMAKE_MATCH_1}")
@@ -78,6 +83,10 @@ foreach(case IN LISTS cases)
         continue()
     endif()
 
+    if(KIND STREQUAL "unit")
+        list(APPEND unit_labels ${labels})
+        continue()
+    endif()
     set(test "${KIND}/${MODULE}/${name}")
     string(APPEND script
         "add_test([==[${test}]==] [==[${EXECUTABLE}]==] [==[--test-case=${name}]==]"
@@ -91,6 +100,20 @@ foreach(case IN LISTS cases)
 endforeach()
 if(NOT cases)
     problem("${EXECUTABLE}${LISTING_FILE} has no test cases")
+endif()
+if(KIND STREQUAL "unit" AND cases)
+    # One test for the program. doctest names the test case, file and line of each failure,
+    # and of a crash.
+    list(REMOVE_DUPLICATES unit_labels)
+    set(test "${KIND}/${MODULE}/all test cases")
+    string(APPEND script
+        "add_test([==[${test}]==] [==[${EXECUTABLE}]==] --no-intro=true --no-version=true)\n"
+        "set_tests_properties([==[${test}]==] PROPERTIES LABELS [==[${unit_labels}]==]"
+        " TIMEOUT ${TIMEOUT} WORKING_DIRECTORY [==[${WORKING_DIR}]==]")
+    if(NOT "${ENVIRONMENT}" STREQUAL "")
+        string(APPEND script " ENVIRONMENT [==[${ENVIRONMENT}]==]")
+    endif()
+    string(APPEND script ")\n")
 endif()
 
 if(problems)

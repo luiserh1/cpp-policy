@@ -213,6 +213,12 @@ foreach(file IN LISTS checked_files)
             if(file MATCHES "^src/([^/]+)/")
                 set(own "${CMAKE_MATCH_1}")
             endif()
+            # Several lines may name one header: each allows some modules, in any file or in
+            # source files only. The include is allowed if one line allows it here.
+            set(confined FALSE)
+            set(allowed FALSE)
+            set(allowed_modules "")
+            set(sources_only_here "")
             foreach(entry IN LISTS CONFINED_INCLUDES)
                 string(REPLACE "|" ";" parts "${entry};")
                 list(GET parts 0 entry_headers)
@@ -236,14 +242,29 @@ foreach(file IN LISTS checked_files)
                         endif()
                     endif()
                 endforeach()
-                if(matches AND NOT own IN_LIST entry_module_list)
-                    report("${file}" ${number}
-                        "includes <${included}>, which only these modules may include: ${entry_modules} (POLICY.md 11.6)")
-                elseif(matches AND entry_sources STREQUAL "sources" AND file MATCHES "\\.(h|hpp|hh|hxx)$")
-                    report("${file}" ${number}
-                        "includes <${included}> in a header; only source files of ${entry_modules} may include it (POLICY.md 11.6)")
+                if(matches)
+                    set(confined TRUE)
+                    list(APPEND allowed_modules ${entry_module_list})
+                    if(own IN_LIST entry_module_list)
+                        if(entry_sources STREQUAL "sources" AND file MATCHES "\\.(h|hpp|hh|hxx)$")
+                            set(sources_only_here "${entry_modules}")
+                        else()
+                            set(allowed TRUE)
+                        endif()
+                    endif()
                 endif()
             endforeach()
+            if(confined AND NOT allowed)
+                if(NOT sources_only_here STREQUAL "")
+                    report("${file}" ${number}
+                        "includes <${included}> in a header; only source files of ${sources_only_here} may include it (POLICY.md 11.6)")
+                else()
+                    list(REMOVE_DUPLICATES allowed_modules)
+                    list(JOIN allowed_modules "," allowed_modules)
+                    report("${file}" ${number}
+                        "includes <${included}>, which only these modules may include: ${allowed_modules} (POLICY.md 11.6)")
+                endif()
+            endif()
         endif()
 
         # A test case's name, read here so that a bad one is found before the test program
@@ -326,7 +347,8 @@ file(REAL_PATH "${SOURCE_DIR}" source_norm)
 file(REAL_PATH "${POLICY_ROOT}" policy_norm)
 if(CHECK_PROJECT_FILES AND NOT per_file AND NOT source_norm STREQUAL policy_norm)
     set(policy_files .clang-tidy .clang-format CMakePresets.json tools/hooks/pre-commit
-                     tools/hooks/pre-push tools/hooks/commit-msg tools/hooks/tidy-files)
+                     tools/hooks/pre-push tools/hooks/commit-msg tools/hooks/tidy-files
+                     tools/hooks/gate)
     # A project that uses vcpkg loads it through the policy's files (POLICY.md 1.1); an edited
     # triplet would build the dependencies differently from the project.
     if(EXISTS "${SOURCE_DIR}/vcpkg.json")

@@ -56,7 +56,9 @@ in this project's own code or tests.
 
 - One doctest program per kind and module: `cpp_policy_add_tests(unit <module>
   SOURCES ...)` in `tests/CMakeLists.txt`. Unit tests use no files, network or
-  threads and finish in well under a second; others are `integration`.
+  threads, share no state and finish in well under a second; others are
+  `integration`. A module's unit tests run together in one process; run one
+  by hand with `<program> --test-case="<name>"`.
 - One behavior per `TEST_CASE`, named as a sentence about it. Tables of cases
   go in a loop with `CAPTURE`.
 - `REQUIRE` only for what the rest of the test depends on (a value before
@@ -91,9 +93,13 @@ doesn't compile: for a new file, add it to `CMakeLists.txt` first.
 Run the full gate and make sure it passes:
 
 ```
-cmake --workflow --preset check        # macOS / Linux
-cmake --workflow --preset win-check    # Windows
+sh tools/hooks/gate
 ```
+
+It runs `cmake --workflow --preset check` (`win-check` on Windows), one gate
+at a time on the machine, and ends with `gate: passed` or `gate: FAILED`.
+Read that line, or the command's own exit code: don't chain other commands
+after it and read theirs.
 
 Formatting problems: `sh tools/hooks/tidy-files --format <file>...` (or every
 file: `cmake --build --preset check --target policy-format-fix`).

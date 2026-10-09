@@ -14,8 +14,5 @@ if [ -n "$changes" ]; then
     exit 1
 fi
 
-case "$(uname -s)" in
-    MINGW*|MSYS*|CYGWIN*) preset=win-check ;;
-    *) preset=check ;;
-esac
-cmake --workflow --preset "$preset"
+# Through the gate's launcher: one gate at a time on the machine, awake, one final line.
+sh tools/hooks/gate

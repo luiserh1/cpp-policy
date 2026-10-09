@@ -38,6 +38,10 @@ set(ENV{GIT_CONFIG_COUNT} 1)
 set(ENV{GIT_CONFIG_KEY_0} core.autocrlf)
 set(ENV{GIT_CONFIG_VALUE_0} false)
 
+# The gate's launcher lets one gate run at a time on the machine. This test may itself be
+# running inside a gate that holds that lock, so the hooks it runs get a lock of their own.
+set(ENV{CPP_POLICY_GATE_LOCK} "${WORK}/gate.lock")
+
 set(repo "${WORK}/repo")
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${repo}/tools" "${WORK}/stub")
@@ -139,6 +143,30 @@ run("${GIT_EXECUTABLE}" checkout -- tracked.txt)
 run(${with_stub} tools/hooks/pre-push)
 string(FIND "${out}" "stub cmake --workflow --preset win-check" found)
 expect("code;EQUAL;0;AND;found;GREATER;-1" "pre-push must use the win-check preset under Git for Windows")
+
+# The gate's launcher: one final line, the workflow's own exit code, another workflow by
+# name, and a lock left by a gate that is gone.
+run(${with_stub} tools/hooks/gate)
+string(FIND "${out}" "gate: passed (win-check)" found)
+expect("code;EQUAL;0;AND;found;GREATER;-1" "the gate must end by saying that it passed")
+run(${with_stub} tools/hooks/gate release)
+string(FIND "${out}" "stub cmake --workflow --preset win-release" found)
+expect("code;EQUAL;0;AND;found;GREATER;-1" "the gate must run the workflow it is given")
+# 99999999 is no process: the launcher must take the lock over, not wait for it.
+file(MAKE_DIRECTORY "$ENV{CPP_POLICY_GATE_LOCK}")
+file(WRITE "$ENV{CPP_POLICY_GATE_LOCK}/pid" "99999999\n")
+run(${with_stub} tools/hooks/gate)
+string(FIND "${out}" "taking it over" found)
+expect("code;EQUAL;0;AND;found;GREATER;-1" "a lock left by a gate that is gone must be taken over")
+if(EXISTS "$ENV{CPP_POLICY_GATE_LOCK}")
+    message(FATAL_ERROR "hooks: the gate left its lock behind")
+endif()
+file(WRITE "${WORK}/stub/cmake" "#!/bin/sh\necho \"stub cmake $*\"\nexit 3\n")
+run(${with_stub} tools/hooks/gate)
+string(FIND "${out}" "gate: FAILED (win-check, exit code 3)" found)
+expect("code;EQUAL;3;AND;found;GREATER;-1"
+    "a failing workflow must end the gate with its exit code and say that it failed")
+file(WRITE "${WORK}/stub/cmake" "#!/bin/sh\necho \"stub cmake $*\"\n")
 
 # commit-msg: one message per rule. Each case is "accept" or "reject" and a message.
 function(check_message verdict text what)

@@ -104,19 +104,19 @@ function(first_commit)
     endif()
 endfunction()
 
-# The tests, as CTest sees them: one per test case, with the kind as name prefix and label.
+# The tests, as CTest sees them, with the kind as name prefix and label: one for each unit
+# program, which runs all its cases in one process.
 function(check_tests)
     set(dest "${WORK}/MyTool")
     step("${dest}" "listing the unit tests" "${CMAKE_CTEST_COMMAND}" --preset ${PRESET} -N -L "^unit$")
-    foreach(test IN ITEMS "unit/app/a name is greeted" "unit/app/empty and too long names are refused"
-                          "unit/lowlevel/a variable that isn't set is nothing")
+    foreach(test IN ITEMS "unit/app/all test cases" "unit/lowlevel/all test cases")
         string(FIND "${out}" "${test}" found)
         if(found EQUAL -1)
             message(FATAL_ERROR "new_project: CTest has no unit test '${test}':\n${out}")
         endif()
     endforeach()
-    if(NOT out MATCHES "Total Tests: 5\n")
-        message(FATAL_ERROR "new_project: expected 5 unit tests, one per test case:\n${out}")
+    if(NOT out MATCHES "Total Tests: 2\n")
+        message(FATAL_ERROR "new_project: expected 2 unit tests, one per program:\n${out}")
     endif()
     # Benchmarks don't run with sanitizers.
     step("${dest}" "listing the benchmarks" "${CMAKE_CTEST_COMMAND}" --preset ${PRESET} -N -L benchmark)

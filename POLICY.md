@@ -675,13 +675,27 @@ every pushed commit to have a result: pre-push ran the gate before the
 push, and a release is tagged on the commit whose run is green
 (section 10).
 
+**The launcher.** `sh tools/hooks/gate [workflow]` runs the workflow and
+adds what a machine shared by several unattended agents needs:
+- **One gate at a time on the machine;** a second waits for the first. Four
+  agents in four folders ran four gates at once in Alfar: one that takes 5
+  minutes alone took 25.
+- **The machine stays awake** (macOS and Linux). A test that sleeps with the
+  machine passes its time limit and is reported as failed: Alfar lost about
+  2.5 hours to one such gate, and a merge was committed after it.
+- **One last line,** `gate: passed` or `gate: FAILED`, and the workflow's own
+  exit code. That merge was committed because the exit code read was
+  another command's, later in the same line.
+
+pre-push runs the gate through it.
+
 Every layer works the same for any agent and for people: they are commands
 and git hooks, and `AGENTS.md` says when to run them. An agent with a hook
 system of its own may call `tidy-files` from it after each edit, but the
 policy relies on nothing agent-specific.
 
-The gate is `cmake --workflow --preset check` (`win-check` on Windows):
-configure, the audit and the format check (first: they take seconds, and a
+The gate is `cmake --workflow --preset check` (`win-check` on Windows),
+run through its launcher, `sh tools/hooks/gate`: configure, the audit and the format check (first: they take seconds, and a
 fault in them shouldn't wait for the compiler), build with clang-tidy, and
 tests under sanitizers. It is the only definition of "passes the policy". Every other
 layer is a faster subset of it.
@@ -1084,6 +1098,9 @@ that module.
   A name ending in `/` stands for every header under it, and one ending in
   `*` for every header whose name starts so: `imgui*` covers a library whose
   headers are in no folder of their own, and those a later version adds.
+- Several lines may name one header, and they add up: `nlohmann/ TO
+  settings` and `nlohmann/ TO inputs cache SOURCES_ONLY` allow it in
+  `settings`'s headers and in the other two modules' source files only.
 - **`SOURCES_ONLY`** allows the include only in those modules' source files,
   not in their headers. A header that includes the library passes it on to
   every file that includes that header, in any module. With `SOURCES_ONLY`
@@ -1135,7 +1152,7 @@ tools, not a program's modules.)
 
 | Kind | What it tests | Rules | Time limit |
 |---|---|---|---|
-| `unit` | One module, through its public header | No files, network, child processes, threads or clock; results don't depend on the machine | 10 seconds per test case (in practice milliseconds) |
+| `unit` | One module, through its public header | No files, network, child processes, threads or clock; results don't depend on the machine; no state shared between test cases | 60 seconds for a module's unit tests together (in practice a fraction of a second) |
 | `integration` | Modules together, or a module with the OS | Real sockets on ephemeral ports (port 0), temporary files and folders under the build folder, threads and processes; every wait has a timeout | 60 seconds, or less with `TIMEOUT` |
 | `benchmark` | What a program costs: its size and its memory under load (13.5) | Built in every configuration, so clang-tidy checks it, but run only without sanitizers, which distort size, memory and time | 60 seconds, or less with `TIMEOUT` |
 
@@ -1157,15 +1174,28 @@ cpp_policy_add_tests(integration server SOURCES test_server.cpp LIBRARIES sls_co
 - **One program per kind and module,** `test_<kind>_<module>`, built with
   the policy like any target and linked with doctest's `main()` from
   cpp-policy.
-- **Each `TEST_CASE` is one CTest test,** named `<kind>/<module>/<test
-  case>` and labelled with its kind, so `ctest -L unit` and `-R <regex>`
-  select tests. `cmake --workflow --preset unit` (`win-unit`) builds without
-  clang-tidy and runs the unit tests only.
-  - Each test case runs in its own process, so no state can leak from one
-    to another, and a crash fails only its own test.
-  - Table rows are not separate tests. Each CTest test is a process, and
-    AddressSanitizer takes about 0.15 s to start one. Rows run in a loop in
-    their test case, and `CAPTURE` names the row that failed.
+- **Tests reach CTest named `<kind>/<module>/…` and labelled with their
+  kind,** so `ctest -L unit` and `-R <regex>` select them.
+  `cmake --workflow --preset unit` (`win-unit`) builds without clang-tidy
+  and runs the unit tests only.
+  - **A module's unit tests are one CTest test,** `unit/<module>/all test
+    cases`: the program runs once, with every test case in one process. A
+    failure names its test case, file and line, as doctest prints them. To
+    run one case by hand: `<program> --test-case="<name>"`.
+  - **Each integration or benchmark test case is its own CTest test,**
+    `<kind>/<module>/<test case>`, in its own process: they use files, ports
+    and the environment, and a crash fails only its own test.
+  - *Why the difference:* under the sanitizers a process costs about 0.2 s,
+    0.12 s of it LeakSanitizer's check when the process ends, whatever the
+    test does. Measured on a project with 1,505 unit test cases in 10
+    programs: 311 s with a process per case (77 s with ten at a time), 2 s
+    with a process per program. Alfar's gate had grown from under a minute
+    to eight for that reason alone. Unit tests may share no state (13.1), so
+    separate processes protected nothing there.
+  - When a unit test crashes (a sanitizer report), doctest names the test
+    case and the cases after it in that program don't run until it is fixed.
+  - Table rows are not separate tests. Rows run in a loop in their test
+    case, and `CAPTURE` names the row that failed.
 - **A test case is named after its behavior,** as a sentence ("an empty name
   is refused"). Names use letters, digits, spaces and `' . : ( ) + = - _`.
   doctest selects a test by a filter in which `,` `*` `?` and `\` are
@@ -1319,8 +1349,15 @@ the end (528 MB on 92 images) while its `export` passed its test.
   | Measure | What it reads | Use |
   |---|---|---|
   | `cpp_policy::live_heap_bytes()`, `peak_heap_bytes()` | An exact count of the C++ heap: every block from `operator new` until its `operator delete` | The memory test |
-  | `cpp_policy::peak_memory_bytes()` | The operating system's peak for the process | A second test, only where the program's own memory is outside the C++ heap: a C library's `malloc`, mapped files. Sockets don't count: their buffers are the kernel's |
+  | `cpp_policy::peak_memory_bytes()` | The operating system's peak for the process | A second test, only where the program's own memory is outside the C++ heap and can't be brought into it (below): a C library's `malloc`, mapped files. Sockets don't count: their buffers are the kernel's |
 
+- **A C library that takes an allocator is given one that uses `operator
+  new`.** zlib's `z_stream` has `zalloc` and `zfree`; set to two functions
+  that call `operator new` and `operator delete`, in the confined file that
+  wraps the library, every block zlib needs is C++ heap and the heap test
+  counts it exactly. The command then needs no operating-system test.
+  ToneMatcher's two such tests, kept for zlib, failed four times in two
+  weeks without finding a leak.
 - **The heap test** (`#include <cpp_policy/heap_bytes.hpp>`) differs for a
   batch command and a server. `live_heap_bytes()` gives the same number to
   the byte for the same work, on every run and every machine load. So does

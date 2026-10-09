@@ -16,12 +16,18 @@ file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 set(ctest_file "${WORK}/tests.cmake")
 
-execute_process(COMMAND "${CMAKE_COMMAND}" "-DLISTING_FILE=${LISTING}" -DKIND=unit -DMODULE=app
+# A case whose name ends in _unit is registered as unit tests, the others as integration
+# tests: the checks are the same, the tests written differ.
+set(kind integration)
+if(case MATCHES "_unit$")
+    set(kind unit)
+endif()
+execute_process(COMMAND "${CMAKE_COMMAND}" "-DLISTING_FILE=${LISTING}" -DKIND=${kind} -DMODULE=app
     -DTIMEOUT=10 "-DWORKING_DIR=${WORK}" "-DCTEST_FILE=${ctest_file}" "-DENVIRONMENT=A=1;B=2"
     -P "${POLICY_ROOT}/cmake/scripts/doctest_tests.cmake"
     RESULT_VARIABLE code OUTPUT_VARIABLE out ERROR_VARIABLE err)
 set(output "${out}${err}")
-if(case STREQUAL "ok")
+if(case MATCHES "^ok")
     if(NOT code EQUAL 0 OR NOT EXISTS "${ctest_file}")
         message(FATAL_ERROR "testing/${case}: the script failed (exit code ${code}):\n${output}")
     endif()

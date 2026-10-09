@@ -48,7 +48,7 @@ git -C "$dest" init --quiet
 git -C "$dest" config core.hooksPath tools/hooks
 echo
 echo "Next, in $dest:"
-echo "  cmake --workflow --preset check     (win-check on Windows)"
+echo "  sh tools/hooks/gate                 (the gate: cmake --workflow --preset check)"
 echo "  git add --all && git commit         (the hooks check the first commit too)"
 echo "The size budget in CMakeLists.txt is the sample program's: the first real program is"
 echo "larger, and its budget is yours to approve (POLICY.md 13.5)."
