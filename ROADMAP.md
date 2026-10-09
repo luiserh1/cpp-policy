@@ -20,7 +20,10 @@ ToneMatcher's library in Alfar:
 - [ ] `upgrade.sh` moves a library's pin as it moves cpp-policy's.
 - [ ] A library offers test helpers, declared as test code.
 - [ ] The credential a private repository needs to be fetched in CI.
-- [ ] What that first use found awkward in the two functions.
+- [ ] A library's headers that its user may not include (asked by
+      ToneMatcher: `png_format.hpp` and `zlib_stream.hpp` are internal by a
+      comment only).
+- [ ] What Alfar finds awkward in using the library.
 
 ### From Alfar's report, not yet designed
 

@@ -8,6 +8,10 @@
 # own file grows with names, not with code. The script prints the size, the budget, and a
 # budget with the policy's 5% headroom. A program over its budget, or with no budget for this
 # system, fails, with the copy's sections listed to show where the size is.
+#
+# With -DREPORT_ONLY=ON it only says the size and what is left of the budget, in one line, and
+# never fails: cpp_policy_size_budget() runs that after each link, because CTest shows a
+# passing test's output to nobody.
 
 cmake_minimum_required(VERSION 3.29)
 cmake_path(GET PROGRAM FILENAME name)
@@ -21,6 +25,22 @@ endif()
 file(SIZE "${copy}" size)
 # 5% headroom, rounded up to whole KiB.
 math(EXPR suggested "((${size} * 105 / 100) + 1023) / 1024 * 1024")
+
+if(REPORT_ONLY)
+    if("${BUDGET}" STREQUAL "")
+        message("cpp-policy: ${name} is ${size} bytes stripped; it has no ${SYSTEM} budget "
+                "(with 5% headroom: ${suggested})")
+    elseif(size GREATER BUDGET)
+        math(EXPR over "${size} - ${BUDGET}")
+        message("cpp-policy: ${name} is ${size} bytes stripped, ${over} OVER its ${SYSTEM} "
+                "budget of ${BUDGET}")
+    else()
+        math(EXPR left "${BUDGET} - ${size}")
+        message("cpp-policy: ${name} is ${size} bytes stripped, ${left} under its ${SYSTEM} "
+                "budget of ${BUDGET}")
+    endif()
+    return()
+endif()
 
 execute_process(COMMAND "${SIZE}" -A "${copy}" OUTPUT_VARIABLE sections ERROR_QUIET)
 if("${BUDGET}" STREQUAL "")

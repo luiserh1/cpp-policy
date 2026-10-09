@@ -1150,13 +1150,23 @@ days.
 
   The project's `CMakeLists.txt` includes that file; so does a user. vcpkg,
   tests, checks and programs stay in `CMakeLists.txt`, which a user never
-  runs.
+  runs. `CMakeLists.txt` doesn't repeat the `find_package()` calls.
+- **The library's target is `<name>_library`, linked by its alias
+  `<name>::<name>`.** The plain name `<name>` is left for the program,
+  which is usually called like its library (`tonematcher`).
 - **The library has layers of its own** (`LAYER`, from the lowest up), and
   its `lowlevel` module is a confined area (section 4). The program's
   layers, in `cpp_policy_layers()`, are all above it.
 - **The library doesn't include the program.** A dependency's headers are
   confined to its modules as `<name>/<module>` (11.6).
 - A project offers one library. Its tests are the project's tests.
+- **Every header of the library can be included by its user,** including one
+  whose comment says it is internal to a module. Until headers can be marked
+  private, keep what must stay inside in a source file, or behind a class
+  that holds its state out of the header. That is also how a C library's
+  type stays out of a header: a forward declaration of `z_stream_s` is
+  refused for its name, and a class with a hidden state (ToneMatcher's
+  `lowlevel::Deflater`) keeps `zlib.h` in one source file.
 - **A release of the library is a tag on a commit whose CI was green on
   every system.** A user compiles the library's code for systems it may
   never build on itself, and the library's CI is the only place that code
@@ -1413,7 +1423,10 @@ cpp_policy_size_budget(my_tool MACOS 109568 LINUX 93184 WINDOWS 285696)
   than code. In SimpleLocalServer's, it was 41% of the bytes.
 - A budget is the stripped size plus **5%**, rounded up to whole KiB. The test
   `benchmark/size/<program>` prints the size, and the budget to set when there
-  is none for this system or when the program has outgrown it. A fresh build
+  is none for this system or when the program has outgrown it. A release
+  build also says the size, and what is left of the budget, after each link:
+  CTest shows a passing test's output to nobody, and ToneMatcher's program
+  had been 160 bytes under its budget without anyone knowing. A fresh build
   gives the same size to the byte, and toolchain updates moved
   SimpleLocalServer's by 544 bytes over many releases. So 5% catches real
   growth (a new dependency, a large table) without failing on noise.
@@ -1689,7 +1702,9 @@ median of three reruns), 2026-10-01:
     to matter (zlib's memory through `operator new`, and a new
     decompression loop) moved the one benchmark that reads and writes PNGs
     by 0.08% and the other three by under 0.0001%. Its time went from 344
-    to 371 ms, which alone would have said nothing.
+    to 371 ms, which alone would have said nothing. Moving 46 files between
+    folders and targets, with no change to the code, moved the counts by at
+    most 99 instructions.
 
 ### 14.3 Writing fast code without weakening it
 
@@ -1795,6 +1810,13 @@ is what a user can do; and the frontends, which only present it.
 - **Frontends hold no logic.** Validation, defaults and formatting that two
   frontends would both need live behind the interface. Behaviour is tested
   once, at the interface, without any frontend.
+- **Reading and writing files are separate functions from the work.** The
+  entry takes and returns data in memory. A helper that loads that data
+  from a path (a configuration, a saved map) may live beside it, in the
+  backend or the library, when more than one frontend needs it; it is its
+  own function, so a frontend that already has the data never touches a
+  file. ToneMatcher's library reads no file in its entry, and offers
+  `load_pipeline_config()` next to it.
 - An interface written this way can also be called from another language,
   which is what a phone frontend needs. Building for iOS and Android is not
   covered by this policy yet.

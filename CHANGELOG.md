@@ -3,16 +3,68 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
-## Unreleased
+## 0.31.0 (2026-10-09)
 
-- POLICY.md 13.5 and `heap_bytes.hpp`: how to measure what one operation
-  adds to the heap (the peak is absolute; subtract the live bytes read
-  before it), and three notes on giving a C library an allocator (only a
-  stream takes one, so `compress`/`uncompress` are replaced; allocate with
-  `std::nothrow`; test that the memory arrives). *Why:* ToneMatcher did it
-  as 13.5 said and reported what the text had left out, including a test
-  that passed for the wrong reason.
-- POLICY.md 14.2: the instruction-count trial's first results.
+From ToneMatcher, which released its library on v0.30.0 the same day: a
+defect in the audit, and what the two library functions made awkward. The
+library's target is renamed, so a project that declares one changes a few
+lines: a minor release.
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** only for a project that offers a library
+(ToneMatcher): see step 2.
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.31.0`.
+2. The library's target is now `<name>_library`. Link it by its alias,
+   `<name>::<name>`, everywhere; the program can take the name `<name>` back
+   (and its size budget with it).
+3. `cpp_policy_confine_includes()` lines that were left out because of the
+   defect below can go in.
+
+### Fixed
+
+- **With any `cpp_policy_confine_includes()` line, the audit rejected every
+  suppression below a file's first `#include`** as "outside a confined
+  area", in confined folders too. The change of 0.29.0 that made two lines
+  for one header add up reused the variable that says whether the file is
+  confined. Found by ToneMatcher, with the line numbers; no fixture had a
+  confinement line and a suppression together, and `includes_in_confined`
+  now does. Projects on 0.29.0 or 0.30.0 with such lines and a `NOLINT` in
+  `src/lowlevel/` fail their audit until they upgrade.
+
+### Changed
+
+- **A library's target is `<name>_library`,** with the alias
+  `<name>::<name>` and the file `lib<name>.a` (POLICY.md 11.7). *Why:* in
+  0.30.0 it was `<name>`, which is what a project's program is usually
+  called; ToneMatcher had to rename its program's target to
+  `tonematcher_program`. The self-test's library project now has a program
+  with the library's name.
+- **A release build says each program's size after it links,** and what is
+  left of its budget (13.5). *Why:* CTest hides a passing test's output, so
+  the size could be read only from a failing job. ToneMatcher's program had
+  been 160 bytes under its macOS budget without anyone knowing, and its
+  Windows size couldn't be read at all.
+
+### Documentation
+
+- 11.7: `CMakeLists.txt` doesn't repeat `library.cmake`'s `find_package()`
+  calls; every header of a library can be included by its user, and how to
+  keep something inside meanwhile (a class with a hidden state, which is
+  also how a C library's type stays out of a header).
+- 15.6: reading and writing files are functions apart from the entry, and
+  may live beside it.
+- 13.5 and `heap_bytes.hpp`: how to measure what one operation adds to the
+  heap (the peak is absolute; subtract the live bytes read before it), and
+  three notes on giving a C library an allocator (only a stream takes one,
+  so `compress`/`uncompress` are replaced; allocate with `std::nothrow`;
+  test that the memory arrives). ToneMatcher did it as 13.5 said and
+  reported what the text had left out, including a test that passed for
+  the wrong reason.
+- 14.2: the instruction-count trial's first results. A real change showed
+  as 0.08% on the one benchmark it touched; moving 46 files between folders
+  and targets changed the others by at most 99 instructions.
 
 ## 0.30.0 (2026-10-09)
 

@@ -666,7 +666,8 @@ endfunction()
 # LAYER: the library's modules from the lowest layer up, as in cpp_policy_layers(); the audit
 # holds them, and refuses an include from the library into src/. SOURCES: relative to
 # lib/<name>/. DEPENDENCIES: the vcpkg packages it needs, which a user's vcpkg.json must
-# list. LINK: the targets it links, PUBLIC. It defines <name> and the alias <name>::<name>.
+# list. LINK: the targets it links, PUBLIC. It defines the target <name>_library, which
+# everyone links by its alias <name>::<name>; the name <name> is left for a program.
 # ---------------------------------------------------------------------------
 set(CPP_POLICY_LIBRARY_FLOOR 0.30.0 CACHE INTERNAL
     "The oldest cpp-policy release a library may pin for this release to use it (POLICY.md 11.7)")
@@ -728,9 +729,11 @@ function(cpp_policy_library name)
     if(layers STREQUAL "" OR sources STREQUAL "")
         message(FATAL_ERROR "cpp-policy: usage: ${usage}")
     endif()
-    if(TARGET ${name})
-        message(FATAL_ERROR "cpp-policy: there is already a target '${name}'; a library is "
-            "declared once")
+    # The target is <name>_library and the file lib<name>.a: the project's program is often
+    # called <name> too. Everyone links the alias, <name>::<name>.
+    set(target ${name}_library)
+    if(TARGET ${target})
+        message(FATAL_ERROR "cpp-policy: the library '${name}' is declared already")
     endif()
 
     # This call's file, not this function's: library.cmake, wherever it was fetched to.
@@ -744,18 +747,19 @@ function(cpp_policy_library name)
         list(APPEND files "${root}/lib/${name}/${source}")
     endforeach()
 
-    add_library(${name} STATIC ${files})
-    add_library(${name}::${name} ALIAS ${name})
+    add_library(${target} STATIC ${files})
+    add_library(${name}::${name} ALIAS ${target})
+    set_target_properties(${target} PROPERTIES OUTPUT_NAME ${name})
     if(link)
-        target_link_libraries(${name} PUBLIC ${link})
+        target_link_libraries(${target} PUBLIC ${link})
     endif()
     get_property(used GLOBAL PROPERTY _CPP_POLICY_USING_LIBRARY)
     if(used)
         # For the user its headers are a dependency's: the user's warnings as errors and
         # clang-tidy don't apply inside them, whatever folder they were fetched to.
-        target_include_directories(${name} SYSTEM PUBLIC "${root}/lib")
+        target_include_directories(${target} SYSTEM PUBLIC "${root}/lib")
     else()
-        target_include_directories(${name} PUBLIC "${root}/lib")
+        target_include_directories(${target} PUBLIC "${root}/lib")
     endif()
     if(used)
         # In a user's build (cpp_policy_use_library).
@@ -763,7 +767,7 @@ function(cpp_policy_library name)
             message(FATAL_ERROR "cpp-policy: cpp_policy_use_library(${used}) fetched a library "
                 "that calls itself '${name}'")
         endif()
-        set_target_properties(${name} PROPERTIES CPP_POLICY_LIBRARY_DEPENDENCY TRUE)
+        set_target_properties(${target} PROPERTIES CPP_POLICY_LIBRARY_DEPENDENCY TRUE)
         set_property(GLOBAL PROPERTY _CPP_POLICY_USED_DEPENDENCIES "${dependencies}")
     else()
         # In the library's own project: checked like the rest of it.
@@ -779,7 +783,7 @@ function(cpp_policy_library name)
         set_property(GLOBAL PROPERTY CPP_POLICY_LIBRARY "${name}")
         set_property(GLOBAL PROPERTY CPP_POLICY_LIBRARY_LAYERS "${layers}")
     endif()
-    cpp_policy_apply(${name})
+    cpp_policy_apply(${target})
 endfunction()
 
 # ---------------------------------------------------------------------------
@@ -807,8 +811,8 @@ function(cpp_policy_use_library name)
             "commit (40 hexadecimal digits), with the release in a comment beside it: a tag "
             "can be moved to other code later (POLICY.md 10)")
     endif()
-    if(TARGET ${name})
-        message(FATAL_ERROR "cpp-policy: there is already a target '${name}'")
+    if(TARGET ${name}_library)
+        message(FATAL_ERROR "cpp-policy: the library '${name}' is used already")
     endif()
     include(FetchContent)
     # SOURCE_SUBDIR names a folder that isn't there, so that the repository is fetched and
@@ -855,7 +859,7 @@ function(cpp_policy_use_library name)
     set_property(GLOBAL PROPERTY _CPP_POLICY_USED_DEPENDENCIES "")
     include("${source}/library.cmake")
     set_property(GLOBAL PROPERTY _CPP_POLICY_USING_LIBRARY "")
-    if(NOT TARGET ${name})
+    if(NOT TARGET ${name}_library)
         message(FATAL_ERROR "cpp-policy: ${source}/library.cmake didn't declare the library "
             "'${name}' with cpp_policy_library()")
     endif()
@@ -1200,6 +1204,14 @@ function(cpp_policy_size_budget target)
                 "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/cpp_policy_size"
                 -P "${CPP_POLICY_ROOT}/cmake/scripts/size_budget.cmake")
     set_tests_properties(benchmark/size/${target} PROPERTIES LABELS benchmark TIMEOUT 60)
+    # And said after each link: CTest hides a passing test's output, so nobody saw how close
+    # a program was to its budget (ToneMatcher's was 160 bytes under, unknown to all).
+    add_custom_command(TARGET ${target} POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" "-DPROGRAM=$<TARGET_FILE:${target}>" "-DSYSTEM=${system}"
+                "-DBUDGET=${budget}" "-DSTRIP=${CPP_POLICY_STRIP_EXE}" "-DSIZE=${CPP_POLICY_SIZE_EXE}"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/cpp_policy_size" -DREPORT_ONLY=ON
+                -P "${CPP_POLICY_ROOT}/cmake/scripts/size_budget.cmake"
+        VERBATIM)
 endfunction()
 
 # ---------------------------------------------------------------------------

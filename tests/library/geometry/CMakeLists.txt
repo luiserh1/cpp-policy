@@ -17,11 +17,11 @@ endif()
 # The library: lib/geometry/, declared in the one file its users include too.
 include(library.cmake)
 
-# The program, over it.
-add_executable(areas src/main.cpp src/app/report.cpp)
-target_include_directories(areas PRIVATE src)
-target_link_libraries(areas PRIVATE geometry::geometry)
-cpp_policy_apply(areas)
+# The program, over it, with the library's name: the library's target is geometry_library.
+add_executable(geometry src/main.cpp src/app/report.cpp)
+target_include_directories(geometry PRIVATE src)
+target_link_libraries(geometry PRIVATE geometry::geometry)
+cpp_policy_apply(geometry)
 
 cpp_policy_layers(LAYER app)
 cpp_policy_add_checks()
