@@ -666,7 +666,9 @@ endfunction()
 # LAYER: the library's modules from the lowest layer up, as in cpp_policy_layers(); the audit
 # holds them, and refuses an include from the library into src/. SOURCES: relative to
 # lib/<name>/. DEPENDENCIES: the vcpkg packages it needs, which a user's vcpkg.json must
-# list. LINK: the targets it links, PUBLIC. It defines the target <name>_library, which
+# list. TEST_SUPPORT: files of the library's modules that only tests use, which become
+# <name>::test_support, with TEST_LINK for what they link (doctest::doctest). LINK: the
+# targets it links, PUBLIC. It defines the target <name>_library, which
 # everyone links by its alias <name>::<name>; the name <name> is left for a program.
 # ---------------------------------------------------------------------------
 set(CPP_POLICY_LIBRARY_FLOOR 0.30.0 CACHE INTERNAL
@@ -674,7 +676,8 @@ set(CPP_POLICY_LIBRARY_FLOOR 0.30.0 CACHE INTERNAL
 
 function(cpp_policy_library name)
     set(usage "cpp_policy_library(<name> LAYER <module>... [LAYER <module>...]... "
-              "SOURCES <file>... [DEPENDENCIES <vcpkg package>...] [LINK <target>...])")
+              "SOURCES <file>... [DEPENDENCIES <vcpkg package>...] [LINK <target>...] "
+              "[TEST_SUPPORT <file>...] [TEST_LINK <target>...])")
     string(JOIN "" usage ${usage})
     if(NOT name MATCHES "^[a-z][a-z0-9_]*$")
         message(FATAL_ERROR "cpp-policy: a library's name is lower case letters, digits and "
@@ -687,6 +690,8 @@ function(cpp_policy_library name)
     set(sources "")
     set(dependencies "")
     set(link "")
+    set(test_support "")
+    set(test_link "")
     set(reading "")
     foreach(argument IN LISTS ARGN)
         if(argument STREQUAL "LAYER")
@@ -698,7 +703,7 @@ function(cpp_policy_library name)
             endif()
             set(current "")
             set(reading layer)
-        elseif(argument MATCHES "^(SOURCES|DEPENDENCIES|LINK)$")
+        elseif(argument MATCHES "^(SOURCES|DEPENDENCIES|LINK|TEST_SUPPORT|TEST_LINK)$")
             string(TOLOWER "${argument}" reading)
         elseif(reading STREQUAL "layer")
             if(NOT argument MATCHES "^[a-z0-9_]+$")
@@ -719,6 +724,10 @@ function(cpp_policy_library name)
             list(APPEND dependencies "${argument}")
         elseif(reading STREQUAL "link")
             list(APPEND link "${argument}")
+        elseif(reading STREQUAL "test_support")
+            list(APPEND test_support "${argument}")
+        elseif(reading STREQUAL "test_link")
+            list(APPEND test_link "${argument}")
         else()
             message(FATAL_ERROR "cpp-policy: usage: ${usage}")
         endif()
@@ -745,6 +754,22 @@ function(cpp_policy_library name)
                 "of its modules (${modules}); SOURCES are relative to lib/${name}/")
         endif()
         list(APPEND files "${root}/lib/${name}/${source}")
+    endforeach()
+    # What the library offers to tests, its own and its users': never part of the library.
+    set(test_files "")
+    set(test_compiled FALSE)
+    foreach(source IN LISTS test_support)
+        if(NOT source MATCHES "^([a-z0-9_]+)/" OR NOT CMAKE_MATCH_1 IN_LIST modules)
+            message(FATAL_ERROR "cpp-policy: library '${name}': test support '${source}' isn't "
+                "in one of its modules (${modules}); TEST_SUPPORT is relative to lib/${name}/")
+        elseif(source IN_LIST sources)
+            message(FATAL_ERROR "cpp-policy: library '${name}': '${source}' is in SOURCES and "
+                "in TEST_SUPPORT; what tests use isn't part of the library")
+        endif()
+        list(APPEND test_files "${root}/lib/${name}/${source}")
+        if(source MATCHES "\\.(cpp|cc|cxx)$")
+            set(test_compiled TRUE)
+        endif()
     endforeach()
 
     add_library(${target} STATIC ${files})
@@ -784,6 +809,27 @@ function(cpp_policy_library name)
         set_property(GLOBAL PROPERTY CPP_POLICY_LIBRARY_LAYERS "${layers}")
     endif()
     cpp_policy_apply(${target})
+
+    # <name>::test_support, for the tests of the library's project and of its users.
+    if(test_files)
+        set(support ${name}_test_support)
+        if(test_compiled)
+            add_library(${support} STATIC ${test_files})
+            target_link_libraries(${support} PUBLIC ${target} ${test_link})
+            if(used)
+                set_target_properties(${support} PROPERTIES CPP_POLICY_LIBRARY_DEPENDENCY TRUE)
+            endif()
+            cpp_policy_apply(${support})
+            if(NOT used)
+                cpp_policy_test_support(${support})
+            endif()
+        else()
+            # Headers only: nothing to compile, so nothing to apply.
+            add_library(${support} INTERFACE)
+            target_link_libraries(${support} INTERFACE ${target} ${test_link})
+        endif()
+        add_library(${name}::test_support ALIAS ${support})
+    endif()
 endfunction()
 
 # ---------------------------------------------------------------------------
@@ -855,6 +901,7 @@ function(cpp_policy_use_library name)
             "(POLICY.md 11.7)")
     endif()
 
+    set_property(GLOBAL APPEND PROPERTY CPP_POLICY_USED_LIBRARIES "${name}")
     set_property(GLOBAL PROPERTY _CPP_POLICY_USING_LIBRARY "${name}")
     set_property(GLOBAL PROPERTY _CPP_POLICY_USED_DEPENDENCIES "")
     include("${source}/library.cmake")
@@ -1236,6 +1283,7 @@ function(cpp_policy_add_checks)
     get_property(confined_includes GLOBAL PROPERTY CPP_POLICY_CONFINED_INCLUDES)
     get_property(library GLOBAL PROPERTY CPP_POLICY_LIBRARY)
     get_property(library_layers GLOBAL PROPERTY CPP_POLICY_LIBRARY_LAYERS)
+    get_property(used_libraries GLOBAL PROPERTY CPP_POLICY_USED_LIBRARIES)
     # A library's lowlevel module is a confined area like src/lowlevel (POLICY.md 4).
     set(confined_dirs "${CPP_POLICY_CONFINED_DIRS}")
     if(library)
@@ -1252,6 +1300,7 @@ function(cpp_policy_add_checks)
         "set(CONFINED_INCLUDES [==[${confined_includes}]==])\n"
         "set(LIBRARY [==[${library}]==])\n"
         "set(LIBRARY_LAYERS [==[${library_layers}]==])\n"
+        "set(USED_LIBRARIES [==[${used_libraries}]==])\n"
         "set(CLANG_FORMAT [==[${CPP_POLICY_CLANG_FORMAT_EXE}]==])\n"
         "set(CLANG_TIDY [==[${CPP_POLICY_CLANG_TIDY_EXE}]==])\n"
         "set(BUILD_DIR [==[${CMAKE_BINARY_DIR}]==])\n")

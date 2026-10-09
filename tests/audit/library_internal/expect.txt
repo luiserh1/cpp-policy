@@ -1,0 +1,1 @@
+lib/geometry/shapes/area.hpp:3: error: includes "geometry/lowlevel/internal/format.hpp", which is internal to the module .lowlevel..*cpp-policy audit: 1 violation

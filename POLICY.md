@@ -1160,13 +1160,19 @@ days.
 - **The library doesn't include the program.** A dependency's headers are
   confined to its modules as `<name>/<module>` (11.6).
 - A project offers one library. Its tests are the project's tests.
-- **Every header of the library can be included by its user,** including one
-  whose comment says it is internal to a module. Until headers can be marked
-  private, keep what must stay inside in a source file, or behind a class
-  that holds its state out of the header. That is also how a C library's
-  type stays out of a header: a forward declaration of `z_stream_s` is
-  refused for its name, and a class with a hidden state (ToneMatcher's
-  `lowlevel::Deflater`) keeps `zlib.h` in one source file.
+- **A header in `lib/<name>/<module>/internal/` is that module's own.** No
+  other module of the library includes it, and no user does: both audits
+  refuse it. Every other header of the library can be included by a user.
+  ToneMatcher's `png_format.hpp` and `zlib_stream.hpp` were internal by a
+  comment only.
+- **A C library's type stays out of a header behind a class with a hidden
+  state.** A forward declaration of `z_stream_s` is refused for its name;
+  ToneMatcher's `lowlevel::Deflater` keeps `zlib.h` in one source file.
+- **What only tests use is offered apart,** as `<name>::test_support`:
+  `TEST_SUPPORT <files>` in `cpp_policy_library()`, with `TEST_LINK` for what
+  they link. They are files of the library's modules that aren't in
+  `SOURCES` (a folder for scratch files, sample inputs), checked as test
+  code. The library's tests link it, and so do a user's.
 - **A release of the library is a tag on a commit whose CI was green on
   every system.** A user compiles the library's code for systems it may
   never build on itself, and the library's CI is the only place that code
@@ -1185,6 +1191,7 @@ cpp_policy_confine_includes(tonematcher/ TO textures)
 
 - **A release, pinned by commit,** with the version in a comment, like
   cpp-policy's own pin (section 10).
+  `sh tools/upgrade.sh --library <name> <tag>` moves it and runs the gate.
 - **The library is built in this project's build, as a dependency.** It gets
   this build's compiler, standard, hardening and sanitizers, which must be
   the same in everything linked together. It doesn't get this project's
@@ -1205,16 +1212,23 @@ cpp_policy_confine_includes(tonematcher/ TO textures)
   the commit that moves the pin raises it, with the owner's approval and
   the library named as the reason.
 
+**A library in a private repository.** On a developer's machine git fetches
+it with the developer's own access. In CI the gate needs a token that can
+read that repository: the owner creates it, stores it as a secret of the
+user's repository, and passes it to the gate as `library_token` (README,
+"Continuous integration"). The gate gives it to git for that job only, as a
+header sent to the libraries' addresses and to no other. Agents never see
+or handle it.
+
 **Not supported yet:** a project that is only a library; a library that
-uses a library; marking some of a library's headers private; test helpers
-offered by a library; a private repository fetched in CI, which needs a
-credential.
+uses a library.
 
 *Enforcement:* the audit rejects, in the library's project, an include from
 `lib/` of anything but `"<name>/<module>/…"`, an include of a higher layer
-of the library, and a module of `lib/` in no layer. Configuration rejects,
-in the user's project, a pin that isn't a commit, a library below the floor
-and a missing package. That a release was green on every system relies on
+of the library, a module of `lib/` in no layer, and another module's
+`internal/` header. In the user's project the audit rejects an include of a
+library's `internal/` header, and configuration rejects a pin that isn't a
+commit, a library below the floor and a missing package. That a release was green on every system relies on
 review.
 
 ## 12. Waiting on the toolchain

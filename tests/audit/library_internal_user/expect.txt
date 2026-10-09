@@ -1,0 +1,1 @@
+src/app/report.cpp:2: error: includes a header that is internal to the library .geometry. \(its module .lowlevel.\).*cpp-policy audit: 1 violation

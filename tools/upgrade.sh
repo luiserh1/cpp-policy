@@ -3,6 +3,10 @@
 # root with the release tag:
 #
 #   sh <cpp-policy>/tools/upgrade.sh v0.7.0 [--no-gate]
+#   sh <cpp-policy>/tools/upgrade.sh --library <name> v1.2.0 [--no-gate]
+#
+# The second form moves the pin of a library the project uses (cpp_policy_use_library,
+# POLICY.md 11.7) to that release of the library: its commit, with the tag in a comment.
 #
 # <cpp-policy> can be any copy of cpp-policy, such as the one the build fetched
 # (build/check/_deps/cpp_policy-src). The release itself is fetched from the project's
@@ -24,8 +28,70 @@ fail() {
 }
 usage() {
     echo "usage: sh upgrade.sh <tag, e.g. v0.7.0> [--no-gate]" >&2
+    echo "       sh upgrade.sh --library <name> <tag> [--no-gate]" >&2
     exit 2
 }
+
+# --library: move the pin of a library this project uses (POLICY.md 11.7), nothing else.
+if [ "${1:-}" = --library ]; then
+    [ $# -ge 3 ] && [ $# -le 4 ] || usage
+    name=$2
+    tag=$3
+    gate=yes
+    if [ $# -eq 4 ]; then
+        [ "$4" = --no-gate ] || usage
+        gate=no
+    fi
+    case $tag in
+        v[0-9]*.[0-9]*.[0-9]*) ;;
+        *) usage ;;
+    esac
+    [ -f CMakeLists.txt ] || fail "run it from the project's root (there is no CMakeLists.txt here)"
+    [ -z "$(git status --porcelain)" ] || fail "the working folder has uncommitted changes; commit or stash them first"
+    # The call, then the first GIT_REPOSITORY and GIT_TAG from it on.
+    use_line=$(awk -v name="$name" '
+        {
+            line = $0
+            if (sub(/^.*cpp_policy_use_library[ \t]*\([ \t]*/, "", line)) {
+                split(line, words, /[ \t)]/)
+                if (words[1] == name) { print NR; exit }
+            }
+        }' CMakeLists.txt)
+    [ -n "$use_line" ] || fail "CMakeLists.txt has no cpp_policy_use_library($name ...)"
+    repo_line=$(awk -v start="$use_line" 'NR >= start && /GIT_REPOSITORY/ { print NR; exit }' CMakeLists.txt)
+    pin_line=$(awk -v start="$use_line" 'NR >= start && /GIT_TAG/ { print NR; exit }' CMakeLists.txt)
+    [ -n "$repo_line" ] && [ -n "$pin_line" ] ||
+        fail "cpp_policy_use_library($name ...) has no GIT_REPOSITORY and GIT_TAG"
+    url=$(sed -n "${repo_line}s/.*GIT_REPOSITORY[[:space:]]*\([^[:space:])]*\).*/\1/p" CMakeLists.txt)
+    sed -n "${pin_line}p" CMakeLists.txt | grep -q 'GIT_TAG[[:space:]]*[0-9a-f]\{40\}' ||
+        fail "CMakeLists.txt line $pin_line must pin the library by commit (POLICY.md 11.7), not by tag"
+    # A release is a tag; an annotated tag's commit is its "^{}" line.
+    refs=$(git ls-remote "$url" "refs/tags/$tag" "refs/tags/$tag^{}" 2>/dev/null) ||
+        fail "can't reach $url"
+    commit=$(printf '%s\n' "$refs" | awk '$2 ~ /\^\{\}$/ { print $1; found = 1 } END { if (!found) exit 1 }') ||
+        commit=$(printf '%s\n' "$refs" | awk 'NF { print $1; exit }')
+    [ -n "$commit" ] || fail "$url has no release $tag"
+    work=$(mktemp -d)
+    trap 'rm -rf "$work"' EXIT
+    sed -e "${pin_line}s/[0-9a-f]\{40\}/$commit/" CMakeLists.txt >"$work/CMakeLists.txt"
+    if sed -n "${pin_line}p" "$work/CMakeLists.txt" | grep -q '#[[:space:]]*v[0-9]'; then
+        sed -e "${pin_line}s/#[[:space:]]*v[0-9][0-9.]*/# $tag/" "$work/CMakeLists.txt" >"$work/second"
+    else
+        sed -e "${pin_line}s/\$/ # $tag/" "$work/CMakeLists.txt" >"$work/second"
+    fi
+    # cat keeps the file's permissions.
+    cat "$work/second" >CMakeLists.txt
+    sed -n "${pin_line}p" CMakeLists.txt | grep -q "$commit.*# $tag" ||
+        fail "the library's pin didn't change as expected (CMakeLists.txt line $pin_line)"
+    echo "library $name: $tag is commit $commit."
+    git --no-pager diff -- CMakeLists.txt
+    echo "Read the library's CHANGELOG for $tag: a change that alters a result is said there first."
+    echo "Its code counts in this project's size and memory budgets (POLICY.md 11.7, 13.5)."
+    if [ "$gate" = yes ]; then
+        sh tools/hooks/gate
+    fi
+    exit 0
+fi
 
 [ $# -ge 1 ] && [ $# -le 2 ] || usage
 tag=$1

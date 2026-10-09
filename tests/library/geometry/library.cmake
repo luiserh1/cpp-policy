@@ -3,8 +3,13 @@
 cpp_policy_library(geometry
     LAYER lowlevel
     LAYER shapes
+    LAYER testing
     SOURCES
         lowlevel/clock.cpp
         shapes/area.cpp
+    # What tests use, the library's own and its users': geometry::test_support.
+    TEST_SUPPORT
+        testing/samples.hpp
+        testing/samples.cpp
     # Declared for the self-test of the check; this library links nothing.
     DEPENDENCIES zlib)

@@ -22,6 +22,12 @@ name: benchmark
 
 on:
   workflow_call:
+    secrets:
+      library_token:
+        description: >-
+          A token that can read the private repositories of the libraries this project uses
+          (POLICY.md 11.7). Not needed when they are public, or when there are none.
+        required: false
 
 permissions:
   contents: read
@@ -47,6 +53,40 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      # A library this project uses (cpp_policy_use_library, POLICY.md 11.7) may be in a
+      # private repository. The owner's token for it is given to git for this job only, as a
+      # header sent to those repositories' addresses and to no other: nothing is written to
+      # the runner's git configuration, and no address carries the token.
+      - name: Let git fetch the libraries this project uses
+        env:
+          LIBRARY_TOKEN: ${{ secrets.library_token }}
+        run: |
+          urls=$(awk '/cpp_policy_use_library[ \t]*\(/ { inside = 1 }
+                      inside && /GIT_REPOSITORY/ { for (i = 1; i < NF; i++) if ($i == "GIT_REPOSITORY") print $(i + 1) }
+                      inside && /GIT_TAG/ { inside = 0 }' CMakeLists.txt)
+          if [ -z "$urls" ]; then
+            echo "This project uses no library."
+            exit 0
+          fi
+          echo "Libraries: $urls"
+          if [ -z "$LIBRARY_TOKEN" ]; then
+            echo "::notice::No library_token secret was passed: a library in a private repository can't be fetched."
+            exit 0
+          fi
+          encoded=$(printf 'x-access-token:%s' "$LIBRARY_TOKEN" | base64 | tr -d '\n')
+          echo "::add-mask::$encoded"
+          count=0
+          for url in $urls; do
+            case $url in
+              https://github.com/*) ;;
+              *) echo "::warning::$url isn't a https://github.com/ address; the token isn't used for it."; continue ;;
+            esac
+            echo "GIT_CONFIG_KEY_$count=http.$url.extraheader" >> "$GITHUB_ENV"
+            echo "GIT_CONFIG_VALUE_$count=AUTHORIZATION: basic $encoded" >> "$GITHUB_ENV"
+            count=$((count + 1))
+          done
+          echo "GIT_CONFIG_COUNT=$count" >> "$GITHUB_ENV"
 
       # As in gate.yml: a copy of vcpkg of the runner's own, at the manifest's baseline.
       - name: Use the runner's vcpkg at the manifest's baseline

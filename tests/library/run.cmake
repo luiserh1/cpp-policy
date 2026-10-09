@@ -9,7 +9,9 @@
 # - the user builds the library in its own build, with its sanitizers and hardening and
 #   without its warnings as errors or clang-tidy, links it and runs it, and passes its own
 #   audit although it has modules with the library's names;
-# - the user's audit fails when a module that isn't allowed to includes the library, and its
+# - the user links the library's test support into a test of its own;
+# - the user's audit fails when it includes a header internal to one of the library's modules
+#   or when a module that isn't allowed to includes the library, and its
 #   configuration fails when its vcpkg.json lacks a package the library needs or when the
 #   library was checked with a cpp-policy older than the floor;
 # - the library's audit fails when its code includes the program's.
@@ -126,6 +128,15 @@ string(REGEX REPLACE "\n\n.*" "" rule "${rule}")
 if(rule MATCHES "clang-tidy")
     message(FATAL_ERROR "library: the user's build runs clang-tidy on the library:\n${rule}")
 endif()
+
+# --- A header internal to one of the library's modules.
+file(READ "${WORK}/user/src/app/summary.cpp" source)
+file(WRITE "${WORK}/user/src/app/summary.cpp"
+    "#include \"geometry/lowlevel/internal/units.hpp\"\n${source}")
+must_fail("the user's audit, with an include of an internal header"
+    "src/app/summary.cpp:1: error: includes a header that is internal to the library 'geometry' (its module 'lowlevel')"
+    "${CMAKE_COMMAND}" --build "${WORK}/user/build" --target policy-audit)
+file(WRITE "${WORK}/user/src/app/summary.cpp" "${source}")
 
 # --- A module that isn't allowed to include the library.
 must_pass("configuring the user with another module allowed"

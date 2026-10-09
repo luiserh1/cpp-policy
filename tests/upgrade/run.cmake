@@ -222,4 +222,48 @@ string(FIND "${cmake}"
 expect("stale;EQUAL;-1;AND;replaced;GREATER;-1;AND;included;GREATER;-1"
     "the old vcpkg lines must become the include of tools/vcpkg/setup.cmake, in their place:\n${cmake}")
 
+# --- A library's pin (POLICY.md 11.7): moved to a release's commit, with the tag beside it.
+set(library "${WORK}/geometry")
+file(MAKE_DIRECTORY "${library}")
+run("${library}" ${git} init --quiet)
+file(WRITE "${library}/library.cmake" "# release 1.0.0\n")
+run("${library}" ${git} add --all)
+run("${library}" ${git} commit --quiet -m "Release 1.0.0")
+run("${library}" ${git} tag v1.0.0)
+run("${library}" ${git} rev-parse HEAD)
+string(STRIP "${out}" library_old)
+file(WRITE "${library}/library.cmake" "# release 1.1.0\n")
+run("${library}" ${git} commit --quiet -am "Release 1.1.0")
+# An annotated tag, whose own object isn't the commit.
+run("${library}" ${git} tag -a v1.1.0 -m v1.1.0)
+run("${library}" ${git} rev-parse HEAD)
+string(STRIP "${out}" library_new)
+file(APPEND "${project}/CMakeLists.txt"
+    "cpp_policy_use_library(geometry\n"
+    "    GIT_REPOSITORY file://${library}/.git\n"
+    "    GIT_TAG        ${library_old}) # v1.0.0\n"
+    "cpp_policy_use_library(other\n"
+    "    GIT_REPOSITORY file://${library}/.git\n"
+    "    GIT_TAG        ${library_old}) # v1.0.0\n")
+run("${project}" ${git} add --all)
+run("${project}" ${git} commit --quiet -m "upgraded, and using two libraries")
+
+run("${project}" ${upgrade} --library geometry v9.9.9 --no-gate)
+string(FIND "${out}" "has no release v9.9.9" found)
+expect("NOT;code;EQUAL;0;AND;found;GREATER;-1" "it must fail on a release the library doesn't have")
+run("${project}" ${upgrade} --library missing v1.1.0 --no-gate)
+string(FIND "${out}" "has no cpp_policy_use_library(missing" found)
+expect("NOT;code;EQUAL;0;AND;found;GREATER;-1" "it must fail on a library the project doesn't use")
+run("${project}" ${git} status --porcelain)
+expect("out;STREQUAL;nothing" "a refused library upgrade must leave the project unchanged")
+
+run("${project}" ${upgrade} --library geometry v1.1.0 --no-gate)
+expect("code;EQUAL;0" "the library's upgrade to v1.1.0 must succeed")
+file(READ "${project}/CMakeLists.txt" cmake)
+string(FIND "${cmake}" "cpp_policy_use_library(geometry\n    GIT_REPOSITORY file://${library}/.git\n    GIT_TAG        ${library_new}) # v1.1.0\n" moved)
+string(FIND "${cmake}" "cpp_policy_use_library(other\n    GIT_REPOSITORY file://${library}/.git\n    GIT_TAG        ${library_old}) # v1.0.0\n" kept)
+string(FIND "${cmake}" "GIT_TAG        ${new}) # v2.0.0\n" policy_pin)
+expect("moved;GREATER;-1;AND;kept;GREATER;-1;AND;policy_pin;GREATER;-1"
+    "only the named library's pin must move, to the release's commit:\n${cmake}")
+
 message("upgrade: OK")

@@ -3,6 +3,54 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.32.0 (2026-10-09)
+
+Release B of the library plan (POLICY.md 11.7): what the first real use,
+ToneMatcher's library for Alfar, showed was missing. All of it optional: a
+minor release.
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** none.
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.32.0`.
+2. A project that uses a library in a private repository: the owner creates
+   a token and passes it to the gate (README, "Continuous integration").
+3. Optional, in a project that offers a library: move headers that are a
+   module's own into `<module>/internal/`; offer test helpers with
+   `TEST_SUPPORT`.
+
+### Added
+
+- **`library_token`, a secret of `gate.yml` and `benchmark.yml`:** a token
+  that can read the private repositories of the libraries a project uses.
+  The gate reads their addresses from the `cpp_policy_use_library()` calls
+  and gives git the token for the job only, as a header sent to those
+  addresses and to no other. *Why:* ToneMatcher's and Alfar's repositories
+  are private, and CI's own token reads only its own repository. Tried
+  here with a dummy value: the header went to the library's address and not
+  to another repository on the same host.
+- **`upgrade.sh --library <name> <tag>`** moves a library's pin to that
+  release's commit, with the tag in a comment, and runs the gate.
+- **`TEST_SUPPORT` and `TEST_LINK` in `cpp_policy_library()`:** files of the
+  library that only tests use, offered as `<name>::test_support`. *Why:*
+  Alfar keeps a copy of ToneMatcher's `scratch_folder.hpp` for its tests.
+- **`internal/`:** a header in `lib/<name>/<module>/internal/` is that
+  module's own. The library's audit refuses it from another module, and a
+  user's audit refuses it altogether (fixtures `library_internal`,
+  `library_internal_user`). *Why:* ToneMatcher's `png_format.hpp` and
+  `zlib_stream.hpp` were internal by a comment only, and Alfar could
+  include them.
+- The self-test's library offers test support and has an internal header;
+  its user links the first and is refused the second.
+
+### Not tried yet
+
+**The token in a real CI run.** cpp-policy's repository is public and uses
+no library, so its CI runs that step only as far as "This project uses no
+library". The first real run will be Alfar's, once the owner has created
+the token. If it fails to fetch, the job's log says which address.
+
 ## 0.31.0 (2026-10-09)
 
 From ToneMatcher, which released its library on v0.30.0 the same day: a

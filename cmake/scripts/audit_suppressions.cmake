@@ -97,6 +97,11 @@ endif()
 if(NOT DEFINED LIBRARY_LAYERS)
     set(LIBRARY_LAYERS "")
 endif()
+# The libraries this project uses (cpp_policy_use_library): their internal headers aren't
+# for it.
+if(NOT DEFINED USED_LIBRARIES)
+    set(USED_LIBRARIES "")
+endif()
 set(library_modules "")
 set(all_modules "${modules}")
 if(NOT LIBRARY STREQUAL "")
@@ -333,6 +338,14 @@ foreach(file IN LISTS checked_files)
             endif()
         endif()
 
+        # A used library's internal headers (<library>/<module>/internal/...) are its own.
+        if(NOT USED_LIBRARIES STREQUAL ""
+           AND line MATCHES "^[ \t]*#[ \t]*include[ \t]*[<\"]([^/>\"]+)/([^/>\"]+)/internal/[^>\"]*[>\"]"
+           AND CMAKE_MATCH_1 IN_LIST USED_LIBRARIES)
+            report("${file}" ${number}
+                "includes a header that is internal to the library '${CMAKE_MATCH_1}' (its module '${CMAKE_MATCH_2}'); use what the library offers outside internal/ (POLICY.md 11.7)")
+        endif()
+
         # A library's files include the library's headers by their full name, never the
         # program's, and keep the library's own layers (POLICY.md 11.7).
         if(NOT LIBRARY STREQUAL "" AND file MATCHES "^lib/${LIBRARY}/([^/]+)/"
@@ -349,7 +362,10 @@ foreach(file IN LISTS checked_files)
             else()
                 set(target "${CMAKE_MATCH_1}")
                 cpp_policy_in_dirs("${file}" "${CONFINED_DIRS}" own_confined)
-                if(NOT target STREQUAL own AND own_confined)
+                if(NOT target STREQUAL own AND included MATCHES "^${LIBRARY}/[^/]+/internal/")
+                    report("${file}" ${number}
+                        "includes \"${included}\", which is internal to the module '${target}' (POLICY.md 11.7)")
+                elseif(NOT target STREQUAL own AND own_confined)
                     report("${file}" ${number}
                         "lib/${LIBRARY}/${own} is confined: it may include only its own headers, not \"${included}\"")
                 elseif(NOT target STREQUAL own AND DEFINED library_layer_of_${own}

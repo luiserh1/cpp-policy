@@ -9,7 +9,7 @@ The rules are in [POLICY.md](POLICY.md).
 From a clone of cpp-policy checked out at the release you want:
 
 ```
-git -C cpp-policy checkout v0.31.0
+git -C cpp-policy checkout v0.32.0
 sh cpp-policy/tools/new-project.sh ~/code/MyTool MyTool            # VCPKG_ROOT must be set
 cd ~/code/MyTool && sh tools/hooks/gate
 git add --all && git commit
@@ -38,7 +38,7 @@ can't ship a template that fails its own policy.
 include(FetchContent)
 FetchContent_Declare(cpp_policy
     GIT_REPOSITORY https://github.com/luiserh1/cpp-policy.git
-    GIT_TAG        <commit>)   # v0.31.0, the latest release; see CHANGELOG.md
+    GIT_TAG        <commit>)   # v0.32.0, the latest release; see CHANGELOG.md
 FetchContent_MakeAvailable(cpp_policy)
 
 add_library(app_core STATIC src/model/board.cpp)
@@ -75,7 +75,7 @@ and this repository's CMake code runs on every machine that configures the
 project (POLICY.md 10). The commit is the line ending in `^{}`:
 
 ```
-git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.31.0*'
+git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.32.0*'
 ```
 
 Don't add `GIT_SHALLOW`: it only works with branch and tag names.
@@ -85,7 +85,7 @@ Don't add `GIT_SHALLOW`: it only works with branch and tag names.
 From the project's root, with a clean working folder:
 
 ```
-sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.31.0
+sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.32.0
 ```
 
 Any copy of this repository's `tools/upgrade.sh` works (from v0.10.1 on): it
@@ -158,7 +158,7 @@ permissions:
   contents: read
 jobs:
   gate:
-    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@<commit> # v0.31.0
+    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@<commit> # v0.32.0
     with:
       systems: '["linux", "windows", "macos"]'
       vcpkg: true          # if the project has a vcpkg.json
@@ -170,6 +170,26 @@ build uses. Move both in the same commit when upgrading.
 `systems` picks the systems. GitHub's runners are free for public
 repositories; private ones spend the account's Actions minutes, and a macOS
 minute costs about ten Linux ones (Windows about two).
+
+**A library in a private repository** (POLICY.md 11.7). The gate can't fetch
+it without a token. The owner does this once, in the browser:
+
+1. On GitHub, *Settings > Developer settings > Fine-grained tokens*: a token
+   for the library's repository only, with "Contents: Read-only".
+2. In the repository of the project that **uses** the library,
+   *Settings > Secrets and variables > Actions*: a secret named
+   `LIBRARY_TOKEN` with that token.
+3. In that project's CI workflow, under each call to cpp-policy:
+
+   ```yaml
+       secrets:
+         library_token: ${{ secrets.LIBRARY_TOKEN }}
+   ```
+
+The gate gives the token to git for the job only, as a header sent to the
+libraries' addresses and to no other; nothing is written to the runner. A
+fine-grained token expires: the job then fails to fetch, and the fix is a
+new token in the same secret.
 
 A newer push makes an older run of the same branch obsolete, and the gate
 cancels it: on a branch the older run is stopped; on the default branch the

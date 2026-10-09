@@ -16,7 +16,15 @@ target_include_directories(user PRIVATE src)
 target_link_libraries(user PRIVATE geometry::geometry)
 cpp_policy_apply(user)
 
+# A test program that uses what the library offers to tests.
+add_executable(user_samples tests/samples.cpp)
+target_link_libraries(user_samples PRIVATE geometry::test_support)
+cpp_policy_apply(user_samples)
+
 enable_testing()
+add_test(NAME integration/app/the_library_offers_test_support COMMAND user_samples)
+set_tests_properties(integration/app/the_library_offers_test_support PROPERTIES
+    LABELS integration)
 add_test(NAME integration/app/the_library_answers COMMAND user)
 set_tests_properties(integration/app/the_library_answers PROPERTIES LABELS integration
     PASS_REGULAR_EXPRESSION "area 12 on a host with a name, clock runs")

@@ -11,19 +11,14 @@ in the walkthroughs of that time.
 
 ## Later
 
-### Libraries, release B
+### Libraries, after their first use
 
-Release A (0.30.0) gave a project a library and another project its use
-(POLICY.md 11.7). What follows is shaped by the first real use,
-ToneMatcher's library in Alfar:
+Releases A and B (0.30.0, 0.32.0) are out. Open:
 
-- [ ] `upgrade.sh` moves a library's pin as it moves cpp-policy's.
-- [ ] A library offers test helpers, declared as test code.
-- [ ] The credential a private repository needs to be fetched in CI.
-- [ ] A library's headers that its user may not include (asked by
-      ToneMatcher: `png_format.hpp` and `zlib_stream.hpp` are internal by a
-      comment only).
-- [ ] What Alfar finds awkward in using the library.
+- [ ] The token in a real CI run: Alfar's, once the owner has created it.
+- [ ] What Alfar finds awkward in using ToneMatcher's library.
+- [ ] A project that is only a library, and a library that uses a library:
+      when a project needs one.
 
 ### From Alfar's report, not yet designed
 
