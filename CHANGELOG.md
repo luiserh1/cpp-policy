@@ -3,6 +3,17 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## Unreleased
+
+- POLICY.md 13.5 and `heap_bytes.hpp`: how to measure what one operation
+  adds to the heap (the peak is absolute; subtract the live bytes read
+  before it), and three notes on giving a C library an allocator (only a
+  stream takes one, so `compress`/`uncompress` are replaced; allocate with
+  `std::nothrow`; test that the memory arrives). *Why:* ToneMatcher did it
+  as 13.5 said and reported what the text had left out, including a test
+  that passed for the wrong reason.
+- POLICY.md 14.2: the instruction-count trial's first results.
+
 ## 0.30.0 (2026-10-09)
 
 One policy project used as a library by another (POLICY.md 11.7, new):

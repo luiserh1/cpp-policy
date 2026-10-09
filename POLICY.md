@@ -1446,7 +1446,15 @@ the end (528 MB on 92 images) while its `export` passed its test.
   wraps the library, every block zlib needs is C++ heap and the heap test
   counts it exactly. The command then needs no operating-system test.
   ToneMatcher's two such tests, kept for zlib, failed four times in two
-  weeks without finding a leak.
+  weeks without finding a leak; with the allocator they were removed, and
+  the heap tests passed unchanged within the same budgets.
+  - Only a stream takes an allocator. zlib's one-call functions, `compress`
+    and `uncompress`, don't: replace them with a stream (`inflateInit`,
+    `inflate`, `inflateEnd`).
+  - Allocate with `new (std::nothrow)`: a failure then reaches the C library
+    as a null block, and no exception crosses its code.
+  - Test that the memory arrives: writing a 1 x 1 PNG raised ToneMatcher's
+    heap by more than 200,000 bytes with the allocator and by 448 without.
 - **The heap test** (`#include <cpp_policy/heap_bytes.hpp>`) differs for a
   batch command and a server. `live_heap_bytes()` gives the same number to
   the byte for the same work, on every run and every machine load. So does
@@ -1477,6 +1485,11 @@ the end (528 MB on 92 images) while its `export` passed its test.
      once is in place.
   2. `reset_peak_heap_bytes()`, run N inputs, read `peak_heap_bytes()`.
   3. `reset_peak_heap_bytes()`, run 5N inputs, read it again.
+
+  The peak is an absolute figure. To measure what one operation adds, read
+  `live_heap_bytes()` before it and subtract: the test program already holds
+  about half a megabyte, so "the peak is over N" can pass for the wrong
+  reason. It did, in the first version of ToneMatcher's allocator test.
   - **A batch command has a budget per input, 1 KiB by default:** enough
     for its name and a small fixed-size record. The second reading is at most
     the first plus 4N × the budget. A command that processes files in sorted
@@ -1671,6 +1684,12 @@ median of three reruns), 2026-10-01:
     family and one toolchain build, so a toolchain window (10.1) changes it.
   - Linux only: Windows and macOS don't give a program these counters
     without elevated rights.
+  - First results, on ToneMatcher: the same code on two runs differed by 1
+    to 3,011 instructions in 1.4 to 5.2 billion. The first change expected
+    to matter (zlib's memory through `operator new`, and a new
+    decompression loop) moved the one benchmark that reads and writes PNGs
+    by 0.08% and the other three by under 0.0001%. Its time went from 344
+    to 371 ms, which alone would have said nothing.
 
 ### 14.3 Writing fast code without weakening it
 

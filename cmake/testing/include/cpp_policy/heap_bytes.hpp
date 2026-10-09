@@ -12,6 +12,15 @@ namespace cpp_policy {
 // new and operator delete; in builds with sanitizers nothing is replaced and all three
 // functions report 0. Linked into benchmark tests by cpp_policy_add_tests().
 
+// To measure what one piece of work adds, read the live bytes first: the peak is an absolute
+// figure, and the test program itself already holds some heap (doctest's, about half a
+// megabyte), so "the peak is over N" proves nothing.
+//
+//     const std::uint64_t before = cpp_policy::live_heap_bytes();
+//     cpp_policy::reset_peak_heap_bytes();
+//     work();
+//     const std::uint64_t rise = cpp_policy::peak_heap_bytes() - before;
+
 // Bytes allocated and not yet freed.
 [[nodiscard]] std::uint64_t live_heap_bytes() noexcept;
 
