@@ -1011,6 +1011,15 @@ Two files record a project's work, each with one job:
 The commit that finishes a piece of work also records it in `CHANGELOG.md`
 (under "Unreleased" until the release).
 
+**The version is written once,** in `project(<Name> VERSION ...)` in
+`CMakeLists.txt`. A program that prints its version gets it from there, as
+a compile definition for the file that prints it
+(`target_compile_definitions(... PRIVATE APP_VERSION="${PROJECT_VERSION}")`,
+which the policy's check of definitions accepts), not from a second constant
+kept by hand. ToneMatcher tagged a release whose program still
+printed the version before: the constant was a second place, and the release
+commit changed only the first.
+
 **cpp-policy upgrades are one line.** `CHANGELOG.md` is about the program.
 Its introduction has a line `Policy: cpp-policy v<version>.`, updated in
 place at each upgrade. An upgrade gets an entry only for what it changed in
@@ -1451,6 +1460,24 @@ Projects add it to `vcpkg.json` like any dependency (section 1.1).
 
 ### 13.4 How tests are written
 
+- **Test data is under `tests/data/`,** tracked, binary files included (36
+  PNG samples and their expected pixels in ToneMatcher). The audit and the
+  format check don't read it.
+  - **What made it is beside it:** the script or the command, so that a
+    sample can be made again or a new one added. That script may be in any
+    language. It runs once, by hand; the build, the tests and the gate never
+    run it, so the project needs nothing installed for it.
+  - A test finds its data through `ENVIRONMENT "<NAME>=<folder>"` in
+    `cpp_policy_add_tests()`, never through a path relative to where the
+    test happens to run.
+  - No personal or private data, and nothing a licence forbids
+    redistributing: the repository may become public, and a library's
+    users fetch all of it.
+- **Tests that run several at a time (13.2) share nothing by name.** Each
+  test case that writes files uses a folder named after itself or with a
+  random name, under the build folder. Two test cases with the same folder
+  name pass alone and fail together now and then; a helper that makes these
+  folders should refuse one that is already in use.
 - **`REQUIRE` only for what the rest of the test depends on;** `CHECK` for
   everything else, so one run reports every failure. For example,
   `REQUIRE(result.has_value())` comes before `*result`, and

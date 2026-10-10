@@ -3,6 +3,20 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## Unreleased
+
+- POLICY.md 11.5: a project's version is written once, in `project()`, and
+  a program that prints it gets it from there.
+  *Why:* ToneMatcher's v0.4.1 printed 0.4.0; its version was in two places
+  and the release commit changed one.
+- POLICY.md 13.4: test data lives under `tests/data/`, binary files
+  included, with the script that made it beside it, in any language and
+  never run by the build or the gate; and tests that run several at a time
+  share no folder by name.
+  *Why:* asked by ToneMatcher, which tracks 36 PNG samples and their Python
+  generator, and found by hand that no two of its tests share a scratch
+  folder before turning parallel tests on.
+
 ## 0.33.0 (2026-10-10)
 
 From the first real use of a library: Alfar replaced its copy of

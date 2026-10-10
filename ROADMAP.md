@@ -42,6 +42,13 @@ Releases A and B (0.30.0, 0.32.0) are out. Open:
 
 - **Instruction counts** (ToneMatcher, since 2026-10-08): whether a budget
   rule is worth writing, once the counts have been seen over real commits.
+  - Seen so far: the same code repeats to about 3,000 instructions in
+    billions; a rewrite of the PNG row filters showed as -43% on one
+    benchmark; untouched benchmarks moved by 3, 413 and 788 instructions
+    when a function they call gained an argument.
+  - So a budget needs a small tolerance, not zero; and a count says nothing
+    of the output, which a benchmark could check with a checksum in the
+    same run.
 
 ### Open, the owner's
 
