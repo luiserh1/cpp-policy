@@ -1016,7 +1016,10 @@ The commit that finishes a piece of work also records it in `CHANGELOG.md`
 a compile definition for the file that prints it
 (`target_compile_definitions(... PRIVATE APP_VERSION="${PROJECT_VERSION}")`,
 which the policy's check of definitions accepts), not from a second constant
-kept by hand. ToneMatcher tagged a release whose program still
+kept by hand. The definition goes on the target that holds the code that
+prints it. It is build configuration, which section 2.4 allows as a macro,
+and the code gives it a name and a type at once:
+`constexpr std::string_view version = APP_VERSION;`. ToneMatcher tagged a release whose program still
 printed the version before: the constant was a second place, and the release
 commit changed only the first.
 
@@ -1306,6 +1309,7 @@ day the feature appears, or a tool's defect is fixed (`tests/probes/`).
 | W3 | Parallel algorithms (`std::execution::par`) in libc++ without `-fexperimental-library` | Not used; parallel computation isn't covered by the policy yet | libc++ makes them stable. (libstdc++ has them with GCC 16 on Linux, but only by linking TBB, a compiled dependency that section 1.1 would have to admit.) | Probe `waiting/w3_parallel_algorithms` (macOS) |
 
 | W4 | `readability-trailing-comma`, and `policy-format-fix` settling the commas with it | The check is off (`.clang-tidy`), and the fixer only formats (`format.cmake`) | clang-tidy stops reporting the comma after an empty braced value (`f(a, T{}, b)`, `= {}` as a default argument, `{T{}, T{}}`, `.member = {},`) whose type has default member initializers. Seen in LLVM 23.1.1 and 23.1.2; its fix removes a comma the syntax needs | Probe `waiting/w4_trailing_comma` (every system) |
+| W5 | `clang-analyzer-optin.core.EnumCastOutOfRange` on Windows | The check is off in the Windows build's copy of `.clang-tidy` (`_cpp_policy_tidy_config()` in `CppPolicy.cmake`); macOS and Linux keep it | clang-tidy stops reporting Microsoft's own `<filesystem>` header (`xfilesystem_abi.h`, a cast to `__std_fs_stats_flags`) for `std::filesystem::is_empty()`, `file_size()` and `last_write_time()`. Seen by ToneMatcher on three functions, each as a failed Windows job after a green local gate | Probe `waiting/w5_filesystem_enum` (Windows) |
 
 When an item resolves: remove its workarounds (search for `Waiting Wn`),
 delete its row and probe, and record the change in `CHANGELOG.md`.

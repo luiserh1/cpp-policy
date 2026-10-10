@@ -358,3 +358,13 @@ add_test(NAME waiting/w4_trailing_comma
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/probes/tidy/w4_trailing_comma.cpp" -DITEM=W4
             -DCHECK=readability-trailing-comma
             -P "${CMAKE_CURRENT_SOURCE_DIR}/probes/tidy_probe.cmake")
+# A finding inside Microsoft's own <filesystem> header, so only on Windows, where the check
+# is off for it (CppPolicy.cmake). The probe is read with this build's flags.
+if(WIN32)
+    add_test(NAME waiting/w5_filesystem_enum
+        COMMAND "${CMAKE_COMMAND}" "-DCLANG_TIDY=${CPP_POLICY_CLANG_TIDY_EXE}"
+                "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/probes/tidy/w5_filesystem_enum.cpp"
+                -DITEM=W5 -DCHECK=clang-analyzer-optin.core.EnumCastOutOfRange
+                "-DBUILD_DIR=${CMAKE_BINARY_DIR}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/probes/tidy_probe.cmake")
+endif()

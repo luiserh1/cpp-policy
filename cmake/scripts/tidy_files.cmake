@@ -49,6 +49,9 @@ set(reconfigured FALSE)
 # configured.
 set(TEST_SOURCES "")
 set(TEST_TIDY_CHECKS "")
+# The build's copy of the policy's .clang-tidy: on Windows it has one check fewer (Waiting
+# W5, POLICY.md 12), and this must say what the build will say.
+set(TIDY_CONFIG "${POLICY_ROOT}/.clang-tidy")
 include("${BUILD_DIR}/cpp_policy_tests.cmake" OPTIONAL)
 # A header is test code when it is in a test source's folder, or anywhere under the top-level
 # folder the test sources are in (tests/support/ for sources in tests/unit/), unless that
@@ -217,7 +220,7 @@ foreach(file IN LISTS FILES)
         endif()
     endif()
     execute_process(
-        COMMAND "${CLANG_TIDY}" "--config-file=${POLICY_ROOT}/.clang-tidy" ${test_option} ${only}
+        COMMAND "${CLANG_TIDY}" "--config-file=${TIDY_CONFIG}" ${test_option} ${only}
                 --quiet -p "${BUILD_DIR}" "${target}"
         WORKING_DIRECTORY "${SOURCE_DIR}"
         RESULT_VARIABLE result)

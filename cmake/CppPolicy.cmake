@@ -270,10 +270,31 @@ endfunction()
 # clang-tidy command; and the generator rebuilds whatever command changed.
 function(_cpp_policy_tidy_config out)
     set(source "${CPP_POLICY_ROOT}/.clang-tidy")
-    file(SHA256 "${source}" hash)
-    string(SUBSTRING "${hash}" 0 16 hash)
     set(dir "${CMAKE_BINARY_DIR}/cpp_policy_tidy")
-    configure_file("${source}" "${dir}/${hash}.clang-tidy" COPYONLY)
+    if(WIN32)
+        # Waiting W5 (POLICY.md 12): with Microsoft's library, the analyzer reports an enum
+        # cast inside <filesystem>'s own header for is_empty(), file_size() and
+        # last_write_time(). The check is off on Windows only; the other systems keep it for
+        # the project's code.
+        file(READ "${source}" config)
+        string(REPLACE "  clang-analyzer-*,\n"
+            "  clang-analyzer-*,\n  -clang-analyzer-optin.core.EnumCastOutOfRange,\n"
+            windows_config "${config}")
+        if(windows_config STREQUAL config)
+            message(FATAL_ERROR "cpp-policy: .clang-tidy has no 'clang-analyzer-*,' line to "
+                "follow with the check that is off on Windows (Waiting W5)")
+        endif()
+        string(SHA256 hash "${windows_config}")
+        string(SUBSTRING "${hash}" 0 16 hash)
+        set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${source}")
+        if(NOT EXISTS "${dir}/${hash}.clang-tidy")
+            file(WRITE "${dir}/${hash}.clang-tidy" "${windows_config}")
+        endif()
+    else()
+        file(SHA256 "${source}" hash)
+        string(SUBSTRING "${hash}" 0 16 hash)
+        configure_file("${source}" "${dir}/${hash}.clang-tidy" COPYONLY)
+    endif()
     file(GLOB copies "${dir}/*.clang-tidy")
     list(REMOVE_ITEM copies "${dir}/${hash}.clang-tidy")
     if(copies)
@@ -406,6 +427,12 @@ function(_cpp_policy_verify_targets)
     file(WRITE "${CMAKE_BINARY_DIR}/cpp_policy_tests.cmake"
         "set(TEST_SOURCES [==[${test_sources}]==])\n"
         "set(TEST_TIDY_CHECKS [==[${CPP_POLICY_TEST_TIDY_CHECKS}]==])\n")
+    # The configuration the build's clang-tidy reads, for tidy-files to read the same one.
+    if(CPP_POLICY_CLANG_TIDY)
+        _cpp_policy_tidy_config(tidy_config)
+        file(APPEND "${CMAKE_BINARY_DIR}/cpp_policy_tests.cmake"
+            "set(TIDY_CONFIG [==[${tidy_config}]==])\n")
+    endif()
     foreach(var IN ITEMS CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
                          CMAKE_CXX_FLAGS_RELWITHDEBINFO CMAKE_CXX_FLAGS_MINSIZEREL)
         separate_arguments(flags NATIVE_COMMAND "${${var}}")

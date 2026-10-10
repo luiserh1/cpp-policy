@@ -5,6 +5,15 @@ Each entry says what changed and why. Projects read this before moving their
 
 ## Unreleased
 
+- **`clang-analyzer-optin.core.EnumCastOutOfRange` is off on Windows**
+  (Waiting W5, POLICY.md 12), in the build and in `tidy-files`, which now
+  reads the build's own copy of `.clang-tidy`. A probe on Windows says when
+  the defect is gone.
+  *Why:* with Microsoft's library the analyzer reports the library's own
+  header for `std::filesystem::is_empty()`, `file_size()` and
+  `last_write_time()`. ToneMatcher met it three times, each as a failed
+  Windows job after a green local gate, and could only stop calling the
+  function.
 - POLICY.md 11.5: a project's version is written once, in `project()`, and
   a program that prints it gets it from there.
   *Why:* ToneMatcher's v0.4.1 printed 0.4.0; its version was in two places
