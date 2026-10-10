@@ -3,7 +3,18 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
-## Unreleased
+## 0.33.1 (2026-10-10)
+
+From ToneMatcher's reports on v0.33.0. A patch release: nothing that passes
+stops passing.
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** none.
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.33.1`.
+
+### Changed
 
 - **`clang-analyzer-optin.core.EnumCastOutOfRange` is off on Windows**
   (Waiting W5, POLICY.md 12), in the build and in `tidy-files`, which now
