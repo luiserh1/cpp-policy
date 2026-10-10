@@ -575,7 +575,9 @@ it needs a build of its own, and `clang-cl` doesn't provide it. `dev` and
 Test presets:
 - Every test has a 60-second timeout, so a hung test fails instead of holding
   up a push (CTest's own default is 25 minutes). A project may set a shorter
-  `TIMEOUT` on its tests.
+  `TIMEOUT` on its tests, or a longer one with a reason (13.2).
+- CTest gets four jobs. Every test still runs alone unless the project calls
+  `cpp_policy_parallel_tests()` (13.2).
 - The `dev` and `check` test presets turn on AddressSanitizer's leak
   detection (`ASAN_OPTIONS=detect_leaks=1`) and apply the policy's
   suppression list for false positives in the OS (section 5). Detection is on
@@ -686,6 +688,7 @@ adds what a machine shared by several unattended agents needs:
 - **One last line,** `gate: passed` or `gate: FAILED`, and the workflow's own
   exit code. That merge was committed because the exit code read was
   another command's, later in the same line.
+- **Before that line, the passing tests close to their time limit** (13.2).
 
 pre-push runs the gate through it.
 
@@ -1101,13 +1104,36 @@ that module.
 - Several lines may name one header, and they add up: `nlohmann/ TO
   settings` and `nlohmann/ TO inputs cache SOURCES_ONLY` allow it in
   `settings`'s headers and in the other two modules' source files only.
+  - An include is allowed when any one line allows it. A narrower line
+    therefore restricts nothing beside a wider one: with `lib/ TO a b c` in
+    place, `lib/parse/ TO a` leaves `lib/parse/` open to `b` and `c` too.
+- **`TO NONE`** keeps a header from every module:
+
+  ```cmake
+  cpp_policy_confine_includes(tonematcher/ TO NONE)
+  cpp_policy_confine_includes(tonematcher/parse/ TO project app)
+  cpp_policy_confine_includes(zlib.h TO NONE)
+  ```
+
+  Since lines add up, the first two open one folder of a library to two
+  modules and leave the rest of it to nobody: the way to say which parts of
+  a library a project uses. The third is for a package that only a library
+  needs (11.7) and none of the project's own code includes. `NONE` stands
+  alone after `TO`; the same name on a `NONE` line and on a line with
+  modules is refused.
 - **`SOURCES_ONLY`** allows the include only in those modules' source files,
   not in their headers. A header that includes the library passes it on to
   every file that includes that header, in any module. With `SOURCES_ONLY`
   no header can, so the library's types can't appear in the module's
   interface. Use it wherever the interface doesn't need them.
-- Every dependency in `vcpkg.json` that the program's own code includes has
-  such a line (doctest and nanobench are used only by tests).
+- Every dependency in `vcpkg.json` has such a line (doctest and nanobench
+  are used only by tests): the modules that include it, or `NONE` when only
+  a library the project uses does.
+- The lines are about what a file includes itself. A module that gets a
+  dependency's types through another header (a library's, or another
+  module's) needs no line of its own for them: that header's interface is
+  what passes them on, and `SOURCES_ONLY` is what stops a module's headers
+  from doing so.
 - This is the rule behind a backend with several frontends (a command line,
   a window, later a phone): the frontends include the backend's interface,
   written with the project's own plain types (section 15.1), and nothing
@@ -1115,8 +1141,9 @@ that module.
 
 *Enforcement:* the audit rejects, under `src/`, an include of a named header
 (written with `<>` or `""`) from any other module or from `main.cpp`, and
-with `SOURCES_ONLY` from any header. It also fails if a line names a module
-that `src/` doesn't have. That every dependency has a line relies on review.
+with `SOURCES_ONLY` from any header, and with `NONE` from anywhere. It also
+fails if a line names a module that `src/` doesn't have. That every
+dependency has a line relies on review.
 
 ### 11.7 A library used by other projects
 
@@ -1193,7 +1220,10 @@ cpp_policy_use_library(tonematcher
     GIT_REPOSITORY https://github.com/luiserh1/ToneMatcher.git
     GIT_TAG        <commit>)   # v0.4.0
 target_link_libraries(app_core PRIVATE tonematcher::tonematcher)
-cpp_policy_confine_includes(tonematcher/ TO textures)
+cpp_policy_confine_includes(tonematcher/ TO NONE)
+cpp_policy_confine_includes(tonematcher/image/ TO textures)
+cpp_policy_confine_includes(tonematcher/parse/ TO textures settings)
+cpp_policy_confine_includes(zlib.h TO NONE)   # only the library includes it
 ```
 
 - **A release, pinned by commit,** with the version in a comment, like
@@ -1210,10 +1240,20 @@ cpp_policy_confine_includes(tonematcher/ TO textures)
   code can't be trusted to meet.
 - **The library is below every layer of this project.** Which modules may
   include it is this project's choice, with the rule for any dependency
-  (11.6).
+  (11.6): `TO NONE` for the library as a whole, and a line for each of its
+  modules that the project uses. Lines add up, so one line that gives the
+  whole library to many modules would undo the narrower ones.
 - **Its packages don't travel:** vcpkg doesn't read a manifest through a
   fetch. This project's `vcpkg.json` lists each package the library needs,
-  with its reason, and configuration fails if one is missing.
+  with its reason ("ToneMatcher's library reads PNG with it" is one), and
+  configuration fails if one is missing.
+  - The library's `library.cmake` calls `find_package()` for them; this
+    project calls it only for what its own targets link.
+  - A package none of this project's code includes is confined `TO NONE`.
+- **The first build after a library replaces copied code is a whole one:**
+  every file that includes it is compiled and checked again, and the
+  commit's hook checks every file staged. Alfar: 738 objects in 15 minutes,
+  and 30 minutes for the hook on 320 files. Once.
 - **Its code counts in this project's budgets** (13.5): each program's size
   and memory. When a release of the library takes a program past a budget,
   the commit that moves the pin raises it, with the owner's approval and
@@ -1273,7 +1313,7 @@ tools, not a program's modules.)
 | Kind | What it tests | Rules | Time limit |
 |---|---|---|---|
 | `unit` | One module, through its public header | No files, network, child processes, threads or clock; results don't depend on the machine; no state shared between test cases | 60 seconds for a module's unit tests together (in practice a fraction of a second) |
-| `integration` | Modules together, or a module with the OS | Real sockets on ephemeral ports (port 0), temporary files and folders under the build folder, threads and processes; every wait has a timeout | 60 seconds, or less with `TIMEOUT` |
+| `integration` | Modules together, or a module with the OS | Real sockets on ephemeral ports (port 0), temporary files and folders under the build folder, threads and processes; every wait has a timeout | 60 seconds, or less with `TIMEOUT`; more with `SLOW` and a reason (13.2) |
 | `benchmark` | What a program costs: its size and its memory under load (13.5) | Built in every configuration, so clang-tidy checks it, but run only without sanitizers, which distort size, memory and time | 60 seconds, or less with `TIMEOUT` |
 
 **Regression tests** aren't a kind of their own. When a bug is fixed, a test
@@ -1289,6 +1329,8 @@ on the roadmap.
 cpp_policy_add_tests(unit message SOURCES test_sanitize.cpp LIBRARIES sls_core)
 cpp_policy_add_tests(integration server SOURCES test_server.cpp LIBRARIES sls_core
                      TIMEOUT 30 ENVIRONMENT "HELPER=$<TARGET_FILE:helper>")
+cpp_policy_add_tests(integration window SOURCES test_walk.cpp LIBRARIES gui
+                     TIMEOUT 180 SLOW "the walk through every task is one hand's session")
 ```
 
 - **One program per kind and module,** `test_<kind>_<module>`, built with
@@ -1328,6 +1370,36 @@ cpp_policy_add_tests(integration server SOURCES test_server.cpp LIBRARIES sls_co
     a bad one is reported before the program is compiled);
   - a doctest suite other than `regression`;
   - a program with no tests.
+- **A test has 60 seconds,** a unit program 60 for all its cases, and
+  `TIMEOUT` sets less for a program's tests. A test that passes its limit
+  fails.
+  - **More than 60, up to 600, needs `SLOW "<reason>"`:** a sentence that
+    says why a test of that program can't be shorter or split. It is printed
+    at every configure, like every exception. Not for unit tests: a slow
+    test is an integration test.
+  - **A passing test that used two thirds of its limit is named** by the
+    gate's launcher before its last line, and in CI's log: `gate: close to
+    its time limit: "<test>" took 46 s of 60`. It is the next test to fail
+    on a busy machine. Two of Alfar's tests sat at 41 and 46 seconds for
+    days, and then failed four gate runs while other work shared the
+    machine.
+- **Tests run one at a time,** unless the project asks otherwise with one
+  line before its first `cpp_policy_add_tests()`:
+
+  ```cmake
+  cpp_policy_parallel_tests()
+  ```
+
+  - Unit and integration tests then run four at a time (the presets' number
+    of jobs). On Alfar, integration tests were 381 of the gate's 389 seconds
+    of tests.
+  - **Still alone:** benchmarks, whose measures another test would disturb;
+    the tests of a `SLOW` program; any test added with `add_test()`; and the
+    tests of a program declared `ALONE`, for tests that share something two
+    of them can't hold at once (a fixed port, a folder with a fixed name).
+  - Before turning it on, make each test use a folder and a port of its own,
+    or mark its program `ALONE`. Tests that run together also share the
+    processors: one that was near its limit alone will pass it.
 - **A test that isn't a doctest program** is added with `add_test()`, named
   and labelled the same way. Examples: running the finished program with
   arguments, or a script. Configuration fails for a test without a

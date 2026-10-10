@@ -956,15 +956,18 @@ endfunction()
 # folder of their own: imgui*).
 #   cpp_policy_confine_includes(httplib.h TO server)
 #   cpp_policy_confine_includes(nlohmann/ zlib.h TO backend SOURCES_ONLY)
+#   cpp_policy_confine_includes(tonematcher/ TO NONE)
 # With SOURCES_ONLY, only those modules' source files may include them, not their headers, so
-# no other module gets them through a header either. Call it before cpp_policy_add_checks().
+# no other module gets them through a header either. TO NONE: no module may. Lines add up, so
+# NONE for a directory and a line for one folder under it leaves that folder to its modules
+# and the rest to nobody. Call it before cpp_policy_add_checks().
 # ---------------------------------------------------------------------------
 function(cpp_policy_confine_includes)
     if(TARGET policy-audit)
         message(FATAL_ERROR
             "cpp-policy: call cpp_policy_confine_includes() before cpp_policy_add_checks()")
     endif()
-    set(usage "cpp_policy_confine_includes(<header, directory/ or prefix*>... TO <module>... [SOURCES_ONLY])")
+    set(usage "cpp_policy_confine_includes(<header, directory/ or prefix*>... TO <module>...|NONE [SOURCES_ONLY])")
     set(headers "")
     set(modules "")
     set(sources_only "")
@@ -980,6 +983,8 @@ function(cpp_policy_confine_includes)
                                     "directory ending in '/' or a prefix ending in '*': ${usage}")
             endif()
             list(APPEND headers "${argument}")
+        elseif(argument STREQUAL "NONE")
+            list(APPEND modules NONE)
         elseif(NOT argument MATCHES "^[a-z0-9_]+(/[a-z0-9_]+)?$")
             message(FATAL_ERROR "cpp-policy: '${argument}' isn't a module name (a directory "
                                 "under src/, or <library>/<module> for one under lib/): ${usage}")
@@ -990,6 +995,40 @@ function(cpp_policy_confine_includes)
     if(headers STREQUAL "" OR modules STREQUAL "")
         message(FATAL_ERROR "cpp-policy: ${usage}")
     endif()
+    if(NONE IN_LIST modules)
+        list(LENGTH modules module_count)
+        if(module_count GREATER 1 OR NOT sources_only STREQUAL "")
+            message(FATAL_ERROR "cpp-policy: NONE stands alone after TO, with no module and "
+                                "no SOURCES_ONLY: ${usage}")
+        endif()
+    endif()
+    # The same name kept from everybody on one line and given to a module on another says
+    # two things. (A wider NONE line with a narrower line under it is the way to open one
+    # folder of a library.)
+    get_property(earlier GLOBAL PROPERTY CPP_POLICY_CONFINED_INCLUDES)
+    foreach(entry IN LISTS earlier)
+        string(REPLACE "|" ";" parts "${entry};")
+        list(GET parts 0 entry_headers)
+        list(GET parts 1 entry_modules)
+        string(REPLACE "," ";" entry_headers "${entry_headers}")
+        set(entry_is_none FALSE)
+        if(entry_modules STREQUAL "NONE")
+            set(entry_is_none TRUE)
+        endif()
+        set(this_is_none FALSE)
+        if(NONE IN_LIST modules)
+            set(this_is_none TRUE)
+        endif()
+        if(entry_is_none STREQUAL this_is_none)
+            continue()
+        endif()
+        foreach(header IN LISTS headers)
+            if(header IN_LIST entry_headers)
+                message(FATAL_ERROR "cpp-policy: '${header}' is confined TO NONE on one line "
+                    "and to modules on another; lines add up, so remove one (POLICY.md 11.6)")
+            endif()
+        endforeach()
+    endforeach()
     list(JOIN headers "," headers)
     list(JOIN modules "," modules)
     set_property(GLOBAL APPEND PROPERTY CPP_POLICY_CONFINED_INCLUDES
@@ -1005,7 +1044,9 @@ endfunction()
 # every test case becomes a CTest test named <kind>/<module>/<test case> and labelled with
 # its kind; a unit program is one CTest test that runs all its cases in one process
 # (scripts/doctest_tests.cmake). A unit program has 60 seconds; integration and
-# benchmark tests 60, or TIMEOUT. Benchmark programs also get cpp_policy::peak_heap_bytes()
+# benchmark tests 60, or TIMEOUT; above 60 and up to 600 with SLOW "<reason>", shown at every
+# configure. Tests run one at a time unless the project calls cpp_policy_parallel_tests()
+# first; ALONE keeps a program's tests apart then. Benchmark programs also get cpp_policy::peak_heap_bytes()
 # and peak_memory_bytes(), and nanobench when the project uses it, and are built everywhere (so clang-tidy checks them)
 # but run only in builds without sanitizers, which distort memory and time.
 # ---------------------------------------------------------------------------
@@ -1022,11 +1063,46 @@ function(_cpp_policy_testing_library)
     cpp_policy_apply(cpp_policy_testing)
 endfunction()
 
+# Unit and integration tests several at a time (the presets give CTest 4 jobs). Without this
+# call every test runs alone, as before. Benchmarks always run alone, and so do the tests of
+# a program declared SLOW or ALONE (a fixed port, a shared folder). Call it before the first
+# cpp_policy_add_tests().
+function(cpp_policy_parallel_tests)
+    get_property(added GLOBAL PROPERTY CPP_POLICY_TESTS_ADDED)
+    if(added OR ARGN)
+        message(FATAL_ERROR "cpp-policy: call cpp_policy_parallel_tests(), with no arguments, "
+            "before the first cpp_policy_add_tests()")
+    endif()
+    set_property(GLOBAL PROPERTY CPP_POLICY_PARALLEL_TESTS TRUE)
+    message(STATUS "cpp-policy: unit and integration tests run several at a time")
+endfunction()
+
+# The presets give CTest several jobs. A test added with add_test() runs alone all the same:
+# only cpp_policy_add_tests() knows which tests may share the machine. Run when the top
+# CMakeLists.txt has been read, over every directory.
+function(_cpp_policy_plain_tests_alone directory)
+    get_property(tests DIRECTORY "${directory}" PROPERTY TESTS)
+    if(tests)
+        set_tests_properties(${tests} DIRECTORY "${directory}" PROPERTIES RUN_SERIAL TRUE)
+    endif()
+    get_property(children DIRECTORY "${directory}" PROPERTY SUBDIRECTORIES)
+    foreach(child IN LISTS children)
+        _cpp_policy_plain_tests_alone("${child}")
+    endforeach()
+endfunction()
+get_property(_cpp_policy_deferred GLOBAL PROPERTY CPP_POLICY_PLAIN_TESTS_DEFERRED)
+if(NOT _cpp_policy_deferred AND NOT CMAKE_SCRIPT_MODE_FILE)
+    set_property(GLOBAL PROPERTY CPP_POLICY_PLAIN_TESTS_DEFERRED TRUE)
+    cmake_language(DEFER DIRECTORY "${CMAKE_SOURCE_DIR}"
+        CALL _cpp_policy_plain_tests_alone "${CMAKE_SOURCE_DIR}")
+endif()
+
 function(cpp_policy_add_tests kind module)
-    cmake_parse_arguments(PARSE_ARGV 2 arg "" "TIMEOUT;NO_LEAK_CHECK"
+    cmake_parse_arguments(PARSE_ARGV 2 arg "ALONE" "TIMEOUT;NO_LEAK_CHECK;SLOW"
         "SOURCES;LIBRARIES;ENVIRONMENT")
     set(usage "cpp_policy_add_tests(<kind> <module> SOURCES <file>... [LIBRARIES <target>...] "
-              "[TIMEOUT <seconds>] [ENVIRONMENT <VAR=value>...] [NO_LEAK_CHECK <reason>])")
+              "[TIMEOUT <seconds>] [SLOW <reason>] [ALONE] [ENVIRONMENT <VAR=value>...] "
+              "[NO_LEAK_CHECK <reason>])")
     string(JOIN "" usage ${usage})
     if(arg_UNPARSED_ARGUMENTS OR NOT arg_SOURCES)
         message(FATAL_ERROR "cpp-policy: usage: ${usage}")
@@ -1072,13 +1148,47 @@ function(cpp_policy_add_tests kind module)
         endif()
         set(timeout 60)
     elseif(DEFINED arg_TIMEOUT)
-        if(NOT arg_TIMEOUT MATCHES "^[1-9][0-9]*$" OR arg_TIMEOUT GREATER 60)
-            message(FATAL_ERROR "cpp-policy: TIMEOUT is 1 to 60 seconds, the presets' limit")
+        if(NOT arg_TIMEOUT MATCHES "^[1-9][0-9]*$" OR arg_TIMEOUT GREATER 600)
+            message(FATAL_ERROR "cpp-policy: TIMEOUT is 1 to 60 seconds, or up to 600 with "
+                "SLOW \"<reason>\" (POLICY.md 13.2)")
+        endif()
+        if(arg_TIMEOUT GREATER 60 AND NOT DEFINED arg_SLOW)
+            message(FATAL_ERROR "cpp-policy: ${kind} tests for '${module}' ask for "
+                "${arg_TIMEOUT} seconds: more than 60 needs SLOW \"<reason>\", which says "
+                "why a test of this program can't be shorter or split (POLICY.md 13.2)")
         endif()
         set(timeout ${arg_TIMEOUT})
     else()
         set(timeout 60)
     endif()
+    if(DEFINED arg_SLOW)
+        if(kind STREQUAL "unit")
+            message(FATAL_ERROR "cpp-policy: SLOW isn't for unit tests: a slow test is an "
+                "integration test (POLICY.md 13)")
+        endif()
+        if(timeout LESS 61)
+            message(FATAL_ERROR "cpp-policy: SLOW goes with a TIMEOUT above 60 seconds; "
+                "${kind} tests for '${module}' have ${timeout}")
+        endif()
+        string(STRIP "${arg_SLOW}" slow_reason)
+        string(LENGTH "${slow_reason}" reason_length)
+        if(reason_length LESS 20)
+            message(FATAL_ERROR "cpp-policy: SLOW needs its reason, in a sentence: why a "
+                "test of this program can't be shorter or split (POLICY.md 13.2)")
+        endif()
+        # Shown at every configure, like every other exception.
+        message(NOTICE "cpp-policy: the ${kind} tests of '${module}' may take ${timeout} "
+            "seconds each, not 60: ${slow_reason}")
+    endif()
+    # Which of this program's tests may run beside others (POLICY.md 13.2): none, unless the
+    # project has asked for it; and then not benchmarks, whose measures another test would
+    # disturb, nor a program that is SLOW or says ALONE.
+    get_property(parallel GLOBAL PROPERTY CPP_POLICY_PARALLEL_TESTS)
+    set(serial TRUE)
+    if(parallel AND NOT kind STREQUAL "benchmark" AND NOT DEFINED arg_SLOW AND NOT arg_ALONE)
+        set(serial FALSE)
+    endif()
+    set_property(GLOBAL PROPERTY CPP_POLICY_TESTS_ADDED TRUE)
     set(target test_${kind}_${module})
     if(TARGET ${target})
         message(FATAL_ERROR "cpp-policy: ${kind} tests for '${module}' are already added; "
@@ -1149,7 +1259,8 @@ function(cpp_policy_add_tests kind module)
     add_custom_command(TARGET ${target} POST_BUILD
         BYPRODUCTS "${ctest_file}"
         COMMAND "${CMAKE_COMMAND}" "-DEXECUTABLE=$<TARGET_FILE:${target}>" "-DKIND=${kind}"
-                "-DMODULE=${module}" "-DTIMEOUT=${timeout}" "-DENVIRONMENT=${arg_ENVIRONMENT}"
+                "-DMODULE=${module}" "-DTIMEOUT=${timeout}" "-DSERIAL=${serial}"
+                "-DENVIRONMENT=${arg_ENVIRONMENT}"
                 "-DWORKING_DIR=${CMAKE_CURRENT_BINARY_DIR}" "-DCTEST_FILE=${ctest_file}"
                 -P "${CPP_POLICY_ROOT}/cmake/scripts/doctest_tests.cmake"
         COMMENT "cpp-policy: registering the tests of ${target}"

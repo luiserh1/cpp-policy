@@ -3,13 +3,82 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
-## Unreleased
+## 0.33.0 (2026-10-10)
 
+From the first real use of a library: Alfar replaced its copy of
+ToneMatcher's code (39 files) with ToneMatcher's library at the first try,
+and reported what the user's side made awkward, with two proposals from
+its owner about tests' time. Everything here is optional: a minor release.
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** none.
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.33.0`.
+2. Optional: `cpp_policy_parallel_tests()` before the first
+   `cpp_policy_add_tests()`, once each integration test uses a folder and a
+   port of its own (POLICY.md 13.2). Mark a program whose tests can't run
+   beside others `ALONE`.
+3. Optional, in a project that uses a library: `TO NONE` for the library
+   as a whole and a line per module used (POLICY.md 11.7).
+4. Optional, for the owner: `AGENTS.md`'s first paragraph in new projects
+   says to configure before reading the fetched `POLICY.md` after a pin
+   move. Agents may not edit `AGENTS.md`.
+
+### Added
+
+- **`cpp_policy_confine_includes(<header>... TO NONE)`:** no module may
+  include it. Lines add up, so `lib/ TO NONE` with `lib/parse/ TO a b` opens
+  one folder of a library and leaves the rest to nobody.
+  *Why:* Alfar uses five of the library's eleven modules and had no way to
+  say that nobody includes the other six; it gave them to one module, which
+  wasn't true. The same line holds a package that only the library needs
+  (zlib there), which had no confinement line to be on.
+- **`SLOW "<reason>"` in `cpp_policy_add_tests()`:** a `TIMEOUT` above 60
+  seconds, up to 600, for one test program, printed at every configure.
+  *Why:* the limit had no exception, and a test that honestly takes longer
+  could only be cut to fit. The owner's proposal: keep 60 as the rule, and
+  make the exception say why, as `NO_LEAK_CHECK` does.
+- **The gate names the passing tests that used two thirds of their limit,**
+  before the launcher's last line and in CI's log
+  (`cmake/scripts/test_times.cmake`).
+  *Why:* two of Alfar's tests took 41 and 46 seconds of 60 for days and
+  nothing said so; then four gate runs failed on them alone while other
+  agents were building.
+- **`cpp_policy_parallel_tests()`:** a project's unit and integration tests
+  run four at a time. Benchmarks, `SLOW` programs, `add_test()` tests and
+  programs declared `ALONE` still run alone. The presets give CTest four
+  jobs; without the call every test is marked to run alone, so nothing
+  changes for a project that doesn't ask.
+  *Why:* after 0.29.0, integration tests are 381 of the 389 seconds of
+  Alfar's tests, one at a time. Opt-in, because tests that share a port or
+  a folder would fail together.
+- **`tidy-files` configures again when the build folder holds another
+  release of the policy than `CMakeLists.txt` pins.**
+  *Why:* a pin moved by a merge left v0.31.0 in Alfar's build folder, and
+  the first POLICY.md 11.7 its agent read was the old one.
+
+### Changed
+
+- POLICY.md 11.6 and 11.7 say what "lines add up" means for a narrower line
+  beside a wider one, that a module which gets a dependency's types through
+  another header needs no line, that `library.cmake` is where
+  `find_package()` is called, and what the first build after a library
+  replaces copied code costs. 11.7's example for a user is `TO NONE` and a
+  line per module.
+  *Why:* each was a question Alfar had to answer by trying.
 - POLICY.md 11.7: a library's test support goes in a module of its own in
   the top layer, and may be headers only; the release commit (changelog and
   version) comes before the tag, which goes on it once its CI is green.
   *Why:* asked by ToneMatcher on releasing v0.4.1, whose tagged tree lists
   the release's changes under "Unreleased".
+
+### Measured, by Alfar
+
+- The switch to the library: both programs about 200 bytes larger, 2,942
+  built files byte for byte the same, 120 s before and 124 s after.
+- The gate's tests on the same code: about 580 s with v0.26.5 (1,634 CTest
+  tests), 389 s with v0.31.0 (642). Unit tests went from about 180 s to 8.
 
 ## 0.32.0 (2026-10-09)
 

@@ -2,7 +2,9 @@
 
 This project follows **cpp-policy** (fetched by CMake; rules in
 `build/<preset>/_deps/cpp_policy-src/POLICY.md`, or
-https://github.com/luiserh1/cpp-policy/blob/main/POLICY.md).
+https://github.com/luiserh1/cpp-policy/blob/main/POLICY.md). That folder holds
+the release of the last configure: after the pin in `CMakeLists.txt` moves,
+run `cmake --preset <preset>` before reading it.
 
 ## The rules in short
 

@@ -22,8 +22,13 @@ set(kind integration)
 if(case MATCHES "_unit$")
     set(kind unit)
 endif()
+# A case whose name ends in _parallel is registered as cpp_policy_parallel_tests() makes it.
+set(serial TRUE)
+if(case MATCHES "_parallel$")
+    set(serial FALSE)
+endif()
 execute_process(COMMAND "${CMAKE_COMMAND}" "-DLISTING_FILE=${LISTING}" -DKIND=${kind} -DMODULE=app
-    -DTIMEOUT=10 "-DWORKING_DIR=${WORK}" "-DCTEST_FILE=${ctest_file}" "-DENVIRONMENT=A=1;B=2"
+    -DTIMEOUT=10 -DSERIAL=${serial} "-DWORKING_DIR=${WORK}" "-DCTEST_FILE=${ctest_file}" "-DENVIRONMENT=A=1;B=2"
     -P "${POLICY_ROOT}/cmake/scripts/doctest_tests.cmake"
     RESULT_VARIABLE code OUTPUT_VARIABLE out ERROR_VARIABLE err)
 set(output "${out}${err}")
@@ -32,6 +37,14 @@ if(case MATCHES "^ok")
         message(FATAL_ERROR "testing/${case}: the script failed (exit code ${code}):\n${output}")
     endif()
     file(READ "${ctest_file}" output)
+    # Every test runs alone unless the project asked for several at a time.
+    string(REGEX MATCHALL "set_tests_properties" all "${output}")
+    string(REGEX MATCHALL " RUN_SERIAL TRUE " alone "${output}")
+    list(LENGTH all all)
+    list(LENGTH alone alone)
+    if((serial AND NOT alone EQUAL all) OR (NOT serial AND NOT alone EQUAL 0))
+        message(FATAL_ERROR "testing/${case}: ${alone} of ${all} tests are RUN_SERIAL:\n${output}")
+    endif()
 elseif(code EQUAL 0)
     message(FATAL_ERROR "testing/${case}: the script accepted the listing:\n${output}")
 elseif(EXISTS "${ctest_file}")

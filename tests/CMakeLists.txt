@@ -247,6 +247,12 @@ foreach(case IN LISTS audit_cases)
     set_tests_properties(audit/${name} PROPERTIES PASS_REGULAR_EXPRESSION "${expect}")
 endforeach()
 
+# --- The gate's notice of tests close to their time limit (POLICY.md 13.2).
+add_test(NAME testing/test_times
+    COMMAND "${CMAKE_COMMAND}" "-DPOLICY_ROOT=${CPP_POLICY_ROOT}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/test_times"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/testing/test_times.cmake")
+
 # --- CMake bypass fixtures: each directory is a mini project that configures with the
 # policy (clang-tidy on); expect.txt holds a regex its configure output must match.
 file(GLOB bypass_cases CONFIGURE_DEPENDS LIST_DIRECTORIES true "${CMAKE_CURRENT_SOURCE_DIR}/bypass/*")

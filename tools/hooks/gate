@@ -10,7 +10,8 @@
 # - The machine stays awake while it runs (macOS and Linux). A test that sleeps with the
 #   machine passes its time limit and is reported as failed.
 # - It ends with one line, "gate: passed" or "gate: FAILED", and returns the workflow's own
-#   exit code, so that a command chained after it can't hide the result.
+#   exit code, so that a command chained after it can't hide the result. Before that line it
+#   names the passing tests that used two thirds or more of their time limit.
 # pre-push runs it. Copy unchanged into the project's tools/hooks/ (git runs only files named
 # after its hooks).
 set -u
@@ -64,6 +65,17 @@ else
     cmake --workflow --preset "$preset"
 fi
 code=$?
+
+# A passing test that used most of its time limit is named here, before the last line: it
+# is the next one to fail on a busy machine (POLICY.md 13.2). The script is the policy's
+# copy that the build fetched.
+config=build/$preset/cpp_policy_config.cmake
+if [ $code -eq 0 ] && [ -f "$config" ]; then
+    policy=$(sed -n 's/^set(POLICY_ROOT \[==\[\(.*\)\]==\])$/\1/p' "$config")
+    if [ -n "$policy" ] && [ -f "$policy/cmake/scripts/test_times.cmake" ]; then
+        cmake "-DBUILD_DIR=build/$preset" -P "$policy/cmake/scripts/test_times.cmake" || true
+    fi
+fi
 
 if [ $code -eq 0 ]; then
     echo "gate: passed ($preset)"

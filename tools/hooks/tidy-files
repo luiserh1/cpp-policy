@@ -34,6 +34,19 @@ fi
 # The policy's copy that the build fetched; its scripts do the work.
 policy=$(sed -n 's/^set(POLICY_ROOT \[==\[\(.*\)\]==\])$/\1/p' "$config")
 [ -n "$policy" ] || { echo "tidy-files: $config names no POLICY_ROOT" >&2; exit 1; }
+# A pin moved since the last configure (a merge, a checkout) leaves the release of before in
+# the build folder: its rules would be the ones applied here, and its POLICY.md the one read.
+case $policy in
+    */_deps/cpp_policy-src)
+        pinned=$(sed -n '/cpp-policy\.git/,/GIT_TAG/s/.*GIT_TAG *\([0-9a-f]\{40\}\).*/\1/p' CMakeLists.txt | head -n 1)
+        fetched=$(git -C "$policy" rev-parse HEAD 2>/dev/null || true)
+        if [ -n "$pinned" ] && [ -n "$fetched" ] && [ "$pinned" != "$fetched" ]; then
+            echo "tidy-files: build/$preset holds cpp-policy at $fetched, and CMakeLists.txt pins"
+            echo "tidy-files: $pinned; configuring again (cmake --preset $preset)"
+            cmake --preset "$preset" >/dev/null
+        fi
+        ;;
+esac
 
 # CMake lists are separated by ";".
 files=$(printf '%s;' "$@")

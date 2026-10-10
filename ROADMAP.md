@@ -16,7 +16,8 @@ in the walkthroughs of that time.
 Releases A and B (0.30.0, 0.32.0) are out. Open:
 
 - [ ] The token in a real CI run: Alfar's, once the owner has created it.
-- [ ] What Alfar finds awkward in using ToneMatcher's library.
+- [ ] `cpp_policy_parallel_tests()` in a real project (0.33.0): what Alfar's
+      gate takes with it, and which of its tests had to be `ALONE`.
 - [ ] A project that is only a library, and a library that uses a library:
       when a project needs one.
 
@@ -30,8 +31,12 @@ Releases A and B (0.30.0, 0.32.0) are out. Open:
 - [ ] **Smaller:** the padding check's threshold; the message when a build
       runs without its preset; a shipped local-time function (W2); the
       hook's clang-tidy after a gate that passed on the same tree.
-- [ ] **Alfar's gate time before and after 0.29.0,** asked of Alfar: the
-      measurement that release was made on is of a generated project.
+- [ ] **From its report of 2026-10-10:** a build after a `CMakeLists.txt`
+      changes runs clang-tidy on the whole tree again (13 to 30 minutes);
+      the size budget is tested only in the release workflow, and on macOS
+      moves 16 KiB at a time; `tidy-files` says "OK (0 files)" for a path
+      that doesn't exist; its trial of one full gate per stage, with the
+      hook and the touched modules' tests between commits.
 
 ### Trials running
 

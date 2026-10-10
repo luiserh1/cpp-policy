@@ -1,0 +1,1 @@
+src/gui/panel.cpp:2: error: includes <tonematcher/image/image.hpp>, which no module may include: it is confined TO NONE.*src/gui/panel.cpp:4: error: includes <tonematcher/parse/number.hpp>, which only these modules may include: project.*src/project/read.cpp:5: error: includes <zlib.h>, which no module may include.*cpp-policy audit: 3 violation

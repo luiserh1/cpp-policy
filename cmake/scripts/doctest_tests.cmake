@@ -2,7 +2,8 @@
 # runs it after each build of the program:
 #
 #   cmake -DEXECUTABLE=<program> -DKIND=<kind> -DMODULE=<module> -DTIMEOUT=<seconds>
-#         [-DENVIRONMENT=<VAR=value;...>] -DWORKING_DIR=<dir> -DCTEST_FILE=<file>
+#         [-DSERIAL=<TRUE|FALSE>] [-DENVIRONMENT=<VAR=value;...>] -DWORKING_DIR=<dir>
+#         -DCTEST_FILE=<file>
 #         -P doctest_tests.cmake
 #
 # Each integration or benchmark test case becomes the CTest test <kind>/<module>/<test case>,
@@ -16,6 +17,13 @@
 # tests. The self-test passes LISTING_FILE instead of EXECUTABLE: a saved listing.
 
 cmake_minimum_required(VERSION 3.29)
+
+# A test runs with no other beside it unless cpp_policy_add_tests() says it may (SERIAL
+# false): the presets give CTest several jobs.
+set(alone " RUN_SERIAL TRUE")
+if(DEFINED SERIAL AND NOT SERIAL)
+    set(alone "")
+endif()
 
 if(DEFINED LISTING_FILE)
     file(READ "${LISTING_FILE}" listing)
@@ -92,7 +100,7 @@ foreach(case IN LISTS cases)
         "add_test([==[${test}]==] [==[${EXECUTABLE}]==] [==[--test-case=${name}]==]"
         " --no-intro=true --no-version=true)\n"
         "set_tests_properties([==[${test}]==] PROPERTIES LABELS [==[${labels}]==]"
-        " TIMEOUT ${TIMEOUT} WORKING_DIRECTORY [==[${WORKING_DIR}]==]")
+        " TIMEOUT ${TIMEOUT}${alone} WORKING_DIRECTORY [==[${WORKING_DIR}]==]")
     if(NOT "${ENVIRONMENT}" STREQUAL "")
         string(APPEND script " ENVIRONMENT [==[${ENVIRONMENT}]==]")
     endif()
@@ -109,7 +117,7 @@ if(KIND STREQUAL "unit" AND cases)
     string(APPEND script
         "add_test([==[${test}]==] [==[${EXECUTABLE}]==] --no-intro=true --no-version=true)\n"
         "set_tests_properties([==[${test}]==] PROPERTIES LABELS [==[${unit_labels}]==]"
-        " TIMEOUT ${TIMEOUT} WORKING_DIRECTORY [==[${WORKING_DIR}]==]")
+        " TIMEOUT ${TIMEOUT}${alone} WORKING_DIRECTORY [==[${WORKING_DIR}]==]")
     if(NOT "${ENVIRONMENT}" STREQUAL "")
         string(APPEND script " ENVIRONMENT [==[${ENVIRONMENT}]==]")
     endif()

@@ -255,3 +255,8 @@ jobs:
           preset=${{ matrix.workflow }}
           if [ "${{ matrix.system }}" = windows ]; then preset=win-$preset; fi
           cmake --workflow --preset "$preset"
+          # Passing tests close to their time limit are named in the log (POLICY.md 13.2).
+          policy=$(sed -n 's/^set(POLICY_ROOT \[==\[\(.*\)\]==\])$/\1/p' "build/$preset/cpp_policy_config.cmake" 2>/dev/null || true)
+          if [ -n "$policy" ] && [ -f "$policy/cmake/scripts/test_times.cmake" ]; then
+            cmake "-DBUILD_DIR=build/$preset" -P "$policy/cmake/scripts/test_times.cmake" || true
+          fi
