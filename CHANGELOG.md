@@ -3,6 +3,14 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## Unreleased
+
+- POLICY.md 11.7: a library's test support goes in a module of its own in
+  the top layer, and may be headers only; the release commit (changelog and
+  version) comes before the tag, which goes on it once its CI is green.
+  *Why:* asked by ToneMatcher on releasing v0.4.1, whose tagged tree lists
+  the release's changes under "Unreleased".
+
 ## 0.32.0 (2026-10-09)
 
 Release B of the library plan (POLICY.md 11.7): what the first real use,

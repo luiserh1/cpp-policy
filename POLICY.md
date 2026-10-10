@@ -1172,9 +1172,16 @@ days.
   `TEST_SUPPORT <files>` in `cpp_policy_library()`, with `TEST_LINK` for what
   they link. They are files of the library's modules that aren't in
   `SOURCES` (a folder for scratch files, sample inputs), checked as test
-  code. The library's tests link it, and so do a user's.
+  code. The library's tests link it, and so do a user's. They go in a module
+  of their own (`testing`), which is in a `LAYER` like any other: the top
+  one, since a helper may use anything in the library and nothing in the
+  library may use it. Headers alone are enough; no source file is needed.
 - **A release of the library is a tag on a commit whose CI was green on
-  every system.** A user compiles the library's code for systems it may
+  every system.** That commit is the release commit: it names the release in
+  `CHANGELOG.md` and sets the version, it is pushed, and the tag goes on it
+  once its run is green. One run, and the tagged tree's changelog says which
+  release it is. (Tagging first and naming the release in a later commit
+  leaves the tagged tree calling its own changes "Unreleased".) A user compiles the library's code for systems it may
   never build on itself, and the library's CI is the only place that code
   met a compiler. A change that alters a result on purpose says so first in
   `CHANGELOG.md`.
