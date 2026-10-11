@@ -3,7 +3,19 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
-## Unreleased
+## 0.33.4 (2026-10-11)
+
+When the gate runs. Text only: nothing that passes stops passing.
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** none.
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.33.4`.
+2. For the owner: `AGENTS.md`'s section "Before you say you are done"
+   changed in the template. Agents may not edit `AGENTS.md`.
+
+### Changed
 
 - **POLICY.md 8 says when the gate runs:** at the end of each stage of work
   and always before anything joins the main line, not before every commit;
