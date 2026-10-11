@@ -33,6 +33,15 @@ if [ "$windows" = yes ]; then
     esac
 fi
 
+# A project with a vcpkg.json can't configure without VCPKG_ROOT. An agent's shell keeps no
+# environment between commands, so a push after a passed gate fails for that alone: said
+# here, as the last line, and not in the middle of CMake's output.
+if [ -f vcpkg.json ] && [ -z "${VCPKG_ROOT:-}" ]; then
+    echo "gate: FAILED ($preset): VCPKG_ROOT is not set in this shell. Set it in the same" >&2
+    echo "gate: command (VCPKG_ROOT=<vcpkg folder> sh tools/hooks/gate, or the same before git push)" >&2
+    exit 2
+fi
+
 # The lock is a folder: mkdir either creates it or fails, on every system. It holds the
 # process number of its owner, so that a lock left by a gate that was killed is taken over.
 lock=${CPP_POLICY_GATE_LOCK:-/tmp/cpp-policy-gate-$(id -u).lock}

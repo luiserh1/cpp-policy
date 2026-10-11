@@ -167,6 +167,22 @@ string(FIND "${out}" "gate: FAILED (win-check, exit code 3)" found)
 expect("code;EQUAL;3;AND;found;GREATER;-1"
     "a failing workflow must end the gate with its exit code and say that it failed")
 file(WRITE "${WORK}/stub/cmake" "#!/bin/sh\necho \"stub cmake $*\"\n")
+# A project with a vcpkg.json and a shell without VCPKG_ROOT: the gate says so itself, at
+# once, and doesn't start the workflow.
+file(WRITE "${repo}/vcpkg.json" "{}\n")
+set(vcpkg_root "$ENV{VCPKG_ROOT}")
+unset(ENV{VCPKG_ROOT})
+run(${with_stub} tools/hooks/gate)
+string(FIND "${out}" "VCPKG_ROOT is not set" found)
+string(FIND "${out}" "stub cmake" started)
+expect("code;EQUAL;2;AND;found;GREATER;-1;AND;started;EQUAL;-1"
+    "without VCPKG_ROOT the gate must stop before the workflow and name the variable")
+set(ENV{VCPKG_ROOT} "${WORK}")
+run(${with_stub} tools/hooks/gate)
+string(FIND "${out}" "gate: passed" found)
+expect("code;EQUAL;0;AND;found;GREATER;-1" "with VCPKG_ROOT set the gate must run")
+set(ENV{VCPKG_ROOT} "${vcpkg_root}")
+file(REMOVE "${repo}/vcpkg.json")
 
 # commit-msg: one message per rule. Each case is "accept" or "reject" and a message.
 function(check_message verdict text what)

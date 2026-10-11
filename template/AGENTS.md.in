@@ -100,6 +100,9 @@ in a push or a merge):
 sh tools/hooks/gate
 ```
 
+The gate and `git push` (whose hook runs the gate) need `VCPKG_ROOT` in the
+shell of that same command: a variable set in an earlier command is gone.
+
 Not before every commit. Between commits, the commit hook and `tidy-files`
 check the files you changed; run the tests of the modules you touched as
 well (`ctest --preset check -R "<module>"`).

@@ -3,6 +3,15 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## Unreleased
+
+- **The gate's launcher stops at once, with its last line saying why, when
+  the project has a `vcpkg.json` and the shell has no `VCPKG_ROOT`.**
+  `AGENTS.md` in new projects says the variable must be in the same command.
+  *Why:* ToneMatcher's pushes failed twice after a passed gate for that
+  alone: an agent's shell keeps no environment between commands, and the
+  reason was a line in the middle of CMake's output.
+
 ## 0.33.4 (2026-10-11)
 
 When the gate runs. Text only: nothing that passes stops passing.
