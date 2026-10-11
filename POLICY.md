@@ -719,6 +719,26 @@ adds what a machine shared by several unattended agents needs:
 
 pre-push runs the gate through it.
 
+**When the gate runs.** Work is done in stages: a stage is what ends in a
+push or in a merge into the main line.
+
+- **The full gate runs at the end of each stage, and always before anything
+  joins the main line.** Not before every commit: between commits the
+  commit hook and `tidy-files` say what the gate would say about the files
+  changed.
+- **A stage that adds or changes tests also runs the release workflow
+  once** (`sh tools/hooks/gate release`) before it ends. The gate is the
+  check build; a test can pass there and fail in the release build, where
+  the code is optimized and timing differs.
+- *Why:* Alfar's unattended agents first ran the gate before every commit,
+  which was most of their time. Over fifteen stages with one gate each, 14
+  full gates passed and no fault reached a stage's end that a gate per
+  commit would have caught sooner. The one fault that did was a test that
+  failed only in the release build, which no number of check gates shows.
+- Which tests to run between commits is the agent's judgment (those of the
+  modules it touched, as Alfar did); no tool checks it, so it is advice in
+  `AGENTS.md` and not a rule here.
+
 Every layer works the same for any agent and for people: they are commands
 and git hooks, and `AGENTS.md` says when to run them. An agent with a hook
 system of its own may call `tidy-files` from it after each edit, but the

@@ -92,10 +92,23 @@ format, the file's length, suppressions and `// boundary:` comments,
 test-case names, and clang-tidy. It says "NOT CHECKED" for a file this build
 doesn't compile: for a new file, add it to `CMakeLists.txt` first.
 
-Run the full gate and make sure it passes:
+Run the full gate and make sure it passes, **at the end of each stage of
+work and always before anything joins the main line** (a stage is what ends
+in a push or a merge):
 
 ```
 sh tools/hooks/gate
+```
+
+Not before every commit. Between commits, the commit hook and `tidy-files`
+check the files you changed; run the tests of the modules you touched as
+well (`ctest --preset check -R "<module>"`).
+
+If the stage added or changed tests, also run the release workflow once
+before it ends: a test can pass in the check build and fail there.
+
+```
+sh tools/hooks/gate release
 ```
 
 It runs `cmake --workflow --preset check` (`win-check` on Windows), one gate

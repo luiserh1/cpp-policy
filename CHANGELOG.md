@@ -3,6 +3,19 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## Unreleased
+
+- **POLICY.md 8 says when the gate runs:** at the end of each stage of work
+  and always before anything joins the main line, not before every commit;
+  and a stage that adds or changes tests also runs the release workflow
+  once. `AGENTS.md` in new projects says the same, with the advice to run
+  the touched modules' tests between commits.
+  *Why:* decided by the owner on Alfar's trial of 2026-10-09 to 10-11:
+  fifteen stages, 14 full gates, none failed, and the one fault that reached
+  a stage's end was a test that fails only in the release build.
+  *Existing projects:* `AGENTS.md` is the owner's to change; the script for
+  it was given to the owner on 2026-10-11.
+
 ## 0.33.3 (2026-10-11)
 
 From Alfar's report on v0.33.2. A patch release: nothing that passes stops
