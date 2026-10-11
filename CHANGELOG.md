@@ -3,7 +3,17 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
-## Unreleased
+## 0.33.5 (2026-10-11)
+
+A patch release: nothing that passes stops passing.
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** none. It brings the changed `tools/hooks/gate`.
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.33.5`.
+
+### Fixed
 
 - **The gate's launcher stops at once, with its last line saying why, when
   the project has a `vcpkg.json` and the shell has no `VCPKG_ROOT`.**
