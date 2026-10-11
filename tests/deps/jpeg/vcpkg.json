@@ -1,0 +1,6 @@
+{
+  "name": "fixture",
+  "dependencies": [
+    { "name": "libjpeg-turbo", "default-features": false, "$reason": "Reads JPEG photos; BSD-3-Clause and IJG" }
+  ]
+}

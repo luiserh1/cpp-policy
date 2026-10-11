@@ -56,9 +56,21 @@ Prefer the standard library. Add a library only when it saves real work the
 project would otherwise have to write and maintain. When one is needed:
 
 - **License:** permissive open source only: MIT, BSD-2-Clause, BSD-3-Clause,
-  Apache-2.0, BSL-1.0, Zlib, ISC, 0BSD, Unlicense, CC0-1.0. No GPL: projects
-  link statically, so the GPL would cover the whole program. LGPL or any other
-  license needs a review and a change to this list, made in cpp-policy.
+  Apache-2.0, BSL-1.0, Zlib, ISC, 0BSD, Unlicense, CC0-1.0, IJG, libpng-2.0.
+  No GPL: projects link statically, so the GPL would cover the whole program.
+  LGPL or any other license needs a review and a change to this list, made
+  in cpp-policy.
+  - **A license written `A AND B` needs both on the list;** `A OR B` needs
+    one. `libjpeg-turbo` is `BSD-3-Clause AND IJG`.
+  - **A package's own dependencies are checked too,** so a package the
+    project never named can be the one refused. The message says so.
+  - **IJG** (libjpeg-turbo) asks one thing of a program distributed without
+    its source: its documentation says "this software is based in part on
+    the work of the Independent JPEG Group". A project that uses it puts
+    that sentence in its `README.md`.
+  - The owner's approval of a dependency is about the need for it. It
+    doesn't replace this list: a license outside it stops the build until
+    cpp-policy's list changes.
 - **Lightweight:** few dependencies of its own; header-only or small is
   better. Optional features stay off: every dependency sets
   `"default-features": false` and lists the features it uses in `"features"`.

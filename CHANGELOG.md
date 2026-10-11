@@ -3,6 +3,32 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.33.2 (2026-10-11)
+
+Two licenses on the list, asked by Alfar. A patch release: nothing that
+passes stops passing.
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** none.
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.33.2`.
+2. A project that uses libjpeg-turbo adds the Independent JPEG Group's
+   sentence to its `README.md` (POLICY.md 1.1).
+
+### Changed
+
+- **`IJG` and `libpng-2.0` are allowed licenses** (POLICY.md 1.1). Both are
+  permissive, with no copyleft; IJG asks for one sentence in the
+  documentation of a program distributed without source.
+  *Why:* the owner had approved libjpeg-turbo for Alfar, and configuration
+  refused it (`BSD-3-Clause AND IJG`) and libspng (`BSD-2-Clause AND
+  libpng-2.0`). Nearly every program that reads JPEG uses the first.
+- The refusal of a license says that every license joined by `AND` must be
+  on the list, and, for a package `vcpkg.json` doesn't list, that a listed
+  package depends on it. POLICY.md 1.1 says both.
+  *Why:* the second refusal named a package that was nowhere in Alfar.
+
 ## 0.33.1 (2026-10-10)
 
 From ToneMatcher's reports on v0.33.0. A patch release: nothing that passes

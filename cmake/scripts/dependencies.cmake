@@ -14,7 +14,8 @@ cmake_minimum_required(VERSION 3.29)
 
 # Permissive licenses (SPDX identifiers). Adding one is a policy change, made in cpp-policy.
 set(allowed_licenses
-    MIT BSD-2-Clause BSD-3-Clause Apache-2.0 BSL-1.0 Zlib ISC 0BSD Unlicense CC0-1.0)
+    MIT BSD-2-Clause BSD-3-Clause Apache-2.0 BSL-1.0 Zlib ISC 0BSD Unlicense CC0-1.0
+    IJG libpng-2.0)
 
 set(errors 0)
 macro(report message)
@@ -24,6 +25,7 @@ endmacro()
 
 # --- The manifest -----------------------------------------------------------------------
 file(READ "${MANIFEST}" manifest)
+set(listed "")
 string(JSON count ERROR_VARIABLE no_dependencies LENGTH "${manifest}" dependencies)
 if(no_dependencies)
     set(count 0)
@@ -38,6 +40,7 @@ if(count GREATER 0)
             continue()
         endif()
         string(JSON name GET "${manifest}" dependencies ${i} name)
+        list(APPEND listed "${name}")
         string(JSON features ERROR_VARIABLE missing GET "${manifest}" dependencies ${i} default-features)
         if(missing OR NOT features STREQUAL "OFF")
             report("vcpkg.json: dependency '${name}' must set \"default-features\": false; list the features it needs in \"features\"")
@@ -99,7 +102,12 @@ foreach(dir IN LISTS INSTALLED_DIRS)
         endif()
         license_allowed("${license}" allowed)
         if(NOT allowed)
-            report("${package}: license '${license}' is not allowed (allowed: ${allowed_licenses})")
+            # A package the project never named is refused too: say where it comes from.
+            set(origin "")
+            if(NOT package IN_LIST listed)
+                set(origin "; vcpkg.json doesn't list it: a package it lists depends on it")
+            endif()
+            report("${package}: license '${license}' is not allowed${origin} (every license joined by AND must be one of: ${allowed_licenses})")
         endif()
     endforeach()
 endforeach()

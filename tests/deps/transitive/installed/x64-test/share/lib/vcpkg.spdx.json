@@ -1,0 +1,6 @@
+{
+  "packages": [
+    { "name": "lib", "licenseConcluded": "MIT" },
+    { "name": "lib:x64-test", "licenseConcluded": "MIT" }
+  ]
+}

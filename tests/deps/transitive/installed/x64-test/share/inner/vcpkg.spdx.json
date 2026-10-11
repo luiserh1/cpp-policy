@@ -1,0 +1,5 @@
+{
+  "packages": [
+    { "name": "inner", "licenseConcluded": "MIT AND LGPL-2.1-only" }
+  ]
+}

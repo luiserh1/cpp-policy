@@ -1,0 +1,5 @@
+{
+  "packages": [
+    { "name": "libjpeg-turbo", "licenseConcluded": "BSD-3-Clause AND IJG" }
+  ]
+}

@@ -54,6 +54,9 @@ Releases A and B (0.30.0, 0.32.0) are out. Open:
 
 - **MPL-2.0** (Eigen, Ceres): left open until a project needs it
   (2026-10-08).
+- **An owner's exception for one named package's license,** with a reason
+  printed at every configure (asked by Alfar, 2026-10-11): when a license
+  comes up that the owner would accept for one project but not for all.
 
 ### Waiting
 

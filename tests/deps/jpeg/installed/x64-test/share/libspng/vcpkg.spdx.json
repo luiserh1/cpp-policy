@@ -1,0 +1,5 @@
+{
+  "packages": [
+    { "name": "libspng", "licenseConcluded": "BSD-2-Clause AND libpng-2.0" }
+  ]
+}
