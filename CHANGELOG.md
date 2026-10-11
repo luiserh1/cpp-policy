@@ -3,6 +3,50 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.33.3 (2026-10-11)
+
+From Alfar's report on v0.33.2. A patch release: nothing that passes stops
+passing.
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** none.
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.33.3`.
+
+### Fixed
+
+- **The audit and the format check no longer walk the excluded folders**
+  (`build/`, `out/`, `.git/`, `vcpkg_installed/`) to list a project's
+  sources. On Alfar's folder, which holds build trees and agents'
+  worktrees, listing its 939 files took 250 s and takes 0.1 s, with the
+  same list.
+  *Why:* Alfar reported `policy-audit` at two to three minutes beside a
+  build, and four seconds on a clone of `src/`. The files were listed
+  everywhere first and the excluded ones dropped afterwards.
+
+### Added
+
+- **A note from the audit for a module named on a confinement line that
+  includes none of the line's headers.** Not an error.
+  *Why:* after Alfar's switch to the library, a module stayed on its
+  `nlohmann/` line with no include of it, and nothing said so.
+
+### Changed
+
+- POLICY.md: a package that is built and not linked (1.1); the two
+  checks a `setjmp` wrapper of a C library meets (2); that a
+  `peak_memory_bytes()` test must first show its work rises above the
+  starting peak (13.5); that a library's pin may be moved by hand (11.7).
+  *Why:* each found by Alfar while adding libjpeg-turbo.
+
+### Measured, by Alfar
+
+- `cpp_policy_parallel_tests()`: 856 tests in 756 s one at a time, 216 to
+  219 s four at a time over three runs. No program `ALONE`, none `SLOW`.
+  One pair of tests shared a scratch folder name, found by reading the
+  tests' text because of 13.4's sentence, not by a failure.
+
 ## 0.33.2 (2026-10-11)
 
 Two licenses on the list, asked by Alfar. A patch release: nothing that

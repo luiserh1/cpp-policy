@@ -64,6 +64,13 @@ project would otherwise have to write and maintain. When one is needed:
     one. `libjpeg-turbo` is `BSD-3-Clause AND IJG`.
   - **A package's own dependencies are checked too,** so a package the
     project never named can be the one refused. The message says so.
+  - **A package that is built and not linked** (libspng, which vcpkg's
+    libjpeg-turbo port needs for a part Alfar doesn't use) still has to be
+    on the list: the check is of what is installed. What a license asks of
+    a distributed program applies to what is in the program. Confine its
+    headers `TO NONE`, check once that the program has none of its symbols
+    (`nm` on the unstripped release program), and say so in the reason of
+    the package that brings it.
   - **IJG** (libjpeg-turbo) asks one thing of a program distributed without
     its source: its documentation says "this software is based in part on
     the work of the Independent JPEG Group". A project that uses it puts
@@ -381,6 +388,14 @@ Check each C++ file right after editing it with `sh tools/hooks/tidy-files
   `FlagA | FlagB` on a plain C `enum` is refused, because its type is
   signed. The cast to unsigned belongs with the library, in the confined
   module that wraps it (section 4): one helper there, not a cast at each use.
+- **A C library whose only error path is `longjmp`** (libjpeg). The wrapper
+  in the confined module needs `setjmp` and `longjmp`, and two checks
+  refuse each: `modernize-avoid-setjmp-longjmp`, and
+  `cppcoreguidelines-pro-bounds-array-to-pointer-decay` for `jmp_buf`. One
+  named suppression of both on each of the two lines, with the reason.
+  (`cert-err52-cpp` says the same and isn't among the policy's checks; it
+  needn't be named.) No object with a destructor may live between the
+  `setjmp` and the call that can jump.
 - **Smaller ones:** `enum class E : std::uint8_t` for small enums
   (`performance-enum-size`); parentheses around a product added to something
   (`(y * width) + x`, `readability-math-missing-parentheses`); `reserve()`
@@ -1163,6 +1178,9 @@ that module.
   written with the project's own plain types (section 15.1), and nothing
   else of it.
 
+A module named on a line that includes none of the line's headers gets a
+note from the audit, not an error: the line says more than the code does.
+
 *Enforcement:* the audit rejects, under `src/`, an include of a named header
 (written with `<>` or `""`) from any other module or from `main.cpp`, and
 with `SOURCES_ONLY` from any header, and with `NONE` from anywhere. It also
@@ -1253,6 +1271,9 @@ cpp_policy_confine_includes(zlib.h TO NONE)   # only the library includes it
 - **A release, pinned by commit,** with the version in a comment, like
   cpp-policy's own pin (section 10).
   `sh tools/upgrade.sh --library <name> <tag>` moves it and runs the gate.
+  Moving it by hand is the same change: the commit and the version in its
+  comment, one line, and then the gate. The script exists to get the commit
+  of a tag right.
 - **The library is built in this project's build, as a dependency.** It gets
   this build's compiler, standard, hardening and sanitizers, which must be
   the same in everything linked together. It doesn't get this project's
@@ -1732,6 +1753,14 @@ the end (528 MB on 92 images) while its `export` passed its test.
   acknowledged, and delayed acknowledgment makes that about 44 ms per
   request: 200 messages took 8.9 s instead of 7 ms. macOS and Windows don't
   show it.
+- **A `peak_memory_bytes()` test sees nothing below the program's starting
+  peak** (9.7 MB in one of Alfar's test programs). With small inputs, 5 and
+  50 of them gave the same number to the byte, and a leak of a decoder's
+  whole state per input would have passed. The test first shows that its
+  work rises above the starting peak: the reading after the work is larger
+  than the one before it, or the test fails as proving nothing. Small leaks
+  per input in a C library are LeakSanitizer's to find, in the ordinary
+  tests.
 - With `peak_memory_bytes()` the peak may grow by **less than 10%**. Peak
   memory never goes down, so growth means something is kept per unit of
   work. Such a test can fail without a leak, from the measure's own steps,

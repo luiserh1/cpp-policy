@@ -305,6 +305,8 @@ foreach(file IN LISTS checked_files)
                         list(APPEND allowed_modules ${entry_module_list})
                     endif()
                     if(own IN_LIST entry_module_list)
+                        string(MD5 used_key "${entry}|${own}")
+                        set(confinement_used_${used_key} TRUE)
                         if(entry_sources STREQUAL "sources" AND file MATCHES "\\.(h|hpp|hh|hxx)$")
                             set(sources_only_here "${entry_modules}")
                         else()
@@ -513,6 +515,27 @@ if(POLICY_COMMIT AND NOT per_file AND NOT source_norm STREQUAL policy_norm)
 endif()
 
 list(LENGTH checked_files count)
+# A module on a confinement line that includes none of what the line gives it: the line
+# says more than the code does (a module that stopped using a library). A note, not an error.
+if(NOT per_file)
+    foreach(entry IN LISTS CONFINED_INCLUDES)
+        string(REPLACE "|" ";" parts "${entry};")
+        list(GET parts 0 entry_headers)
+        list(GET parts 1 entry_modules)
+        string(REPLACE "," ";" entry_module_list "${entry_modules}")
+        string(REPLACE "," " " entry_headers "${entry_headers}")
+        foreach(module IN LISTS entry_module_list)
+            string(MD5 used_key "${entry}|${module}")
+            if(NOT module STREQUAL "NONE" AND module IN_LIST all_modules
+               AND NOT DEFINED confinement_used_${used_key})
+                message("cpp-policy audit: note: cpp_policy_confine_includes(${entry_headers} "
+                    "TO ... ${module} ...): no file of '${module}' includes any of them; "
+                    "take the module off the line (POLICY.md 11.6)")
+            endif()
+        endforeach()
+    endforeach()
+endif()
+
 if(errors GREATER 0)
     message(FATAL_ERROR "cpp-policy audit: ${errors} violation(s) in ${count} file(s)")
 endif()

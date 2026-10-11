@@ -16,8 +16,11 @@ in the walkthroughs of that time.
 Releases A and B (0.30.0, 0.32.0) are out. Open:
 
 - [ ] The token in a real CI run: Alfar's, once the owner has created it.
-- [ ] `cpp_policy_parallel_tests()` in a real project (0.33.0): what Alfar's
-      gate takes with it, and which of its tests had to be `ALONE`.
+- [x] `cpp_policy_parallel_tests()` in real projects (0.33.0): ToneMatcher
+      41 s to 14 s; Alfar 756 s to 217 s, no program `ALONE`.
+- [ ] Windows and Linux have not built Alfar yet: it has no remote, so no
+      CI. The library, libjpeg-turbo and parallel tests are proven there on
+      macOS only.
 - [ ] A project that is only a library, and a library that uses a library:
       when a project needs one.
 
