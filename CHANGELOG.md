@@ -3,6 +3,47 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.35.0 (2026-10-12)
+
+A minor release: the `tsan` build is compiled differently, so its results
+can change. From Alfar's first `tsan` run, and a paragraph asked by
+ToneMatcher.
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** none. It brings the changed
+`CMakePresets.json`; the first `tsan` build after it is a whole one.
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.35.0`.
+2. Optional: the section "Before you say you are done" of `AGENTS.md` has a
+   new paragraph on `sh tools/hooks/gate tsan` (below). `upgrade.sh` doesn't
+   touch `AGENTS.md`; the owner has a script that replaces that section.
+
+### Changed
+
+- **The `tsan` build is optimized at `-O1`,** like `check` since v0.22.0,
+  **and every test's time limit is three times as long in it** (60 seconds
+  become 180; the `tsan` test preset's own limit too). *Why:* Alfar's first
+  `tsan` run took 2,498 s for 911 tests and 19 of them passed 60 s, with no
+  race found. The build had been left at `-O0` when `check` was optimized.
+  At `-O1` the same tests take 757 s and two pass 60 s; ThreadSanitizer
+  still costs two to three times what the check build does, so the limit
+  that catches a hung test in `check` was the real limit of every test
+  under `tsan`. Measured on a copy of Alfar; POLICY.md 7 has the figures,
+  `-O2` included, and why a project doesn't choose which programs run.
+- **A stage that touches code that runs on more than one thread, or its
+  tests, runs `sh tools/hooks/gate tsan` once before it ends** (POLICY.md
+  8, and `AGENTS.md` in new projects). *Why:* nothing told Alfar's agents
+  to run it, and they met `tsan` in CI after weeks of work.
+
+### Documentation
+
+- **How a command's two streams are passed** (POLICY.md 2.10): two
+  parameters, or a struct of two pointers built from references when a
+  function runs out of parameters. A struct of two `std::ostream&` is what
+  `cppcoreguidelines-avoid-const-or-ref-data-members` refuses. Asked by
+  ToneMatcher.
+
 ## 0.34.0 (2026-10-12)
 
 A minor release: on macOS, code that uses what macOS 26.0 lacks stops

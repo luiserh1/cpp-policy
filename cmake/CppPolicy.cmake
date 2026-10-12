@@ -28,6 +28,8 @@ set(CPP_POLICY_CONFINED_DIRS "src/lowlevel" CACHE STRING
     "Directories (relative to the project root) where suppressions and low-level code are allowed")
 set(CPP_POLICY_EXCLUDED_DIRS "build;out;.git;third_party;external;vcpkg_installed" CACHE STRING
     "Directories (relative to the project root) that the audit and format checks skip")
+set(CPP_POLICY_TSAN_TIME_FACTOR 3 CACHE INTERNAL
+    "A test's time limit in the tsan build is this many times its limit elsewhere (POLICY.md 7)")
 set(CPP_POLICY_TEST_KINDS unit integration benchmark CACHE INTERNAL "Test kinds (POLICY.md 13)")
 set(CPP_POLICY_TEST_TIDY_CHECKS "--checks=-bugprone-unchecked-optional-access" CACHE INTERNAL
     "clang-tidy option added for test programs (POLICY.md 13.4)")
@@ -1220,6 +1222,12 @@ function(cpp_policy_add_tests kind module)
         # Shown at every configure, like every other exception.
         message(NOTICE "cpp-policy: the ${kind} tests of '${module}' may take ${timeout} "
             "seconds each, not 60: ${slow_reason}")
+    endif()
+    # ThreadSanitizer costs several times what the check build's sanitizers do: the limit that
+    # catches a hung test there would be the real limit of every test here, at a third of
+    # what the project wrote (Alfar: 19 tests timed out in tsan that take 30 s in check).
+    if(CPP_POLICY_THREAD_SANITIZER)
+        math(EXPR timeout "${timeout} * ${CPP_POLICY_TSAN_TIME_FACTOR}")
     endif()
     # Which of this program's tests may run beside others (POLICY.md 13.2): none, unless the
     # project has asked for it; and then not benchmarks, whose measures another test would

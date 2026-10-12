@@ -620,7 +620,7 @@ looser, is made in `cpp-policy` itself.
 | `check` | The gate | Full build + full clang-tidy + format check + tests under sanitizers + suppression audit; like `dev`, but compiled at `-O1` so the tests run 15 to 21 times faster (14.1) |
 | `unit` | Quick check while working | Like `check` without clang-tidy, the audit and the format check; runs only the unit tests |
 | `debug` | Step-through debugging | Debug, no sanitizers, standard library hardening (debug level) |
-| `tsan` | Data races | Debug, ThreadSanitizer, standard library hardening (debug level); macOS and Linux only |
+| `tsan` | Data races | Debug, ThreadSanitizer, standard library hardening (debug level), compiled at `-O1` like `check`; macOS and Linux only |
 
 Windows presets carry a `win-` prefix. On Windows, `win-dev` and `win-check`
 are optimized (`RelWithDebInfo`, see 7.3), so `win-debug` is the one to step
@@ -634,6 +634,23 @@ Test presets:
 - Every test has a 60-second timeout, so a hung test fails instead of holding
   up a push (CTest's own default is 25 minutes). A project may set a shorter
   `TIMEOUT` on its tests, or a longer one with a reason (13.2).
+- **In the `tsan` build every test's limit is three times what it is
+  elsewhere** (60 seconds become 180), and the build is optimized at `-O1`.
+  A project writes nothing for it.
+  - *Why:* ThreadSanitizer costs several times what the check build's
+    sanitizers do. The limit that catches a hung test in `check` was, under
+    `tsan`, the real limit of every test, at about a third of what the
+    project wrote, and nothing said so.
+  - Alfar's first `tsan` run, 911 tests on one Mac: at `-O0`, as this build
+    was until v0.35.0, 2,498 s and 19 tests over 60 s. At `-O1`, 757 s and
+    2 over 60 s. At `-O2`, 589 s, with the same two tests at 57 s. No level
+    reported a race. With this release's tree, all 911 pass in 866 s; the
+    longest took 108 s of its 180, on a machine that was doing other work.
+  - *Why `-O1` and not `-O2`:* it is what `check` has run at since v0.22.0,
+    and a higher level lets the compiler remove more of the memory accesses
+    ThreadSanitizer watches.
+  - A project doesn't choose which test programs run under `tsan`: a
+    program left out would be watched by nobody.
 - CTest gets four jobs. Every test still runs alone unless the project calls
   `cpp_policy_parallel_tests()` (13.2).
 - The `dev` and `check` test presets turn on AddressSanitizer's leak
@@ -761,6 +778,10 @@ push or in a merge into the main line.
   once** (`sh tools/hooks/gate release`) before it ends. The gate is the
   check build; a test can pass there and fail in the release build, where
   the code is optimized and timing differs.
+- **A stage that touches code that runs on more than one thread, or its
+  tests, also runs the tsan workflow once** (`sh tools/hooks/gate tsan`,
+  on macOS and Linux) before it ends. Alfar met `tsan` for the first time
+  in CI, after weeks of work that no local command had run under it.
 - *Why:* Alfar's unattended agents first ran the gate before every commit,
   which was most of their time. Over fifteen stages with one gate each, 14
   full gates passed and no fault reached a stage's end that a gate per
@@ -1469,7 +1490,7 @@ cpp_policy_add_tests(integration window SOURCES test_walk.cpp LIBRARIES gui
   - a program with no tests.
 - **A test has 60 seconds,** a unit program 60 for all its cases, and
   `TIMEOUT` sets less for a program's tests. A test that passes its limit
-  fails.
+  fails. (In the `tsan` build each limit is three times as long, section 7.)
   - **More than 60, up to 600, needs `SLOW "<reason>"`:** a sentence that
     says why a test of that program can't be shorter or split. It is printed
     at every configure, like every exception. Not for unit tests: a slow
@@ -1862,6 +1883,7 @@ median of three reruns), 2026-10-01:
 | The same at `-O1` (the `check` and `unit` builds) | ×2 to ×6 |
 | The same at `-O0` (the `dev` build, and `check` before v0.22.0) | ×43 to ×86 |
 | ThreadSanitizer, at `-O3` | ×11 to ×14 |
+| ThreadSanitizer at `-O1` (the `tsan` build), against the `check` build | Roughly ×2 to ×3: Alfar's longest tests take 20 to 30 s in `check` and 55 to over 60 s here (2026-10-12; not the same tests one by one) |
 
 - **Every protection stays on in release:** they cost less than the noise
   in which any speed difference would have to show.

@@ -115,7 +115,15 @@ before it ends: a test can pass in the check build and fail there.
 sh tools/hooks/gate release
 ```
 
-It runs `cmake --workflow --preset check` (`win-check` on Windows), one gate
+If the stage touched code that runs on more than one thread, or its tests,
+also run the tsan workflow once before it ends (macOS and Linux): data
+races are found there and nowhere else.
+
+```
+sh tools/hooks/gate tsan
+```
+
+`sh tools/hooks/gate` runs `cmake --workflow --preset check` (`win-check` on Windows), one gate
 at a time on the machine, and ends with `gate: passed` or `gate: FAILED`.
 Read that line, or the command's own exit code: don't chain other commands
 after it and read theirs.
