@@ -25,6 +25,10 @@ Releases A and B (0.30.0, 0.32.0) are out. Open:
       when a project needs one. cli-cpparser (v0.1.0, public) is a library
       with a small example program in `src/`, and nothing in 11.7 got in
       its way.
+- [x] A project that offers a library and uses another: ToneMatcher v0.6.0
+      uses cli-cpparser, at the first configure and green on three systems;
+      the library was on a newer cpp-policy than its user, as the floor
+      allows. Its program got smaller (macOS 15,024 bytes, Linux 8,120).
 - [ ] Two libraries in one project: untried. Alfar will be the first, with
       ToneMatcher's and cli-cpparser.
 

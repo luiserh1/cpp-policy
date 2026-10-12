@@ -388,6 +388,20 @@ Check each C++ file right after editing it with `sh tools/hooks/tidy-files
   const Size* size_; // never null: set from a reference
   ```
   `std::reference_wrapper` works too but needs `.get()` on every use.
+  - **A command's output and error streams are two parameters,**
+    `std::ostream& out, std::ostream& err`, as the projects write them in
+    some sixty places. When a function runs out of parameters (the limit is
+    six), they travel as one: a struct of two pointers, built from
+    references, by the rule above.
+    ```cpp
+    struct Streams {
+        Streams(std::ostream& out_stream, std::ostream& err_stream)
+            : out{&out_stream}, err{&err_stream} {}
+        std::ostream* out; // never null: set from a reference
+        std::ostream* err; // never null: set from a reference
+    };
+    ```
+    A struct of two `std::ostream&` is what the check refuses (ToneMatcher).
 - **Numbers from text with `std::from_chars`.** `data() + size()` is pointer
   arithmetic, and `data()` on a `std::string_view` trips
   `bugprone-suspicious-stringview-data-usage`. `std::to_address` gives both
