@@ -177,6 +177,11 @@ string(FIND "${out}" "VCPKG_ROOT is not set" found)
 string(FIND "${out}" "stub cmake" started)
 expect("code;EQUAL;2;AND;found;GREATER;-1;AND;started;EQUAL;-1"
     "without VCPKG_ROOT the gate must stop before the workflow and name the variable")
+run(${with_stub} tools/hooks/pre-commit)
+string(FIND "${out}" "VCPKG_ROOT is not set" found)
+string(FIND "${out}" "stub cmake" started)
+expect("code;EQUAL;2;AND;found;GREATER;-1;AND;started;EQUAL;-1"
+    "without VCPKG_ROOT pre-commit must stop before its checks and name the variable")
 set(ENV{VCPKG_ROOT} "${WORK}")
 run(${with_stub} tools/hooks/gate)
 string(FIND "${out}" "gate: passed" found)

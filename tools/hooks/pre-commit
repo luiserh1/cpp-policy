@@ -19,6 +19,13 @@ case "$(uname -s)" in
     MINGW*|MSYS*|CYGWIN*) preset=win-check ;;
     *) preset=check ;;
 esac
+# A project with a vcpkg.json can't configure without VCPKG_ROOT, and a change to
+# CMakeLists.txt configures again: said here, since ninja's own message doesn't name it.
+if [ -f vcpkg.json ] && [ -z "${VCPKG_ROOT:-}" ]; then
+    echo "pre-commit: VCPKG_ROOT is not set in this shell. Set it in the same command" >&2
+    echo "pre-commit: (VCPKG_ROOT=<vcpkg folder> git commit ...)" >&2
+    exit 2
+fi
 if [ ! -f "build/$preset/CMakeCache.txt" ]; then
     cmake --preset "$preset" >/dev/null
 fi
