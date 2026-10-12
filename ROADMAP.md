@@ -78,10 +78,15 @@ Releases A and B (0.30.0, 0.32.0) are out. Open:
 - **A shared library of small helpers** (raised 2026-10-12, to deliberate):
   reading a whole file, canonical paths and the like, so that each project
   stops meeting the same differences between systems in CI, as Alfar did
-  on Windows and Linux. To settle first: how it fits 11.2 (no catch-all
-  module: modules named after what they do), what ToneMatcher's library
-  already offers, and Alfar's full list of findings once its three systems
-  are green.
+  on Windows and Linux. Agreed so far (2026-10-12): small modules each
+  named after what it does (`files`, `paths`, `text`), never `utils`, as
+  11.2 asks; some modules of ToneMatcher's library (the number reader, the
+  scratch folder for tests, the process launcher) may move to it; a finding
+  about how to call the standard library becomes a line in 2.10, not a
+  wrapper; no sorting helpers without a clear reason. Needed first: Alfar's
+  full list of findings once its three systems are green, and "a library
+  that uses a library" (11.7, not supported yet), because ToneMatcher's
+  library would then use this one.
 
 ### Waiting
 
