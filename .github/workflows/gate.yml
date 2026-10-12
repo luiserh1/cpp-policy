@@ -91,7 +91,7 @@ jobs:
                                                   || 'macOS'))
        || matrix.system == 'linux' && 'ubuntu-24.04'
        || matrix.system == 'windows' && 'windows-2025'
-       || 'macos-15' }}
+       || 'macos-26' }}
     timeout-minutes: 45
     env:
       # 'true' on the owner's machine: nothing is installed or reset there.

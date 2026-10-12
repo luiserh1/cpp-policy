@@ -6,8 +6,10 @@
 #
 # The size is that of a stripped copy: what would ship. The symbol table left in the build's
 # own file grows with names, not with code. The script prints the size, the budget, and a
-# budget with the policy's 5% headroom. A program over its budget, or with no budget for this
-# system, fails, with the copy's sections listed to show where the size is.
+# budget with the policy's 5% headroom. A program over its budget fails, with the copy's
+# sections listed to show where the size is. With no budget for this system yet it passes and
+# says the number to set: a size can only be measured on its system, and a new program's
+# first run in CI was red on Linux and Windows only to learn two numbers (cli-cpparser).
 #
 # With -DREPORT_ONLY=ON it only says the size and what is left of the budget, in one line, and
 # never fails: cpp_policy_size_budget() runs that after each link, because CTest shows a
@@ -44,9 +46,10 @@ endif()
 
 execute_process(COMMAND "${SIZE}" -A "${copy}" OUTPUT_VARIABLE sections ERROR_QUIET)
 if("${BUDGET}" STREQUAL "")
-    message(FATAL_ERROR "size budget: ${name} has no ${SYSTEM} budget. Stripped, it is ${size} "
+    message("size budget: ${name} has no ${SYSTEM} budget yet. Stripped, it is ${size} "
         "bytes: with 5% headroom, add ${SYSTEM} ${suggested} to its cpp_policy_size_budget() "
-        "(the owner approves budgets, POLICY.md 13.5).\n${sections}")
+        "(the owner approves budgets, POLICY.md 13.5).")
+    return()
 endif()
 if(size GREATER BUDGET)
     math(EXPR over "${size} - ${BUDGET}")

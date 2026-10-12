@@ -9,11 +9,13 @@ The rules are in [POLICY.md](POLICY.md).
 From a clone of cpp-policy checked out at the release you want:
 
 ```
-git -C cpp-policy checkout v0.33.5
+git -C cpp-policy checkout v0.34.0
 sh cpp-policy/tools/new-project.sh ~/code/MyTool MyTool            # VCPKG_ROOT must be set
 cd ~/code/MyTool && sh tools/hooks/gate
-git add --all && git commit
 ```
+
+The template is the new repository's first commit; the project's work starts
+at the next one.
 
 The project is pinned to that release, in `CMakeLists.txt` and its CI
 workflow, and has the release's policy files, `AGENTS.md`, agent settings and
@@ -38,7 +40,7 @@ can't ship a template that fails its own policy.
 include(FetchContent)
 FetchContent_Declare(cpp_policy
     GIT_REPOSITORY https://github.com/luiserh1/cpp-policy.git
-    GIT_TAG        <commit>)   # v0.33.5, the latest release; see CHANGELOG.md
+    GIT_TAG        <commit>)   # v0.34.0, the latest release; see CHANGELOG.md
 FetchContent_MakeAvailable(cpp_policy)
 
 add_library(app_core STATIC src/model/board.cpp)
@@ -75,7 +77,7 @@ and this repository's CMake code runs on every machine that configures the
 project (POLICY.md 10). The commit is the line ending in `^{}`:
 
 ```
-git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.33.5*'
+git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.34.0*'
 ```
 
 Don't add `GIT_SHALLOW`: it only works with branch and tag names.
@@ -85,7 +87,7 @@ Don't add `GIT_SHALLOW`: it only works with branch and tag names.
 From the project's root, with a clean working folder:
 
 ```
-sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.33.5
+sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.34.0
 ```
 
 Any copy of this repository's `tools/upgrade.sh` works (from v0.10.1 on): it
@@ -158,7 +160,7 @@ permissions:
   contents: read
 jobs:
   gate:
-    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@<commit> # v0.33.5
+    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@<commit> # v0.34.0
     with:
       systems: '["linux", "windows", "macos"]'
       vcpkg: true          # if the project has a vcpkg.json
@@ -245,6 +247,7 @@ it: `./svc.sh uninstall`, then `./config.sh remove` with the token GitHub shows.
   installation (the last two check size budgets, POLICY.md 13.5)
 - CMake ≥ 3.29
 - Ninja
+- On a Mac: macOS 26 or later. Every build is for macOS 26.0 (POLICY.md 1)
 
 ## Setup per platform
 
@@ -269,6 +272,10 @@ Things to know:
   its release, before the policy does (POLICY.md 10.1). The configure check
   then reports the wrong major: `brew install llvm@23` fixes it, and the
   presets find it first.
+- **macOS:** the presets build for macOS 26.0 on every Mac, and
+  configuration fails without that target. A standard library feature that
+  macOS 26.0 lacks then fails to compile on the developer's Mac as it would
+  in CI, instead of only there.
 - **Linux:** distributions often ship an older LLVM, or install it only under
   versioned names (`clang++-23`). The unversioned binaries in
   `/usr/lib/llvm-23/bin` are what the presets use.

@@ -22,13 +22,17 @@ Releases A and B (0.30.0, 0.32.0) are out. Open:
       CI. The library, libjpeg-turbo and parallel tests are proven there on
       macOS only.
 - [ ] A project that is only a library, and a library that uses a library:
-      when a project needs one.
+      when a project needs one. cli-cpparser (v0.1.0, public) is a library
+      with a small example program in `src/`, and nothing in 11.7 got in
+      its way.
+- [ ] Two libraries in one project: untried. Alfar will be the first, with
+      ToneMatcher's and cli-cpparser.
 
 ### From Alfar's report, not yet designed
 
 - [ ] **Budgets and "ask the owner" in unattended runs:** a way for the
-      owner to grant a standing rule (the size budget at a release commit),
-      and a first CI run that has no number for a system yet.
+      owner to grant a standing rule (the size budget at a release commit).
+      (A first CI run with no number for a system: done in 0.34.0.)
 - [ ] **A file the policy names for rules that could not be met,** listed by
       the audit.
 - [ ] **Smaller:** the padding check's threshold; the message when a build

@@ -3,6 +3,55 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.34.0 (2026-10-12)
+
+A minor release: on macOS, code that uses what macOS 26.0 lacks stops
+compiling, and programs no longer run on macOS 15 or older. From
+cli-cpparser's report on its first release.
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** none expected. On a Mac the first build after
+it is a whole one, dependencies included (they are built for macOS 26.0
+too). A project whose CI runs macOS on GitHub moves from `macos-15` to
+`macos-26` with the gate.
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.34.0`. It brings
+   the changed `CMakePresets.json`, `tools/vcpkg/triplets/` and
+   `tools/hooks/pre-commit`.
+2. On macOS a program's stripped size may move; the release workflow says
+   so. Raising a budget for that is the owner's to approve, as always.
+
+### Changed
+
+- **On macOS every build is for macOS 26.0,** whatever the Mac it runs on:
+  the presets set `CMAKE_OSX_DEPLOYMENT_TARGET`, configuration fails
+  without it, the triplets build the dependencies for it, and cpp-policy's
+  CI runs on `macos-26`. POLICY.md 1 no longer says that libc++ is pinned
+  with LLVM: its headers are, and the library that runs is the system's.
+  *Why:* a build with no target is for the machine's own system.
+  cli-cpparser's `std::from_chars` for a `double` passed two gates on macOS
+  27 and failed to compile in CI on macOS 15, where libc++'s headers refuse
+  it. ToneMatcher's library has the same call and was only ever built on
+  the owner's Mac. The owner chose 26 over 15: the programs are the owner's
+  own tools, and the older floor means writing by hand what the library has.
+- **A system with no size budget yet passes and says the number to set;**
+  every configure names the systems still without one. A new project starts
+  with none. *Why:* the template's budgets were the sample program's, and
+  the first real program needed a red CI run on Linux and Windows only to
+  learn two numbers. Setting a budget still needs the owner's approval.
+- **`new-project.sh` commits the template,** before it enables the hooks:
+  the project's own first commit then shows only the project's work. *Why:*
+  cli-cpparser's first commit would have mixed the two; it regenerated the
+  template in a scratch folder to separate them.
+
+### Fixed
+
+- **`pre-commit` stops at once and names `VCPKG_ROOT`** when the project has
+  a `vcpkg.json` and the shell doesn't have the variable. *Why:* a commit
+  that changes `CMakeLists.txt` configures again, and ninja's message
+  ("cannot make progress due to previous errors") doesn't say why.
+
 ## 0.33.5 (2026-10-11)
 
 A patch release: nothing that passes stops passing.

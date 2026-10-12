@@ -25,9 +25,14 @@ if(CMAKE_HOST_WIN32)
 else()
     find_program(SH_EXECUTABLE sh REQUIRED)
 endif()
-set(ENV{GIT_CONFIG_COUNT} 1)
+# An identity too: the script commits the template, and a CI runner has none.
+set(ENV{GIT_CONFIG_COUNT} 3)
 set(ENV{GIT_CONFIG_KEY_0} core.autocrlf)
 set(ENV{GIT_CONFIG_VALUE_0} false)
+set(ENV{GIT_CONFIG_KEY_1} user.name)
+set(ENV{GIT_CONFIG_VALUE_1} test)
+set(ENV{GIT_CONFIG_KEY_2} user.email)
+set(ENV{GIT_CONFIG_VALUE_2} test@example.com)
 
 set(policy "${WORK}/cpp-policy")
 set(vcpkg "${WORK}/vcpkg")
@@ -101,6 +106,14 @@ expect("found;GREATER;-1" "the CI workflow must call the gate at the same commit
 run("${dest}" "${GIT_EXECUTABLE}" config core.hooksPath)
 string(STRIP "${out}" hooks_path)
 expect("hooks_path;STREQUAL;tools/hooks" "the project must be a git repository with the hooks enabled")
+# The template is the first commit, alone, and nothing is left uncommitted.
+run("${dest}" "${GIT_EXECUTABLE}" log --format=%s)
+string(STRIP "${out}" subjects)
+expect("subjects;STREQUAL;chore: start from cpp-policy v9.9.9's template"
+    "the template must be the project's first commit, and its only one")
+run("${dest}" "${GIT_EXECUTABLE}" status --porcelain)
+string(LENGTH "${out}" uncommitted)
+expect("uncommitted;EQUAL;0" "nothing of the template may be left uncommitted")
 foreach(name IN ITEMS tools/hooks/pre-push tools/vcpkg/setup.cmake AGENTS.md ROADMAP.md CHANGELOG.md
                      src/main.cpp)
     if(NOT EXISTS "${dest}/${name}")

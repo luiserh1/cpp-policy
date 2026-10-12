@@ -20,6 +20,8 @@ else()
 endif()
 if(CMAKE_HOST_APPLE)
     set(VCPKG_CMAKE_SYSTEM_NAME Darwin)
+    # CPP_POLICY_MACOS_TARGET in cmake/CppPolicy.cmake; a self-test keeps the two equal.
+    set(VCPKG_OSX_DEPLOYMENT_TARGET 26.0)
     if(VCPKG_TARGET_ARCHITECTURE STREQUAL "x64")
         set(VCPKG_OSX_ARCHITECTURES x86_64)
     else()

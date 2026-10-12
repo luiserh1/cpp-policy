@@ -18,6 +18,7 @@ disagree.
 | Language standard | **C++23**, compiler extensions **off** (`CMAKE_CXX_EXTENSIONS OFF`) |
 | Compiler | **LLVM Clang** on all platforms: `clang++` on macOS/Linux, `clang-cl` on Windows |
 | LLVM version | **23.x** (clang, clang-tidy and clang-format from the same release) |
+| macOS | Every build is for **macOS 26.0** (`CMAKE_OSX_DEPLOYMENT_TARGET`, set by the presets), on a Mac with 26 or later |
 | Microsoft toolset (Windows) | **MSVC 14.44** (Visual Studio 2022 17.14) or later: the standard library, runtime and libraries `clang-cl` builds with |
 | Build system | CMake ≥ 3.29, driven only through `CMakePresets.json` |
 | Generator | Ninja |
@@ -47,8 +48,24 @@ Notes:
   - Every CI job prints its standard library's version (MSVC toolset,
     libstdc++ or libc++), so a difference between two runs can be traced.
 
-  On Linux the library is the distribution's libstdc++; on macOS it is
-  libc++, which comes with LLVM and so is pinned with it.
+  On Linux the library is the distribution's libstdc++. On macOS it is
+  libc++: its headers come with LLVM and are pinned with it, but the library
+  a program runs with is the system's, and the headers refuse what the
+  system the build is for doesn't have.
+- **On macOS every build is for the same system, 26.0,** whatever the Mac it
+  runs on. The presets set it, configuration fails without it, and the
+  dependencies are built for it too.
+  - *Why:* a build with no target is for the machine's own system.
+    cli-cpparser read a decimal number with `std::from_chars`, which libc++
+    has from macOS 26: it passed two gates on the owner's macOS 27 and failed
+    to compile in CI on macOS 15. ToneMatcher's library had the same call
+    and had only ever been built on the owner's Mac.
+  - *Why 26:* the projects are the owner's own tools, and an older floor
+    means writing by hand what the library has (65 lines in cli-cpparser for
+    that one function). The programs don't run on macOS 15 or older.
+  - What a newer libc++ adds after 26.0 fails to compile everywhere, with
+    the system that has it in the message (`introduced in macOS ...`).
+  - The floor moves only in a cpp-policy release, like the LLVM pin (10.1).
 
 ### 1.1 Dependencies
 
@@ -1595,19 +1612,28 @@ its target:
 cpp_policy_size_budget(my_tool MACOS 109568 LINUX 93184 WINDOWS 285696)
 ```
 
+- **A system with no budget yet passes, and says the number to set.** A new
+  project starts with none (`cpp_policy_size_budget(my_tool)`): a size can
+  only be measured on its own system, and the template's numbers were the
+  sample program's, so the first real program needed a red CI run to learn
+  two of them (cli-cpparser). Every configure names the systems still
+  without a budget; the release build prints "`my_tool` is N bytes stripped;
+  it has no LINUX budget (with 5% headroom: M)" after the link, in CI's log
+  as well. The owner approves the first numbers like any later one. A
+  program that ships has all three.
 - The size is that of a copy stripped with `llvm-strip`: what would ship. The
   file the build leaves keeps its symbol table, which grows with names rather
   than code. In SimpleLocalServer's, it was 41% of the bytes.
 - A budget is the stripped size plus **5%**, rounded up to whole KiB. The test
-  `benchmark/size/<program>` prints the size, and the budget to set when there
-  is none for this system or when the program has outgrown it. A release
+  `benchmark/size/<program>` prints the size, and the budget to set when the
+  program has outgrown it. A release
   build also says the size, and what is left of the budget, after each link:
   CTest shows a passing test's output to nobody, and ToneMatcher's program
   had been 160 bytes under its budget without anyone knowing. A fresh build
   gives the same size to the byte, and toolchain updates moved
   SimpleLocalServer's by 544 bytes over many releases. So 5% catches real
   growth (a new dependency, a large table) without failing on noise.
-- **Raising a budget needs the owner's approval** and a line in `CHANGELOG.md`
+- **Setting or raising a budget needs the owner's approval** and a line in `CHANGELOG.md`
   saying why. Agents ask. When the program shrank to well under its budget,
   the test says so, and the budget can come down.
 - When a program is over budget, the test lists its sections (code,

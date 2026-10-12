@@ -16,6 +16,7 @@ include(CheckCXXCompilerFlag)
 set(CPP_POLICY_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." CACHE INTERNAL "cpp-policy root directory")
 cmake_path(NORMAL_PATH CPP_POLICY_ROOT)
 set(CPP_POLICY_LLVM_MAJOR 23 CACHE INTERNAL "Required LLVM major version")
+set(CPP_POLICY_MACOS_TARGET 26.0 CACHE INTERNAL "The macOS every build is for (POLICY.md 1)")
 
 option(CPP_POLICY_SANITIZERS "Enable AddressSanitizer + UndefinedBehaviorSanitizer" OFF)
 option(CPP_POLICY_THREAD_SANITIZER "Enable ThreadSanitizer (not with CPP_POLICY_SANITIZERS)" OFF)
@@ -52,6 +53,19 @@ function(_cpp_policy_verify_toolchain)
         message(FATAL_ERROR
             "cpp-policy requires LLVM Clang ${CPP_POLICY_LLVM_MAJOR}.x, found "
             "${CMAKE_CXX_COMPILER_VERSION} (${CMAKE_CXX_COMPILER}).")
+    endif()
+
+    # On macOS the standard library that runs is the system's, and libc++'s headers refuse what
+    # the targeted system lacks. A build with no target is for the machine it runs on: code
+    # passed on the owner's macOS 27 and failed to compile on CI's macOS 15 (cli-cpparser).
+    # The presets set the target, in the cache and in the environment of what they start. The
+    # variable is read on every system, so that CMake doesn't call it unused on Linux.
+    if(NOT "${CMAKE_OSX_DEPLOYMENT_TARGET}" STREQUAL "${CPP_POLICY_MACOS_TARGET}" AND APPLE)
+        message(FATAL_ERROR
+            "cpp-policy builds for macOS ${CPP_POLICY_MACOS_TARGET} on every Mac (POLICY.md 1), "
+            "and this build is for '${CMAKE_OSX_DEPLOYMENT_TARGET}' (empty: the machine's own).\n"
+            "Configure through a preset of this release's CMakePresets.json, which sets "
+            "CMAKE_OSX_DEPLOYMENT_TARGET.")
     endif()
 
     # clang-tidy and clang-format must come from the same LLVM release as the compiler.
@@ -1344,7 +1358,8 @@ endfunction()
 #   cpp_policy_size_budget(my_tool MACOS 109568 LINUX 93184 WINDOWS 285696)
 # In Release builds without sanitizers it adds the test benchmark/size/<program>, which
 # strips a copy of the program with llvm-strip and fails if it is larger than this system's
-# budget, or if this system has none. Raising a budget needs the owner's approval.
+# budget. A system with no budget yet passes and prints the number to set; every configure
+# names the systems still without one. Setting or raising a budget needs the owner's approval.
 # ---------------------------------------------------------------------------
 function(cpp_policy_size_budget target)
     cmake_parse_arguments(PARSE_ARGV 1 arg "" "MACOS;LINUX;WINDOWS" "")
@@ -1362,6 +1377,18 @@ function(cpp_policy_size_budget target)
                 "of bytes: '${arg_${system}}'")
         endif()
     endforeach()
+    set(missing "")
+    foreach(system IN ITEMS MACOS LINUX WINDOWS)
+        if(NOT DEFINED arg_${system})
+            list(APPEND missing ${system})
+        endif()
+    endforeach()
+    if(missing)
+        list(JOIN missing ", " missing)
+        message(NOTICE "cpp-policy: '${target}' has no size budget yet for: ${missing}. The "
+            "release workflow prints its size on each system (\"${target} is N bytes "
+            "stripped\"); the owner approves the budgets (POLICY.md 13.5).")
+    endif()
     if(NOT CMAKE_BUILD_TYPE STREQUAL "Release" OR CPP_POLICY_SANITIZERS
        OR CPP_POLICY_THREAD_SANITIZER)
         return()

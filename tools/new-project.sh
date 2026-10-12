@@ -8,7 +8,8 @@
 # policy files, agent instructions and settings, and a small program that shows each layer,
 # with its tests. It uses vcpkg, at least for doctest: vcpkg.json gets the baseline your
 # VCPKG_ROOT is checked out at. (--vcpkg, needed before v0.19.0, is still accepted.) The
-# folder becomes a git repository with the hooks enabled; nothing is committed.
+# folder becomes a git repository with the hooks enabled, and the template is its first
+# commit, so that the project's own first commit shows only the project's work.
 set -eu
 
 usage() {
@@ -45,13 +46,22 @@ cmake "-DPOLICY_ROOT=$policy" "-DDEST=$dest" "-DNAME=$name" "-DCOMMIT=$commit" "
     "-DREPOSITORY=$repository" "-DVCPKG_BASELINE=$baseline" -P "$policy/cmake/scripts/new_project.cmake"
 
 git -C "$dest" init --quiet
+# The template is committed before the hooks are enabled: it is this release's, unchanged,
+# and cpp-policy's own CI builds and checks it (tests/new_project).
+git -C "$dest" add --all
+if git -C "$dest" commit --quiet -m "chore: start from cpp-policy $tag's template" 2>/dev/null; then
+    committed="The template is committed; the project's work starts at the next commit."
+else
+    committed="git could not commit the template (no user.name or user.email?). Commit it
+before changing anything: git add --all && git commit -m \"chore: start from cpp-policy $tag's template\""
+fi
 git -C "$dest" config core.hooksPath tools/hooks
 echo
+echo "$committed"
 echo "Next, in $dest:"
 echo "  sh tools/hooks/gate                 (the gate: cmake --workflow --preset check)"
-echo "  git add --all && git commit         (the hooks check the first commit too)"
-echo "The size budget in CMakeLists.txt is the sample program's: the first real program is"
-echo "larger, and its budget is yours to approve (POLICY.md 13.5)."
+echo "The program has no size budget yet: the release workflow prints its size on each"
+echo "system, and the budgets are yours to approve (POLICY.md 13.5)."
 echo "Then describe the project in README.md and its first version in ROADMAP.md, and"
 echo "publish it (a private repository needs a decision about macOS in CI:"
 echo ".github/workflows/ci.yml says what)."
