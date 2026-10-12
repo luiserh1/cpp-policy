@@ -69,6 +69,20 @@ Releases A and B (0.30.0, 0.32.0) are out. Open:
   printed at every configure (asked by Alfar, 2026-10-11): when a license
   comes up that the owner would accept for one project but not for all.
 
+- **Rules for optimization levels** (raised 2026-10-12, to deliberate).
+  Today the presets decide and no section says why as a whole: `-O0` in
+  `dev` and `debug`, `-O1` in `check`, `unit` and `tsan`, CMake's Release
+  default (`-O3`) in `release`. Nothing is said on `-O2` against `-O3`,
+  link-time optimization, per-target levels, or flags for the machine's
+  processor.
+- **A shared library of small helpers** (raised 2026-10-12, to deliberate):
+  reading a whole file, canonical paths and the like, so that each project
+  stops meeting the same differences between systems in CI, as Alfar did
+  on Windows and Linux. To settle first: how it fits 11.2 (no catch-all
+  module: modules named after what they do), what ToneMatcher's library
+  already offers, and Alfar's full list of findings once its three systems
+  are green.
+
 ### Waiting
 
 - [ ] **Modules experiment:** once CMake makes `import std` stable, convert
