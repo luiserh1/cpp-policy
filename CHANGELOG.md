@@ -3,6 +3,37 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.38.1 (2026-10-13)
+
+A patch release: nothing that passes stops passing. From cli-cpparser's
+report on its v0.4.0.
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** none. Nothing a project copies changed.
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.38.1`.
+
+### Changed
+
+- **The size test and the line after each release link also give what the
+  program's sections add up to** ("sections: N"). *Why:* a stripped file
+  grows a page at a time, 16 KiB on macOS. A change in cli-cpparser showed
+  no growth on the owner's Mac, where it fitted in the padding, and was
+  512 bytes over its budget on Windows, with nothing to warn of it. The
+  sections' total moves with every byte. The budget is still of the file.
+
+- **A program over its budget: back to the code first, but never at the
+  cost of clarity** (POLICY.md 13.5, and `AGENTS.md` in new projects).
+  *Why:* the owner wants the budget to make agents look for what a change
+  doesn't need, and doesn't want code made harder to read to fit a number;
+  then the agent asks for the budget to be raised. Text only.
+
+### Seen in a project
+
+- pre-push's "not run again" (v0.37.0) worked on every push in
+  cli-cpparser.
+
 ## 0.38.0 (2026-10-13)
 
 A minor release: new, optional, and nothing that passes stops passing. From

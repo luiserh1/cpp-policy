@@ -11,6 +11,11 @@
 # says the number to set: a size can only be measured on its system, and a new program's
 # first run in CI was red on Linux and Windows only to learn two numbers (cli-cpparser).
 #
+# Beside the stripped size it says what the sections add up to (llvm-size's total). The file
+# grows a page at a time, 16 KiB on macOS: a change's growth can fit in the padding there,
+# show nothing, and take another system over its budget (cli-cpparser, 512 bytes over on
+# Windows). The sections' total moves with every byte. The budget is still of the file.
+#
 # With -DREPORT_ONLY=ON it only says the size and what is left of the budget, in one line, and
 # never fails: cpp_policy_size_budget() runs that after each link, because CTest shows a
 # passing test's output to nobody.
@@ -28,26 +33,31 @@ file(SIZE "${copy}" size)
 # 5% headroom, rounded up to whole KiB.
 math(EXPR suggested "((${size} * 105 / 100) + 1023) / 1024 * 1024")
 
+execute_process(COMMAND "${SIZE}" -A "${copy}" OUTPUT_VARIABLE sections ERROR_QUIET)
+set(total "")
+if(sections MATCHES "(^|\n)Total +([0-9]+)")
+    set(total " (sections: ${CMAKE_MATCH_2})")
+endif()
+
 if(REPORT_ONLY)
     if("${BUDGET}" STREQUAL "")
-        message("cpp-policy: ${name} is ${size} bytes stripped; it has no ${SYSTEM} budget "
-                "(with 5% headroom: ${suggested})")
+        message("cpp-policy: ${name} is ${size} bytes stripped${total}; it has no ${SYSTEM} "
+                "budget (with 5% headroom: ${suggested})")
     elseif(size GREATER BUDGET)
         math(EXPR over "${size} - ${BUDGET}")
-        message("cpp-policy: ${name} is ${size} bytes stripped, ${over} OVER its ${SYSTEM} "
-                "budget of ${BUDGET}")
+        message("cpp-policy: ${name} is ${size} bytes stripped${total}, ${over} OVER its "
+                "${SYSTEM} budget of ${BUDGET}")
     else()
         math(EXPR left "${BUDGET} - ${size}")
-        message("cpp-policy: ${name} is ${size} bytes stripped, ${left} under its ${SYSTEM} "
-                "budget of ${BUDGET}")
+        message("cpp-policy: ${name} is ${size} bytes stripped${total}, ${left} under its "
+                "${SYSTEM} budget of ${BUDGET}")
     endif()
     return()
 endif()
 
-execute_process(COMMAND "${SIZE}" -A "${copy}" OUTPUT_VARIABLE sections ERROR_QUIET)
 if("${BUDGET}" STREQUAL "")
     message("size budget: ${name} has no ${SYSTEM} budget yet. Stripped, it is ${size} "
-        "bytes: with 5% headroom, add ${SYSTEM} ${suggested} to its cpp_policy_size_budget() "
+        "bytes${total}: with 5% headroom, add ${SYSTEM} ${suggested} to its cpp_policy_size_budget() "
         "(the owner approves budgets, POLICY.md 13.5).")
     return()
 endif()
@@ -59,8 +69,8 @@ if(size GREATER BUDGET)
         "${suggested}, with the reason in CHANGELOG.md (POLICY.md 13.5).\n${sections}")
 endif()
 math(EXPR left "${BUDGET} - ${size}")
-message("size budget: ${name} is ${size} bytes stripped; its ${SYSTEM} budget is ${BUDGET} "
-    "(${left} left)")
+message("size budget: ${name} is ${size} bytes stripped${total}; its ${SYSTEM} budget is "
+    "${BUDGET} (${left} left)")
 # More than 10% headroom: the program shrank since the budget was set.
 math(EXPR roomy "${size} * 110 / 100")
 if(BUDGET GREATER roomy)

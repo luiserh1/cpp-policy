@@ -1711,9 +1711,26 @@ cpp_policy_size_budget(my_tool MACOS 109568 LINUX 93184 WINDOWS 285696)
   gives the same size to the byte, and toolchain updates moved
   SimpleLocalServer's by 544 bytes over many releases. So 5% catches real
   growth (a new dependency, a large table) without failing on noise.
+- **Beside the stripped size, the test and the line after each link give
+  what the sections add up to** ("sections: N", `llvm-size`'s total). The
+  file grows a page at a time, 16 KiB on macOS, so a change can fit in the
+  padding there, show no growth, and take another system over its budget:
+  cli-cpparser passed on the Mac and was 512 bytes over on Windows. The
+  sections' total moves with every byte, on the developer's machine. The
+  budget stays a budget of the file, which is what ships.
 - **Setting or raising a budget needs the owner's approval** and a line in `CHANGELOG.md`
   saying why. Agents ask. When the program shrank to well under its budget,
   the test says so, and the budget can come down.
+- **A program over its budget sends its author back to the code first,** to
+  look for what the change doesn't need: a heavier facility than the job
+  asks for, a table kept twice, a dependency for one function. That is the
+  budget's use, and it often finds something. **But never at the cost of
+  clarity:** when the only way under the budget makes the code harder to
+  read, the agent asks the owner to raise it, and says what it tried.
+  cli-cpparser's v0.4.0 went over by 512 bytes on Windows and came back
+  under by writing its usage text without `std::format`; the owner judged
+  that rewrite no worse to read, and would rather raise a budget than
+  have code made worse to fit.
 - **The approval is of the growth and its reason, given once,** with the
   size on the system at hand; the other systems' numbers follow from
   measurement. A size can only be measured on its own system, so:
