@@ -15,12 +15,14 @@ in the walkthroughs of that time.
 
 Releases A and B (0.30.0, 0.32.0) are out. Open:
 
-- [ ] The token in a real CI run: Alfar's, once the owner has created it.
+- [x] The token in a real CI run: Alfar's Linux and Windows jobs fetched
+      ToneMatcher's library with it (2026-10-12).
 - [x] `cpp_policy_parallel_tests()` in real projects (0.33.0): ToneMatcher
       41 s to 14 s; Alfar 756 s to 217 s, no program `ALONE`.
-- [ ] Windows and Linux have not built Alfar yet: it has no remote, so no
-      CI. The library, libjpeg-turbo and parallel tests are proven there on
-      macOS only.
+- [ ] Alfar on Windows and Linux: it has its remote and CI since
+      2026-10-12, and both systems are being made green (its own code's
+      findings; a full list is promised). libjpeg-turbo and parallel tests
+      are proven on macOS only until then.
 - [ ] A project that is only a library, and a library that uses a library:
       when a project needs one. cli-cpparser (v0.1.0, public) is a library
       with a small example program in `src/`, and nothing in 11.7 got in
@@ -29,8 +31,9 @@ Releases A and B (0.30.0, 0.32.0) are out. Open:
       uses cli-cpparser, at the first configure and green on three systems;
       the library was on a newer cpp-policy than its user, as the floor
       allows. Its program got smaller (macOS 15,024 bytes, Linux 8,120).
-- [ ] Two libraries in one project: untried. Alfar will be the first, with
-      ToneMatcher's and cli-cpparser.
+- [x] Two libraries in one project: Alfar, with ToneMatcher's and
+      cli-cpparser (2026-10-13). Still untried: `upgrade.sh --library` with
+      two libraries present, and two libraries that share a vcpkg package.
 
 ### From Alfar's report, not yet designed
 

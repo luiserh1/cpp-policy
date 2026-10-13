@@ -3,6 +3,38 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.36.0 (2026-10-13)
+
+A minor release: a push that goes through today can be refused. From
+cli-cpparser's report on its v0.2.0.
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** none. It brings the changed
+`tools/hooks/gate` and `tools/hooks/pre-push`.
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.36.0`.
+2. Optional: `AGENTS.md` in new projects has two more sentences (the
+   remembered failure, and how a budget is raised on three systems). The
+   owner's script brings the first; the second is in "Tests".
+
+### Changed
+
+- **A workflow that failed through the gate's launcher is remembered until
+  it passes in that folder again, and pre-push refuses meanwhile,** naming
+  the workflow to run. The mark is a file under `build/`. *Why:* the push's
+  own gate is the check workflow. In cli-cpparser a commit was chained
+  after `sh tools/hooks/gate release` in one command and went in although
+  the workflow had failed; `AGENTS.md` forbade the chaining and nothing
+  enforced it.
+- **Raising a size budget takes one approval** (POLICY.md 13.5): the owner
+  approves the growth and its reason with the size on one system; that
+  commit removes the other systems' numbers, whose CI jobs pass and print
+  the sizes, and the next commit sets them to the measured size plus 5%.
+  A release commit has all three. *Why:* cli-cpparser's v0.2.0 took two
+  approvals and a CI run that was red only to learn two numbers. No code
+  changes: a system with no budget has passed since v0.34.0.
+
 ## 0.35.0 (2026-10-12)
 
 A minor release: the `tsan` build is compiled differently, so its results

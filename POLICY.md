@@ -764,6 +764,13 @@ adds what a machine shared by several unattended agents needs:
   exit code. That merge was committed because the exit code read was
   another command's, later in the same line.
 - **Before that line, the passing tests close to their time limit** (13.2).
+- **A workflow that failed is remembered until it passes in that folder
+  again,** and pre-push refuses meanwhile, naming it. The push's own gate is
+  the check workflow, so a failed `release` or `tsan` run would otherwise
+  travel with the push. In cli-cpparser a commit was chained after
+  `sh tools/hooks/gate release` in one command and went in although the
+  workflow had failed on a size budget. A commit can't be refused for
+  this: the commit after a failed gate is usually its fix.
 
 pre-push runs the gate through it.
 
@@ -1671,6 +1678,20 @@ cpp_policy_size_budget(my_tool MACOS 109568 LINUX 93184 WINDOWS 285696)
 - **Setting or raising a budget needs the owner's approval** and a line in `CHANGELOG.md`
   saying why. Agents ask. When the program shrank to well under its budget,
   the test says so, and the budget can come down.
+- **The approval is of the growth and its reason, given once,** with the
+  size on the system at hand; the other systems' numbers follow from
+  measurement. A size can only be measured on its own system, so:
+  1. The commit that grows the program sets the approved budget for the
+     system it was measured on and removes the others' numbers. Their CI
+     jobs pass and print the sizes (a system with no budget, above).
+  2. The next commit sets each to its measured size plus 5%, with no
+     second approval.
+  3. A release commit has all three numbers.
+  - *Why:* cli-cpparser's v0.2.0 needed the owner's approval for macOS, a
+    CI run that was red on Linux and Windows only to learn two sizes, and a
+    second approval and run.
+  - That a release has all three relies on review; every configure names
+    the systems without a number.
 - When a program is over budget, the test lists its sections (code,
   constants, exception tables, strings). For detail, link with a map
   (`-Wl,-map,<file>` on macOS, `-Wl,-Map=<file>` with `lld`, `/MAP` with

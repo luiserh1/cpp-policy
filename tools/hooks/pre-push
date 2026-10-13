@@ -14,5 +14,18 @@ if [ -n "$changes" ]; then
     exit 1
 fi
 
+# A workflow that failed here and hasn't passed since (the gate's launcher remembers it): the
+# check workflow below would not run it again, so the push would carry the failure.
+for failed in build/cpp_policy_gate_failed_*; do
+    [ -f "$failed" ] || continue
+    workflow=${failed#build/cpp_policy_gate_failed_}
+    case $workflow in
+        check|win-check) continue ;;
+    esac
+    echo "pre-push: the $workflow workflow failed in this folder and has not passed since."
+    echo "pre-push: make it pass first: sh tools/hooks/gate $workflow"
+    exit 1
+done
+
 # Through the gate's launcher: one gate at a time on the machine, awake, one final line.
 sh tools/hooks/gate

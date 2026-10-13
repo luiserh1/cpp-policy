@@ -166,7 +166,23 @@ run(${with_stub} tools/hooks/gate)
 string(FIND "${out}" "gate: FAILED (win-check, exit code 3)" found)
 expect("code;EQUAL;3;AND;found;GREATER;-1"
     "a failing workflow must end the gate with its exit code and say that it failed")
+# A workflow that failed is remembered until it passes: pre-push refuses meanwhile and names
+# it, though its own gate (the check workflow) would pass.
+# (A project's .gitignore has build/; this repository says it here.)
+file(APPEND "${repo}/.git/info/exclude" "build/\n")
+run(${with_stub} tools/hooks/gate release)
+expect("code;EQUAL;3" "a failing release workflow must fail the gate")
 file(WRITE "${WORK}/stub/cmake" "#!/bin/sh\necho \"stub cmake $*\"\n")
+run(${with_stub} tools/hooks/pre-push)
+string(FIND "${out}" "the win-release workflow failed in this folder" found)
+string(FIND "${out}" "stub cmake" started)
+expect("NOT;code;EQUAL;0;AND;found;GREATER;-1;AND;started;EQUAL;-1"
+    "pre-push must refuse while a workflow that failed has not passed again")
+run(${with_stub} tools/hooks/gate release)
+run(${with_stub} tools/hooks/pre-push)
+string(FIND "${out}" "gate: passed (win-check)" found)
+expect("code;EQUAL;0;AND;found;GREATER;-1"
+    "once the workflow passes again, pre-push must run the gate and pass")
 # A project with a vcpkg.json and a shell without VCPKG_ROOT: the gate says so itself, at
 # once, and doesn't start the workflow.
 file(WRITE "${repo}/vcpkg.json" "{}\n")

@@ -12,6 +12,10 @@
 # - It ends with one line, "gate: passed" or "gate: FAILED", and returns the workflow's own
 #   exit code, so that a command chained after it can't hide the result. Before that line it
 #   names the passing tests that used two thirds or more of their time limit.
+# - A workflow that failed is remembered (build/cpp_policy_gate_failed_<workflow>) until it
+#   passes here again, and pre-push refuses meanwhile: a commit chained after a failed
+#   release workflow went in unnoticed (cli-cpparser), and only the check workflow runs
+#   again at the push.
 # pre-push runs it. Copy unchanged into the project's tools/hooks/ (git runs only files named
 # after its hooks).
 set -u
@@ -86,9 +90,13 @@ if [ $code -eq 0 ] && [ -f "$config" ]; then
     fi
 fi
 
+failed=build/cpp_policy_gate_failed_$preset
 if [ $code -eq 0 ]; then
+    rm -f "$failed"
     echo "gate: passed ($preset)"
 else
+    mkdir -p build
+    echo "$(git rev-parse HEAD 2>/dev/null || echo unknown) exit code $code" >"$failed"
     echo "gate: FAILED ($preset, exit code $code)"
 fi
 exit $code

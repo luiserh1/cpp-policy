@@ -74,6 +74,9 @@ in this project's own code or tests.
   (`cpp_policy_size_budget()` in `CMakeLists.txt`). Never set or raise a
   budget yourself: if a change goes over it, shrink the change or ask the
   owner. A system with no budget yet prints the size to propose to the owner.
+  When the owner has approved a growth on one system, the others' numbers
+  are removed in that commit and set from what CI prints in the next
+  (POLICY.md 13.5).
 - A command that processes input of unbounded size has a memory test with
   `cpp_policy::peak_heap_bytes()` (POLICY.md 13.5). It may keep 1 KiB per
   input (its name and a small record). Never raise that budget yourself: if
@@ -126,7 +129,8 @@ sh tools/hooks/gate tsan
 `sh tools/hooks/gate` runs `cmake --workflow --preset check` (`win-check` on Windows), one gate
 at a time on the machine, and ends with `gate: passed` or `gate: FAILED`.
 Read that line, or the command's own exit code: don't chain other commands
-after it and read theirs.
+after it and read theirs. A workflow that failed is remembered until it
+passes again in this folder, and `git push` is refused meanwhile.
 
 Formatting problems: `sh tools/hooks/tidy-files --format <file>...` (or every
 file: `cmake --build --preset check --target policy-format-fix`).
