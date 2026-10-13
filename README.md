@@ -9,7 +9,7 @@ The rules are in [POLICY.md](POLICY.md).
 From a clone of cpp-policy checked out at the release you want:
 
 ```
-git -C cpp-policy checkout v0.37.0
+git -C cpp-policy checkout v0.38.0
 sh cpp-policy/tools/new-project.sh ~/code/MyTool MyTool            # VCPKG_ROOT must be set
 cd ~/code/MyTool && sh tools/hooks/gate
 ```
@@ -40,7 +40,7 @@ can't ship a template that fails its own policy.
 include(FetchContent)
 FetchContent_Declare(cpp_policy
     GIT_REPOSITORY https://github.com/luiserh1/cpp-policy.git
-    GIT_TAG        <commit>)   # v0.37.0, the latest release; see CHANGELOG.md
+    GIT_TAG        <commit>)   # v0.38.0, the latest release; see CHANGELOG.md
 FetchContent_MakeAvailable(cpp_policy)
 
 add_library(app_core STATIC src/model/board.cpp)
@@ -77,7 +77,7 @@ and this repository's CMake code runs on every machine that configures the
 project (POLICY.md 10). The commit is the line ending in `^{}`:
 
 ```
-git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.37.0*'
+git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.38.0*'
 ```
 
 Don't add `GIT_SHALLOW`: it only works with branch and tag names.
@@ -87,7 +87,7 @@ Don't add `GIT_SHALLOW`: it only works with branch and tag names.
 From the project's root, with a clean working folder:
 
 ```
-sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.37.0
+sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.38.0
 ```
 
 Any copy of this repository's `tools/upgrade.sh` works (from v0.10.1 on): it
@@ -95,7 +95,9 @@ fetches the release from the project's `GIT_REPOSITORY` and hands over to the
 release's own `upgrade.sh`, which knows what that release changed. It moves the `GIT_TAG` pin and the
 CI gate pins to the release's commit (with the tag in the comment), copies
 `.clang-tidy`, `.clang-format`, `CMakePresets.json`, `tools/hooks/` and, in a
-project with a `vcpkg.json`, `tools/vcpkg/`, checks every change, shows
+project with a `vcpkg.json`, `tools/vcpkg/`, replaces the section "Before you
+say you are done" of `AGENTS.md` with the release's, updates the `Policy:`
+line of `CHANGELOG.md`, checks every change, shows
 the diff and the release's CHANGELOG entry (follow its "Upgrading a project"
 steps), and runs the gate. It commits nothing. `--no-gate` skips the gate.
 These are policy files, so in a project that follows `AGENTS.md` the owner
@@ -160,7 +162,7 @@ permissions:
   contents: read
 jobs:
   gate:
-    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@<commit> # v0.37.0
+    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@<commit> # v0.38.0
     with:
       systems: '["linux", "windows", "macos"]'
       vcpkg: true          # if the project has a vcpkg.json

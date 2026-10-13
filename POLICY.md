@@ -942,6 +942,10 @@ as `#pragma once` and suppressions, have fixtures in `tests/audit/`.
   machine that configures a project.
 - Projects upgrade with `tools/upgrade.sh <tag>` (README, "Upgrading"): it
   moves both pins and the copied policy files together and checks the result.
+  It also brings the release's text on when the gate runs, into the section
+  "Before you say you are done" of `AGENTS.md`, and updates the changelog's
+  `Policy:` line (11.5). The rest of `AGENTS.md` is the project's: lines a
+  project adds to that one section are replaced, so they go elsewhere.
 - The version is defined once, in `project(cpp_policy VERSION ...)` in
   `CMakeLists.txt`. A release commit sets it, adds the release to
   `CHANGELOG.md` (each change with its reason), updates the tag in the
@@ -1331,6 +1335,14 @@ days.
   layers, in `cpp_policy_layers()`, are all above it.
 - **The library doesn't include the program.** A dependency's headers are
   confined to its modules as `<name>/<module>` (11.6).
+- **A library that relies on what a release gives the build says so:**
+  `NEEDS_POLICY 0.38.0` in `cpp_policy_library()`, the oldest cpp-policy a
+  project that uses it may be on. Configuration then fails in an older
+  user, with the release to upgrade to. cli-cpparser reads a `double` with
+  `std::from_chars`, which needs the macOS target of v0.34.0, and could
+  only say so in its README. v0.38.0 is the first release that knows the
+  word, and an older one fails on the word itself: so a library that uses
+  it needs v0.38.0 at least.
 - A project offers one library. Its tests are the project's tests.
 - **A header in `lib/<name>/<module>/internal/` is that module's own.** No
   other module of the library includes it, and no user does: both audits

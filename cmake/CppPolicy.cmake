@@ -711,7 +711,9 @@ endfunction()
 # lib/<name>/. DEPENDENCIES: the vcpkg packages it needs, which a user's vcpkg.json must
 # list. TEST_SUPPORT: files of the library's modules that only tests use, which become
 # <name>::test_support, with TEST_LINK for what they link (doctest::doctest). LINK: the
-# targets it links, PUBLIC. It defines the target <name>_library, which
+# targets it links, PUBLIC. NEEDS_POLICY: the oldest cpp-policy release a project that uses
+# the library may be on ("0.38.0"), when the library relies on something that release gives
+# the build. It defines the target <name>_library, which
 # everyone links by its alias <name>::<name>; the name <name> is left for a program.
 # ---------------------------------------------------------------------------
 set(CPP_POLICY_LIBRARY_FLOOR 0.30.0 CACHE INTERNAL
@@ -720,7 +722,7 @@ set(CPP_POLICY_LIBRARY_FLOOR 0.30.0 CACHE INTERNAL
 function(cpp_policy_library name)
     set(usage "cpp_policy_library(<name> LAYER <module>... [LAYER <module>...]... "
               "SOURCES <file>... [DEPENDENCIES <vcpkg package>...] [LINK <target>...] "
-              "[TEST_SUPPORT <file>...] [TEST_LINK <target>...])")
+              "[TEST_SUPPORT <file>...] [TEST_LINK <target>...] [NEEDS_POLICY <version>])")
     string(JOIN "" usage ${usage})
     if(NOT name MATCHES "^[a-z][a-z0-9_]*$")
         message(FATAL_ERROR "cpp-policy: a library's name is lower case letters, digits and "
@@ -735,6 +737,7 @@ function(cpp_policy_library name)
     set(link "")
     set(test_support "")
     set(test_link "")
+    set(needs_policy "")
     set(reading "")
     foreach(argument IN LISTS ARGN)
         if(argument STREQUAL "LAYER")
@@ -746,7 +749,7 @@ function(cpp_policy_library name)
             endif()
             set(current "")
             set(reading layer)
-        elseif(argument MATCHES "^(SOURCES|DEPENDENCIES|LINK|TEST_SUPPORT|TEST_LINK)$")
+        elseif(argument MATCHES "^(SOURCES|DEPENDENCIES|LINK|TEST_SUPPORT|TEST_LINK|NEEDS_POLICY)$")
             string(TOLOWER "${argument}" reading)
         elseif(reading STREQUAL "layer")
             if(NOT argument MATCHES "^[a-z0-9_]+$")
@@ -771,6 +774,8 @@ function(cpp_policy_library name)
             list(APPEND test_support "${argument}")
         elseif(reading STREQUAL "test_link")
             list(APPEND test_link "${argument}")
+        elseif(reading STREQUAL "needs_policy")
+            list(APPEND needs_policy "${argument}")
         else()
             message(FATAL_ERROR "cpp-policy: usage: ${usage}")
         endif()
@@ -780,6 +785,26 @@ function(cpp_policy_library name)
     endif()
     if(layers STREQUAL "" OR sources STREQUAL "")
         message(FATAL_ERROR "cpp-policy: usage: ${usage}")
+    endif()
+    # The library relies on what a release gives the build (cli-cpparser reads a double with
+    # std::from_chars, which needs v0.34.0's macOS target): this build's policy must have it.
+    # A policy older than v0.38.0 doesn't know the word and fails on it, so the word asks for
+    # v0.38.0 at least.
+    if(NOT needs_policy STREQUAL "")
+        if(NOT needs_policy MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
+            message(FATAL_ERROR "cpp-policy: library '${name}': NEEDS_POLICY takes one "
+                "release, as 0.38.0 ('${needs_policy}')")
+        endif()
+        file(STRINGS "${CPP_POLICY_ROOT}/CMakeLists.txt" own_version
+            REGEX "^project\\(cpp_policy VERSION [0-9.]+")
+        string(REGEX REPLACE "^project\\(cpp_policy VERSION ([0-9.]+).*$" "\\1" own_version
+            "${own_version}")
+        if(own_version VERSION_LESS needs_policy)
+            message(FATAL_ERROR "cpp-policy: library '${name}' needs cpp-policy "
+                "v${needs_policy} or later in the project that uses it, and this project is "
+                "on v${own_version}. Upgrade the project first (tools/upgrade.sh "
+                "v${needs_policy}, POLICY.md 11.7)")
+        endif()
     endif()
     # The target is <name>_library and the file lib<name>.a: the project's program is often
     # called <name> too. Everyone links the alias, <name>::<name>.

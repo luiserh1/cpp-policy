@@ -85,6 +85,9 @@ set(vcpkg_files tools/vcpkg/setup.cmake tools/vcpkg/llvm.cmake
 foreach(name IN LISTS vcpkg_files)
     file(WRITE "${policy}/${name}" "# ${name} of 2.0.0\n")
 endforeach()
+# And the template of AGENTS.md, whose section on the gate the upgrade brings.
+file(WRITE "${policy}/template/AGENTS.md.in"
+    "# @NAME@\n\n## Before you say you are done\n\nRun the gate of 2.0.0.\n\n## Never\n\n- The template's own.\n")
 # And its own upgrade.sh, which the one under test must hand over to: this script plus one
 # line that says it ran.
 file(READ "${POLICY_ROOT}/tools/upgrade.sh" script)
@@ -125,6 +128,13 @@ file(WRITE "${project}/.github/workflows/ci.yml"
     "      vcpkg: true\n"
     "  benchmark:\n"
     "    uses: someone/cpp-policy/.github/workflows/benchmark.yml@${old} # v1.0.0\n")
+# The project's own instructions and changelog: the upgrade replaces one section of the
+# first and one line of the second.
+file(WRITE "${project}/AGENTS.md"
+    "# Fixture\n\nThe project's own words.\n\n## Before you say you are done\n\nRun the gate of 1.0.0.\n\n"
+    "## Never\n\n- The project's own rule.\n")
+file(WRITE "${project}/CHANGELOG.md"
+    "# Changelog\n\nPolicy: cpp-policy v1.0.0.\n\n## 0.1.0\n\nOn the policy v1.0.0 since the start.\n")
 # Release 1.0.0's files, as the project copied them.
 run("${policy}" ${git} checkout --quiet v1.0.0 -- .)
 foreach(name IN ITEMS .clang-tidy .clang-format CMakePresets.json tools/hooks/pre-commit
@@ -173,6 +183,15 @@ string(FIND "${out}" "Second: do the upgrade steps." changelog)
 expect("changelog;GREATER;-1" "it must show the release's CHANGELOG entry")
 string(FIND "${out}" "First." older)
 expect("older;EQUAL;-1" "it must show only the new release's CHANGELOG entry")
+file(READ "${project}/AGENTS.md" agents)
+set(wanted "# Fixture\n\nThe project's own words.\n\n## Before you say you are done\n\nRun the gate of 2.0.0.\n\n## Never\n\n- The project's own rule.\n")
+expect("agents;STREQUAL;wanted"
+    "AGENTS.md must get the release's section on the gate and keep the rest as it was")
+file(READ "${project}/CHANGELOG.md" project_changelog)
+set(wanted "# Changelog\n\nPolicy: cpp-policy v2.0.0.\n\n## 0.1.0\n\nOn the policy v1.0.0 since the start.\n")
+expect("project_changelog;STREQUAL;wanted" "the changelog's policy line must name v2.0.0, and only that line")
+string(FIND "${out}" "update the line" reminder)
+expect("reminder;EQUAL;-1" "it must not ask for a changelog line it has updated itself")
 
 file(READ "${project}/CMakeLists.txt" cmake)
 string(FIND "${cmake}" "GIT_TAG        ${new}) # v2.0.0\n" pinned)

@@ -12,4 +12,6 @@ cpp_policy_library(geometry
         testing/samples.hpp
         testing/samples.cpp
     # Declared for the self-test of the check; this library links nothing.
-    DEPENDENCIES zlib)
+    DEPENDENCIES zlib
+    # The first release that knows the word: a user on it or on a later one is accepted.
+    NEEDS_POLICY 0.38.0)

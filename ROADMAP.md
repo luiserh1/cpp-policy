@@ -52,11 +52,14 @@ Releases A and B (0.30.0, 0.32.0) are out. Open:
       that doesn't exist; its trial of one full gate per stage, with the
       hook and the touched modules' tests between commits.
 
-- [ ] **From its report of 2026-10-13, not understood yet:** `tidy-files`
-      took over ten minutes for one widely included header
-      (`src/app/record.hpp`), and the commit hook rebuilt for 10 to 25
-      minutes before a one-file commit of a document in a folder that had
-      fallen behind. The hook's output from one such case is asked for.
+- [ ] **From its report of 2026-10-13:** `tidy-files` took over ten
+      minutes for one widely included header (`src/app/record.hpp`): not
+      understood, its output is asked for. The commit hook rebuilding for
+      10 to 25 minutes before a commit of a document is understood: the
+      hook builds the audit through CMake, a stale build folder configures
+      again, and vcpkg rebuilds the dependencies when the compiler was
+      updated (seen in SimpleLocalServer, two seconds there). Open:
+      whether the hook should configure at all for a commit with no code.
 - [ ] **Asked and not given (2026-10-13):** a way for a project to choose
       which test programs the tsan workflow runs. After v0.35.0 Alfar's Mac
       job is about 18 minutes; to look at again if that proves wrong.

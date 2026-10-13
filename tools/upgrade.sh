@@ -15,7 +15,10 @@
 #   - the pins of cpp-policy's CI gate in .github/workflows/, if there are any;
 #   - the copies of .clang-tidy, .clang-format, CMakePresets.json and tools/hooks/;
 #   - with a vcpkg.json, the copies of tools/vcpkg/, and the lines in CMakeLists.txt that load
-#     vcpkg (the ones releases before v0.15.0 gave become an include of tools/vcpkg/setup.cmake).
+#     vcpkg (the ones releases before v0.15.0 gave become an include of tools/vcpkg/setup.cmake);
+#   - in AGENTS.md, the section "Before you say you are done" (when the gate runs), which
+#     becomes the release's; the rest of the file is the project's and is left alone;
+#   - in CHANGELOG.md, the line "Policy: cpp-policy v<version>." (POLICY.md 11.5).
 # An older copy hands over to the release's own upgrade.sh, which knows what the release
 # changed. It then shows the diff and the release's CHANGELOG entry and runs the gate. It commits
 # nothing, and it refuses to start while the working folder has uncommitted changes, so the
@@ -259,11 +262,50 @@ if [ -f vcpkg.json ]; then
     fi
 fi
 
-# 5. What changed, and what the release asks of projects.
+# 5. AGENTS.md says when the gate runs, and releases change that: the section from "## Before
+# you say you are done" up to "## Never" becomes the release's. Until v0.38.0 the owner did
+# this with a script of their own after each release, and the uncommitted file then stopped
+# this script. A file without exactly one such section is left alone, and said so.
+agents_note=
+template=$policy/template/AGENTS.md.in
+section_start='^## Before you say you are done'
+section_end='^## Never'
+has_section() {
+    [ "$(grep -c "$section_start" "$1")" = 1 ] && [ "$(grep -c "$section_end" "$1")" = 1 ]
+}
+if [ -f AGENTS.md ] && [ -f "$template" ]; then
+    if has_section AGENTS.md && has_section "$template"; then
+        awk -v start="$section_start" -v end="$section_end" -v template="$template" '
+            $0 ~ start {
+                inside = 0
+                while ((getline line < template) > 0) {
+                    if (line ~ start) inside = 1
+                    if (line ~ end) inside = 0
+                    if (inside) print line
+                }
+                skipping = 1
+            }
+            $0 ~ end { skipping = 0 }
+            !skipping { print }' AGENTS.md >"$work/AGENTS.md"
+        cat "$work/AGENTS.md" >AGENTS.md
+    else
+        agents_note="AGENTS.md has no single section \"## Before you say you are done\" before \"## Never\": left as it was. Compare it with the release's template/AGENTS.md.in by hand."
+    fi
+fi
+
+# 6. The changelog's line that names the policy's release (POLICY.md 11.5).
+policy_line='^Policy: cpp-policy v[0-9][0-9.]*\.$'
+changelog_note="In CHANGELOG.md, update the line \"Policy: cpp-policy $tag.\" (POLICY.md 11.5)."
+if [ -f CHANGELOG.md ] && [ "$(grep -c "$policy_line" CHANGELOG.md)" = 1 ]; then
+    rewrite CHANGELOG.md -e "s/$policy_line/Policy: cpp-policy $tag./"
+    changelog_note=
+fi
+
+# 7. What changed, and what the release asks of projects.
 echo "cpp-policy $tag is commit $commit. Changed and new files:"
 # status, not diff --stat: a file the release adds (a new hook) is untracked until committed.
 git status --short
-git --no-pager diff -- CMakeLists.txt .github
+git --no-pager diff -- CMakeLists.txt .github AGENTS.md CHANGELOG.md
 version=${tag#v}
 echo
 echo "--- CHANGELOG entry for $tag (read its 'Upgrading a project' steps) ---"
@@ -272,9 +314,10 @@ awk -v heading="## $version " 'index($0, heading) == 1 { show = 1; print; next }
     show { print }' "$policy/CHANGELOG.md"
 echo "---"
 echo "The .gitignore and .gitattributes lines the release requires are checked by the audit."
-echo "In CHANGELOG.md, update the line \"Policy: cpp-policy $tag.\" (POLICY.md 11.5)."
+[ -z "$changelog_note" ] || echo "$changelog_note"
+[ -z "$agents_note" ] || echo "$agents_note"
 
-# 6. The gate, with the preset for this system (as the git hooks choose it).
+# 8. The gate, with the preset for this system (as the git hooks choose it).
 if [ "$gate" = yes ]; then
     case "$(uname -s)" in
         MINGW* | MSYS* | CYGWIN*) preset=win-check ;;

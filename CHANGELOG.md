@@ -3,6 +3,40 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.38.0 (2026-10-13)
+
+A minor release: new, optional, and nothing that passes stops passing. From
+cli-cpparser's report on its v0.3.0, and from upgrading four projects by
+hand in one day.
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** none.
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.38.0`. From this
+   release on it also replaces the section "Before you say you are done" of
+   `AGENTS.md` and updates the `Policy:` line of `CHANGELOG.md`: look at
+   both in the diff it shows.
+
+### Added
+
+- **`upgrade.sh` brings the release's section "Before you say you are done"
+  into `AGENTS.md`,** and leaves the rest of the file alone. *Why:* that
+  section says when the gate runs, and five releases in three days changed
+  it. The owner replaced it with a script of their own in five projects
+  each time, and the uncommitted file then stopped `upgrade.sh`. A file
+  without exactly one such section is left as it was, and the script says
+  so.
+- **`upgrade.sh` updates the changelog's `Policy: cpp-policy v<version>.`
+  line** when there is exactly one, and asks for it by hand otherwise.
+  *Why:* it was forgotten in four upgrades of four on 2026-10-13.
+- **`NEEDS_POLICY <version>` in `cpp_policy_library()`:** the oldest
+  cpp-policy a project that uses the library may be on; configuration
+  fails in an older one, naming the release to upgrade to (POLICY.md 11.7).
+  *Why:* cli-cpparser v0.3.0 relies on the macOS target of v0.34.0 and
+  could only say so in its README. A release older than this one fails on
+  the word itself, so a library that uses it needs v0.38.0 at least.
+
 ## 0.37.0 (2026-10-13)
 
 A minor release: a test that timed out and would have failed can now pass
