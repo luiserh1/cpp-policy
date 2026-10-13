@@ -27,7 +27,8 @@ set_tests_properties(integration/app/the_library_offers_test_support PROPERTIES
     LABELS integration)
 add_test(NAME integration/app/the_library_answers COMMAND user)
 set_tests_properties(integration/app/the_library_answers PROPERTIES LABELS integration
-    PASS_REGULAR_EXPRESSION "area 12 on a host with a name, clock runs")
+    PASS_REGULAR_EXPRESSION # The release is the library's (1.2.0); this project has no version of its own.
+    "area 12 on a host with a name, clock runs, geometry 1\\.2\\.0")
 
 cpp_policy_layers(LAYER lowlevel LAYER app)
 # Which of this project's modules may include the library. The self-test changes it to show

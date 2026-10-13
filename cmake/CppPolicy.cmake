@@ -713,7 +713,10 @@ endfunction()
 # <name>::test_support, with TEST_LINK for what they link (doctest::doctest). LINK: the
 # targets it links, PUBLIC. NEEDS_POLICY: the oldest cpp-policy release a project that uses
 # the library may be on ("0.38.0"), when the library relies on something that release gives
-# the build. It defines the target <name>_library, which
+# the build. VERSION_IN: the one source file that gets the library's release as the
+# definition <NAME>_VERSION ("1.2.0"), read from project(... VERSION ...) in the
+# CMakeLists.txt beside library.cmake: in a user's build PROJECT_VERSION is the user's.
+# It defines the target <name>_library, which
 # everyone links by its alias <name>::<name>; the name <name> is left for a program.
 # ---------------------------------------------------------------------------
 set(CPP_POLICY_LIBRARY_FLOOR 0.30.0 CACHE INTERNAL
@@ -722,7 +725,8 @@ set(CPP_POLICY_LIBRARY_FLOOR 0.30.0 CACHE INTERNAL
 function(cpp_policy_library name)
     set(usage "cpp_policy_library(<name> LAYER <module>... [LAYER <module>...]... "
               "SOURCES <file>... [DEPENDENCIES <vcpkg package>...] [LINK <target>...] "
-              "[TEST_SUPPORT <file>...] [TEST_LINK <target>...] [NEEDS_POLICY <version>])")
+              "[TEST_SUPPORT <file>...] [TEST_LINK <target>...] [NEEDS_POLICY <version>] "
+              "[VERSION_IN <file>])")
     string(JOIN "" usage ${usage})
     if(NOT name MATCHES "^[a-z][a-z0-9_]*$")
         message(FATAL_ERROR "cpp-policy: a library's name is lower case letters, digits and "
@@ -738,6 +742,7 @@ function(cpp_policy_library name)
     set(test_support "")
     set(test_link "")
     set(needs_policy "")
+    set(version_in "")
     set(reading "")
     foreach(argument IN LISTS ARGN)
         if(argument STREQUAL "LAYER")
@@ -749,7 +754,7 @@ function(cpp_policy_library name)
             endif()
             set(current "")
             set(reading layer)
-        elseif(argument MATCHES "^(SOURCES|DEPENDENCIES|LINK|TEST_SUPPORT|TEST_LINK|NEEDS_POLICY)$")
+        elseif(argument MATCHES "^(SOURCES|DEPENDENCIES|LINK|TEST_SUPPORT|TEST_LINK|NEEDS_POLICY|VERSION_IN)$")
             string(TOLOWER "${argument}" reading)
         elseif(reading STREQUAL "layer")
             if(NOT argument MATCHES "^[a-z0-9_]+$")
@@ -776,6 +781,8 @@ function(cpp_policy_library name)
             list(APPEND test_link "${argument}")
         elseif(reading STREQUAL "needs_policy")
             list(APPEND needs_policy "${argument}")
+        elseif(reading STREQUAL "version_in")
+            list(APPEND version_in "${argument}")
         else()
             message(FATAL_ERROR "cpp-policy: usage: ${usage}")
         endif()
@@ -877,6 +884,26 @@ function(cpp_policy_library name)
         set_property(GLOBAL PROPERTY CPP_POLICY_LIBRARY_LAYERS "${layers}")
     endif()
     cpp_policy_apply(${target})
+
+    # The library's release, for the one file that says it. ToneMatcher wrote this by hand
+    # when Alfar asked for the library's release as a value: POLICY.md 11.5's
+    # PROJECT_VERSION is the user's own in a user's build.
+    if(NOT version_in STREQUAL "")
+        list(LENGTH version_in count)
+        if(NOT count EQUAL 1 OR NOT version_in IN_LIST sources)
+            message(FATAL_ERROR "cpp-policy: library '${name}': VERSION_IN takes one of its "
+                "SOURCES ('${version_in}')")
+        endif()
+        file(READ "${root}/CMakeLists.txt" lists)
+        if(NOT lists MATCHES "project\\([^)]*VERSION[ \t\r\n]+([0-9]+(\\.[0-9]+)*)")
+            message(FATAL_ERROR "cpp-policy: library '${name}': VERSION_IN needs "
+                "project(... VERSION <number>) in ${root}/CMakeLists.txt, written as a "
+                "number (POLICY.md 11.5)")
+        endif()
+        string(TOUPPER "${name}" upper)
+        set_property(SOURCE "${root}/lib/${name}/${version_in}" TARGET_DIRECTORY ${target}
+            APPEND PROPERTY COMPILE_DEFINITIONS "${upper}_VERSION=\"${CMAKE_MATCH_1}\"")
+    endif()
 
     # <name>::test_support, for the tests of the library's project and of its users.
     if(test_files)

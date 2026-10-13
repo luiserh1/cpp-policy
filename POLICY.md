@@ -1151,7 +1151,9 @@ a compile definition for the file that prints it
 (`target_compile_definitions(... PRIVATE APP_VERSION="${PROJECT_VERSION}")`,
 which the policy's check of definitions accepts), not from a second constant
 kept by hand. The definition goes on the target that holds the code that
-prints it. It is build configuration, which section 2.4 allows as a macro,
+prints it. **A library gets its release with `VERSION_IN <file>` in
+`cpp_policy_library()`** (section 11.7): in a project that uses it,
+`PROJECT_VERSION` is the user's. It is build configuration, which section 2.4 allows as a macro,
 and the code gives it a name and a type at once:
 `constexpr std::string_view version = APP_VERSION;`. ToneMatcher tagged a release whose program still
 printed the version before: the constant was a second place, and the release
@@ -1343,6 +1345,17 @@ days.
   only say so in its README. v0.38.0 is the first release that knows the
   word, and an older one fails on the word itself: so a library that uses
   it needs v0.38.0 at least.
+- **A library that says its release gets it from the policy:**
+  `VERSION_IN <file>` names the one of its `SOURCES` that is compiled with
+  `<NAME>_VERSION="1.2.0"` (the library's name in capitals), read from
+  `project(... VERSION ...)` in the `CMakeLists.txt` beside `library.cmake`.
+  The version stays written once (11.5), and is the library's in a user's
+  build too, where `PROJECT_VERSION` is the user's. Alfar wanted
+  ToneMatcher's release for a cache key, and ToneMatcher had to read its
+  own `project()` line with a regex of its own. Configuration fails when
+  that line has no number. v0.40.0 is the first release that knows the
+  word: a library that uses it says `NEEDS_POLICY 0.40.0`, so that an
+  older user is told what to do.
 - A project offers one library. Its tests are the project's tests.
 - **A header in `lib/<name>/<module>/internal/` is that module's own.** No
   other module of the library includes it, and no user does: both audits

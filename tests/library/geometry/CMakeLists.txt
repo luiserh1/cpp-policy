@@ -1,7 +1,7 @@
 # A project that offers a library and has a program of its own (cpp-policy's self-test of
 # POLICY.md 11.7, run by tests/library/run.cmake). A user of the library never runs this file.
 cmake_minimum_required(VERSION 3.29)
-project(geometry_project LANGUAGES CXX)
+project(geometry_project VERSION 1.2.0 LANGUAGES CXX)
 
 if(DEFINED POLICY_ROOT)
     # The self-test: this checkout of cpp-policy.

@@ -7,6 +7,7 @@ cpp_policy_library(geometry
     SOURCES
         lowlevel/clock.cpp
         shapes/area.cpp
+        shapes/version.cpp
     # What tests use, the library's own and its users': geometry::test_support.
     TEST_SUPPORT
         testing/samples.hpp
@@ -14,4 +15,6 @@ cpp_policy_library(geometry
     # Declared for the self-test of the check; this library links nothing.
     DEPENDENCIES zlib
     # The first release that knows the word: a user on it or on a later one is accepted.
-    NEEDS_POLICY 0.38.0)
+    NEEDS_POLICY 0.38.0
+    # The file that says the library's release: it gets GEOMETRY_VERSION.
+    VERSION_IN shapes/version.cpp)

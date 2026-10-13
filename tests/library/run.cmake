@@ -165,6 +165,16 @@ must_fail("configuring a user of a library checked with v0.20.0"
     "${CMAKE_COMMAND}" -S "${WORK}/user_old_library" -B "${WORK}/user_old_library/build"
     ${settings} "-DFETCHCONTENT_SOURCE_DIR_GEOMETRY=${WORK}/geometry_old")
 
+# --- VERSION_IN in a library whose project() has no version.
+make_project(geometry geometry_no_version)
+file(READ "${WORK}/geometry_no_version/CMakeLists.txt" lists)
+string(REPLACE " VERSION 1.2.0" "" lists "${lists}")
+file(WRITE "${WORK}/geometry_no_version/CMakeLists.txt" "${lists}")
+must_fail("configuring a library with VERSION_IN and no version"
+    "library 'geometry': VERSION_IN needs project("
+    "${CMAKE_COMMAND}" -S "${WORK}/geometry_no_version" -B "${WORK}/geometry_no_version/build"
+    ${settings})
+
 # --- The library's code including the program's.
 file(READ "${WORK}/geometry/lib/geometry/shapes/area.cpp" source)
 string(REPLACE "#include \"geometry/lowlevel/clock.hpp\"\n"

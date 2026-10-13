@@ -3,6 +3,32 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.40.0 (2026-10-13)
+
+A minor release: new, optional, and nothing that passes stops passing. From
+ToneMatcher's report on its v0.7.0.
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** none. A project that offers a library may use
+the new word (below).
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.40.0`.
+
+### Added
+
+- **`VERSION_IN <file>` in `cpp_policy_library()`:** that one source file
+  of the library is compiled with `<NAME>_VERSION="<version>"`, read from
+  `project(... VERSION ...)` in the `CMakeLists.txt` beside
+  `library.cmake` (POLICY.md 11.5, 11.7). *Why:* a program gets its
+  version from `PROJECT_VERSION`, which in a project that uses a library is
+  the user's own. Alfar asked ToneMatcher for the library's release as a
+  value, and ToneMatcher wrote its own regex over its `project()` line; the
+  next library would have written another. Configuration fails when the
+  line has no number, where a regex written by hand gives an empty text.
+  - An older policy fails on the word, so a library that uses it also says
+    `NEEDS_POLICY 0.40.0`, and its users upgrade first.
+
 ## 0.39.0 (2026-10-13)
 
 A minor release: new, optional, and nothing that passes stops passing. From

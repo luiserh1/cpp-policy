@@ -12,8 +12,9 @@ std::string summary(int width, int height) {
     if (!area) {
         return std::format("no area: {}", area.error());
     }
-    return std::format("area {} on {}, clock {}", *area, lowlevel::host_note(),
-                       geometry::shapes::clock_runs() ? "runs" : "is stopped");
+    return std::format("area {} on {}, clock {}, geometry {}", *area, lowlevel::host_note(),
+                       geometry::shapes::clock_runs() ? "runs" : "is stopped",
+                       geometry::shapes::version());
 }
 
 } // namespace app
