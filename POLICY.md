@@ -1699,6 +1699,13 @@ cpp_policy_size_budget(my_tool MACOS 109568 LINUX 93184 WINDOWS 285696)
   it has no LINUX budget (with 5% headroom: M)" after the link, in CI's log
   as well. The owner approves the first numbers like any later one. A
   program that ships has all three.
+- **A program that isn't built on a system says `NOT_BUILT` in its place:**
+  `cpp_policy_size_budget(my_window MACOS 5308416 LINUX NOT_BUILT WINDOWS
+  NOT_BUILT)`. Alfar's window program exists on macOS only, and every
+  configure named it for two numbers that could never be measured; a notice
+  nobody can act on teaches its readers to pass over notices. A build on a
+  system that says `NOT_BUILT` fails: a program has a budget wherever it is
+  built.
 - The size is that of a copy stripped with `llvm-strip`: what would ship. The
   file the build leaves keeps its symbol table, which grows with names rather
   than code. In SimpleLocalServer's, it was 41% of the bytes.

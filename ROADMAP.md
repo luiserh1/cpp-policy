@@ -61,8 +61,18 @@ Releases A and B (0.30.0, 0.32.0) are out. Open:
       updated (seen in SimpleLocalServer, two seconds there). Open:
       whether the hook should configure at all for a commit with no code.
 - [ ] **Asked and not given (2026-10-13):** a way for a project to choose
-      which test programs the tsan workflow runs. After v0.35.0 Alfar's Mac
-      job is about 18 minutes; to look at again if that proves wrong.
+      which test programs the tsan workflow runs. Measured after the
+      upgrade: Alfar's Mac job is 23 minutes with a whole first build, its
+      tests 982 s; the gate by hand 20.5 minutes. To look at again if the
+      owner finds that too long for the end of a stage.
+- [ ] **A false positive on Windows, not reproduced here:**
+      `clang-analyzer-cplusplus.NewDeleteLeaks` ("field '_Rep'") on a
+      `std::make_shared` among an aggregate's designated initializers, with
+      MSVC's library, reported at the function's closing brace. Giving
+      that member in a statement of its own ends it; the same shape two
+      functions below was never reported. No small file shows it yet, and
+      one is not asked of Alfar: it would cost CI runs there. If a second
+      project meets it, try one in this repository's own Windows job.
 
 ### Trials running
 

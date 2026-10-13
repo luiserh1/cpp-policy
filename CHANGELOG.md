@@ -3,6 +3,43 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.39.0 (2026-10-13)
+
+A minor release: new, optional, and nothing that passes stops passing. From
+Alfar's report on its upgrade to v0.37.0.
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** none. A project with a program built on some
+systems only may now say so (below).
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.39.0`.
+
+### Added
+
+- **`NOT_BUILT` in place of a system's size budget:**
+  `cpp_policy_size_budget(my_window MACOS 5308416 LINUX NOT_BUILT WINDOWS
+  NOT_BUILT)`. That system is no longer named at configure as waiting for a
+  budget; a build there fails. *Why:* Alfar's window program is built on
+  macOS only, and every configure named it for a Linux and a Windows number
+  that could never be measured. A notice nobody can act on teaches its
+  readers to pass over notices.
+
+### Seen in a project
+
+Alfar on v0.37.0, its first CI run green on the three systems:
+
+- **tsan** (v0.35.0: `-O1`, limits ×3): the Mac's 911 tests took 982 s
+  where they took 2,197 to 2,498 s and 19 timed out; Linux's 562 took 148 s
+  where they took 540 s and 5 timed out. The longest test took 77 of its
+  180 seconds. No races. The Mac's job is 23 minutes with a whole first
+  build, and the tsan gate run by hand 20.5 minutes.
+- **A test run once more after a timeout** (v0.37.0): seen once, in a push
+  hook's gate, on a test that opens a window. It cost 30 seconds and a
+  line where it had cost a failed gate, a 15-minute wait and another gate.
+- **macOS 26.0 as the target** (v0.34.0): vcpkg rebuilt four packages in
+  41 s, and both programs' stripped sizes are what they were, to the byte.
+
 ## 0.38.1 (2026-10-13)
 
 A patch release: nothing that passes stops passing. From cli-cpparser's

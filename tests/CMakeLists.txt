@@ -273,6 +273,14 @@ foreach(case IN LISTS bypass_cases)
                 "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}" -DCPP_POLICY_CLANG_TIDY=ON
                 "-DPOLICY_ROOT=${CPP_POLICY_ROOT}")
     set_tests_properties(bypass/${name} PROPERTIES PASS_REGULAR_EXPRESSION "${expect}")
+    # reject.txt, when there is one: a regex the output must not match.
+    if(EXISTS "${case}/reject.txt")
+        set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${case}/reject.txt")
+        file(READ "${case}/reject.txt" reject)
+        string(STRIP "${reject}" reject)
+        string(REPLACE ";" "." reject "${reject}")
+        set_tests_properties(bypass/${name} PROPERTIES FAIL_REGULAR_EXPRESSION "${reject}")
+    endif()
 endforeach()
 
 # --- Git hooks: run in a throwaway repository with a stub gate. They are POSIX shell scripts;

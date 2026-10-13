@@ -1,0 +1,16 @@
+cmake_minimum_required(VERSION 3.29)
+project(bypass_size_not_built_elsewhere LANGUAGES CXX)
+include("${POLICY_ROOT}/cmake/CppPolicy.cmake")
+
+add_executable(app app.cpp)
+cpp_policy_apply(app)
+# Built on this system only, with its budget: nothing is left to ask for, so no notice.
+if(APPLE)
+    cpp_policy_size_budget(app MACOS 1048576 LINUX NOT_BUILT WINDOWS NOT_BUILT)
+elseif(WIN32)
+    cpp_policy_size_budget(app MACOS NOT_BUILT LINUX NOT_BUILT WINDOWS 1048576)
+else()
+    cpp_policy_size_budget(app MACOS NOT_BUILT LINUX 1048576 WINDOWS NOT_BUILT)
+endif()
+message(STATUS "size_not_built_elsewhere: configured")
+cpp_policy_add_checks()
