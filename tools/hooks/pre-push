@@ -27,5 +27,18 @@ for failed in build/cpp_policy_gate_failed_*; do
     exit 1
 done
 
+# The gate has just passed on this very commit in this folder (the launcher remembers it,
+# and only for a folder with nothing uncommitted): the end of a stage runs the gate, and the
+# push that follows would only run it again.
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*) preset=win-check ;;
+    *) preset=check ;;
+esac
+passed=build/cpp_policy_gate_passed_$preset
+if [ -f "$passed" ] && [ "$(cat "$passed")" = "$(git rev-parse HEAD)" ]; then
+    echo "pre-push: the gate passed on this commit in this folder ($(git rev-parse --short HEAD)); not run again"
+    exit 0
+fi
+
 # Through the gate's launcher: one gate at a time on the machine, awake, one final line.
 sh tools/hooks/gate

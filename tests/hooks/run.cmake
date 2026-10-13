@@ -179,10 +179,23 @@ string(FIND "${out}" "stub cmake" started)
 expect("NOT;code;EQUAL;0;AND;found;GREATER;-1;AND;started;EQUAL;-1"
     "pre-push must refuse while a workflow that failed has not passed again")
 run(${with_stub} tools/hooks/gate release)
+file(REMOVE "${repo}/build/cpp_policy_gate_passed_win-check")
 run(${with_stub} tools/hooks/pre-push)
 string(FIND "${out}" "gate: passed (win-check)" found)
 expect("code;EQUAL;0;AND;found;GREATER;-1"
     "once the workflow passes again, pre-push must run the gate and pass")
+# That gate passed on this commit with nothing uncommitted: the next push doesn't run it
+# again. A new commit does.
+run(${with_stub} tools/hooks/pre-push)
+string(FIND "${out}" "not run again" found)
+string(FIND "${out}" "stub cmake" started)
+expect("code;EQUAL;0;AND;found;GREATER;-1;AND;started;EQUAL;-1"
+    "pre-push must not run the gate again on a commit it has just passed on")
+run("${GIT_EXECUTABLE}" -c user.name=test -c user.email=test@example.com commit --quiet
+    --allow-empty --no-verify -m "another commit")
+run(${with_stub} tools/hooks/pre-push)
+string(FIND "${out}" "stub cmake --workflow" started)
+expect("code;EQUAL;0;AND;started;GREATER;-1" "pre-push must run the gate on a new commit")
 # A project with a vcpkg.json and a shell without VCPKG_ROOT: the gate says so itself, at
 # once, and doesn't start the workflow.
 file(WRITE "${repo}/vcpkg.json" "{}\n")

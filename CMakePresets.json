@@ -281,7 +281,11 @@
       },
       "execution": {
         "timeout": 60,
-        "jobs": 4
+        "jobs": 4,
+        "repeat": {
+          "mode": "after-timeout",
+          "count": 2
+        }
       },
       "environment": {
         "ASAN_OPTIONS": "detect_leaks=1",
@@ -307,7 +311,11 @@
       },
       "execution": {
         "timeout": 60,
-        "jobs": 4
+        "jobs": 4,
+        "repeat": {
+          "mode": "after-timeout",
+          "count": 2
+        }
       },
       "environment": {
         "ASAN_OPTIONS": "detect_leaks=1",
@@ -323,7 +331,11 @@
       },
       "execution": {
         "timeout": 60,
-        "jobs": 4
+        "jobs": 4,
+        "repeat": {
+          "mode": "after-timeout",
+          "count": 2
+        }
       }
     },
     {
@@ -334,7 +346,11 @@
       },
       "execution": {
         "timeout": 180,
-        "jobs": 4
+        "jobs": 4,
+        "repeat": {
+          "mode": "after-timeout",
+          "count": 2
+        }
       }
     },
     {
@@ -345,7 +361,11 @@
       },
       "execution": {
         "timeout": 60,
-        "jobs": 4
+        "jobs": 4,
+        "repeat": {
+          "mode": "after-timeout",
+          "count": 2
+        }
       }
     },
     {
@@ -365,7 +385,11 @@
       },
       "execution": {
         "timeout": 60,
-        "jobs": 4
+        "jobs": 4,
+        "repeat": {
+          "mode": "after-timeout",
+          "count": 2
+        }
       }
     },
     {
@@ -376,7 +400,11 @@
       },
       "execution": {
         "timeout": 60,
-        "jobs": 4
+        "jobs": 4,
+        "repeat": {
+          "mode": "after-timeout",
+          "count": 2
+        }
       }
     }
   ],

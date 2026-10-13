@@ -16,6 +16,9 @@
 #   passes here again, and pre-push refuses meanwhile: a commit chained after a failed
 #   release workflow went in unnoticed (cli-cpparser), and only the check workflow runs
 #   again at the push.
+# - A workflow that passed on a commit, with nothing uncommitted before or after, is
+#   remembered too (build/cpp_policy_gate_passed_<workflow>): pre-push doesn't run the gate
+#   again on a commit it has just passed on in this folder.
 # pre-push runs it. Copy unchanged into the project's tools/hooks/ (git runs only files named
 # after its hooks).
 set -u
@@ -64,6 +67,11 @@ while ! mkdir "$lock" 2>/dev/null; do
     waited=$((waited + 2))
 done
 echo $$ >"$lock/pid"
+# What is about to be checked: a commit, when nothing is uncommitted.
+checked=
+if [ -z "$(git status --porcelain 2>/dev/null || echo unknown)" ]; then
+    checked=$(git rev-parse HEAD 2>/dev/null || true)
+fi
 trap 'rm -rf "$lock"' EXIT
 trap 'exit 130' INT TERM HUP
 
@@ -91,8 +99,14 @@ if [ $code -eq 0 ] && [ -f "$config" ]; then
 fi
 
 failed=build/cpp_policy_gate_failed_$preset
+passed=build/cpp_policy_gate_passed_$preset
+rm -f "$passed"
 if [ $code -eq 0 ]; then
     rm -f "$failed"
+    if [ -n "$checked" ] && [ -z "$(git status --porcelain 2>/dev/null || echo unknown)" ] &&
+        [ "$(git rev-parse HEAD 2>/dev/null)" = "$checked" ]; then
+        echo "$checked" >"$passed"
+    fi
     echo "gate: passed ($preset)"
 else
     mkdir -p build

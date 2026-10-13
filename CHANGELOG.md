@@ -3,6 +3,37 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.37.0 (2026-10-13)
+
+A minor release: a test that timed out and would have failed can now pass
+on a second run. From Alfar's report on what waiting costs it.
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** none. It brings the changed
+`CMakePresets.json`, `tools/hooks/gate` and `tools/hooks/pre-push`.
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.37.0`.
+2. Optional: `AGENTS.md` in new projects has two more paragraphs in "Before
+   you say you are done"; the owner's script brings them.
+
+### Changed
+
+- **A test that times out gets one more run** (every test preset; CTest's
+  `after-timeout`), **and the gate's last lines and CI name each test that
+  needed it.** *Why:* about one launch in a thousand of Alfar's window
+  tests never starts, inside GLFW's start-up on a locked screen; about one
+  gate in four failed on it at night. *What it costs:* a deadlock that
+  happens only sometimes passes on its second run, with that line as the
+  only sign, so a test named there more than once is a finding to report
+  (POLICY.md 7). Only a timeout is run again.
+- **pre-push doesn't run the gate again on a commit it has just passed on**
+  in that folder: the launcher remembers a pass, and only when nothing was
+  uncommitted before or after it. *Why:* the gate at the end of a stage and
+  the push hook's gate were the same run twice, ten minutes each on Alfar.
+  The hook stays, and so does CI's job on the same machine (POLICY.md 8
+  says why).
+
 ## 0.36.0 (2026-10-13)
 
 A minor release: a push that goes through today can be refused. From

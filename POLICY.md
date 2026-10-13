@@ -634,6 +634,21 @@ Test presets:
 - Every test has a 60-second timeout, so a hung test fails instead of holding
   up a push (CTest's own default is 25 minutes). A project may set a shorter
   `TIMEOUT` on its tests, or a longer one with a reason (13.2).
+- **A test that times out gets one more run,** in every test preset
+  (CTest's `after-timeout`), and the gate's last lines and CI name each test
+  that needed it: "timed out and passed on a second run".
+  - *Why:* about one launch in a thousand of Alfar's window tests never
+    starts: the main thread waits inside GLFW's start-up for macOS, seen
+    with the screen locked. A gate launches some 350 of them, so about one
+    gate in four failed at night on a fault in nobody's code, at 20 minutes
+    or more each for an unattended agent.
+  - *What it costs:* a deadlock that happens only sometimes is also a
+    timeout, and now passes on its second run. The line that names it is
+    all that shows it. **A test named there more than once is a finding:**
+    the agent tells the owner, and doesn't wait for a third.
+  - Only a timeout is run again. A test that fails any other way fails.
+    CTest can do this for every test or none, not for chosen programs.
+  - A hung test now takes twice its limit to fail.
 - **In the `tsan` build every test's limit is three times what it is
   elsewhere** (60 seconds become 180), and the build is optimized at `-O1`.
   A project writes nothing for it.
@@ -771,6 +786,15 @@ adds what a machine shared by several unattended agents needs:
   `sh tools/hooks/gate release` in one command and went in although the
   workflow had failed on a size budget. A commit can't be refused for
   this: the commit after a failed gate is usually its fix.
+- **A workflow that passed on a commit is remembered too,** when nothing
+  was uncommitted before or after it, and pre-push doesn't run the gate
+  again on that commit in that folder. The end of a stage runs the gate and
+  the push follows: on Alfar that was the same ten minutes twice, minutes
+  apart. Any new commit, or a gate that fails, forgets it.
+  - The hook is not turned off for a project whose CI runs the gate on the
+    same machine: the hook is what keeps a red commit off a main line that
+    agents push to directly, and CI is the layer that doesn't depend on
+    the agent. What repeats is this second local run, and that is gone.
 
 pre-push runs the gate through it.
 

@@ -17,10 +17,14 @@ add_test([==[integration/window/slow with a reason]==] "program")
 set_tests_properties([==[integration/window/slow with a reason]==] PROPERTIES TIMEOUT 300 _BACKTRACE_TRIPLES "a;1;;b;2;")
 add_test([==[integration/app/failed late]==] "program")
 set_tests_properties([==[integration/app/failed late]==] PROPERTIES TIMEOUT 60)
+add_test([==[integration/app/hung at start]==] "program")
+set_tests_properties([==[integration/app/hung at start]==] PROPERTIES TIMEOUT 60)
 add_test(plain "program")
 ]=])
 set(log "")
-foreach(test IN ITEMS "integration/app/quick|12.50|Passed" "integration/app/the walk (whole)|46.02|Passed"
+# "hung at start" timed out and passed on its second run, as the presets' repeat leaves it.
+foreach(test IN ITEMS "integration/app/hung at start|60.01|Failed" "integration/app/hung at start|3.00|Passed"
+        "integration/app/quick|12.50|Passed" "integration/app/the walk (whole)|46.02|Passed"
         "integration/window/slow with a reason|61.00|Passed" "integration/app/failed late|59.00|Failed"
         "plain|500.00|Passed")
     string(REPLACE "|" ";" parts "${test}")
@@ -46,6 +50,10 @@ if(NOT output MATCHES "\"integration/app/the walk \\(whole\\)\" took 46 s of 60"
    OR NOT output MATCHES "gate: 1 passing test"
    OR output MATCHES "quick|slow with a reason|failed late|plain")
     message(FATAL_ERROR "testing/test_times: only the walk is close to its limit:\n${output}")
+endif()
+if(NOT output MATCHES "timed out and passed on a second run: \"integration/app/hung at start\""
+   OR NOT output MATCHES "gate: 1 test\\(s\\) needed a second run")
+    message(FATAL_ERROR "testing/test_times: the test that ran twice must be named:\n${output}")
 endif()
 # A build folder with no test run says nothing.
 file(REMOVE "${WORK}/Testing/Temporary/LastTest.log")

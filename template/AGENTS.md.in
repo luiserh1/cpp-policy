@@ -130,7 +130,13 @@ sh tools/hooks/gate tsan
 at a time on the machine, and ends with `gate: passed` or `gate: FAILED`.
 Read that line, or the command's own exit code: don't chain other commands
 after it and read theirs. A workflow that failed is remembered until it
-passes again in this folder, and `git push` is refused meanwhile.
+passes again in this folder, and `git push` is refused meanwhile. A gate
+that passed on the commit you push, with nothing uncommitted, is remembered
+too: the push doesn't run it again.
+
+A test that times out is run once more. If the gate's last lines say a test
+"timed out and passed on a second run" and you have seen that test named
+before, tell the owner: it may be a deadlock, not chance.
 
 Formatting problems: `sh tools/hooks/tidy-files --format <file>...` (or every
 file: `cmake --build --preset check --target policy-format-fix`).
