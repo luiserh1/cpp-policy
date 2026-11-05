@@ -2,8 +2,79 @@
 
 Open work on cpp-policy itself: what comes next, and why. What's done is in
 `CHANGELOG.md`, with the reasons; items are removed from here in the commit
-that resolves them. The layout is the one POLICY.md 11.5 gives projects; no
-version is in progress.
+that resolves them. The layout is the one POLICY.md 11.5 gives projects.
+
+## Next release (in progress): one release, then the policy is frozen
+
+The owner's plan (2026-11-05): one more release takes in the whole queue;
+then the policy is frozen until every project has upgraded, top-down
+(libraries, then programs). Its notes must work from v0.38.0
+(ToneMatcher, SimpleLocalServer and GalleryOrganizer are on it;
+cli-cpparser on v0.39.0; Alfar on v0.40.0). Decided with the owner on
+2026-11-05, from Alfar's reports of 10-24 and 11-04 and the experiments
+report of 10-26:
+
+- [ ] 4. A stage's branch is pushed, and its CI is green, before it joins
+      `main` (POLICY.md 8, `AGENTS.md`). Alfar's 190 commits were gated on
+      macOS only, and `main` held a red release for 22 hours.
+- [ ] 2. POLICY.md 13.4: a scratch folder's lock records its process and is
+      free once that process is gone. ToneMatcher fixes
+      `lib/tonematcher/testing/scratch_folder.hpp` after the release (the
+      retry after a timeout always failed on the killed run's lock).
+- [ ] 3. The tidy cache (`cmake/scripts/tidy_cache.cmake`; prototype on the
+      local branch `tidy-cache`): both holes closed (program identity:
+      done in the prototype; path placeholders and the header filter),
+      Linux and Windows (clang-cl has no `-M`), self-tests, quiet timings.
+- [ ] 5. `gate.yml` input `timeout_minutes`, default 45; README: a runner
+      that shares a machine with local work needs more.
+- [ ] 6. `readability-qualified-auto` `AllowedTypes` for `std::array`'s
+      iterators, if it works; else a line in 2.10. A line in 2.10 on
+      `bugprone-optional-value-conversion` (libstdc++ only). No libstdc++
+      pass on the Mac.
+- [ ] 7. pre-commit audits and formats the staged version of staged files
+      only; long checks print the number of files first and findings as
+      they come; 13.5 and `AGENTS.md` say how to try a memory test in the
+      release build.
+- [ ] 8. The gate's audit and format check skip files git doesn't track,
+      unless a target compiles them.
+- [ ] 9. The release workflow runs test cases in a random order, the seed
+      printed at configure and in failures, reproducible by configuring
+      with it. **Can make existing code fail.**
+- [ ] 10. 13.5: a memory budget per unit of input (S, then 5S; growth at
+      most 4S × the budget), no default, the owner approves each.
+- [ ] 11. `cpp_policy_tool(<target> "<reason>")`: a development program,
+      built and checked, no size budget, reason printed at configure.
+- [ ] 12. Linking a library or framework is a dependency (ask the owner);
+      link options are flags (never). POLICY.md 6, `AGENTS.md`.
+- [ ] 13. POLICY.md 11.7: the real path of `upgrade.sh --library`.
+- [ ] 14. POLICY.md 8: the gate's lock is machine-wide by design;
+      `CPP_POLICY_GATE_LOCK`; CI jobs don't take it.
+- [ ] 15. Section 15: what something is comes from measurement or data,
+      not names; machine-dependent figures shown to users are measured or
+      not shown; one way per problem; a fix for the data at hand says so.
+- [ ] 16. 11.5: no code for old formats until someone outside the project
+      depends on the format.
+- [ ] 17. 11.4: accuracy covers every document and user-visible text, with
+      a search for the old wording; changelog entries name the options
+      rejected; a glossary optional; few, short current-state documents;
+      where a reason goes (code or commit message).
+- [ ] 18. Real data by hand, never in the gate; generated data at real
+      size. Declined: no test twice on one machine (CI's clean checkout
+      stays).
+- [ ] 19 to 21. A section "Working for the owner" in `AGENTS.md`, inside
+      the part `upgrade.sh` replaces: the project's rules over an agent's
+      habits; done only after checking; build, don't operate; decisions to
+      the changelog and a "Now" section in `ROADMAP.md`; nothing waits on a
+      prompt; delegated work in its own copy, a commit per step, stop at
+      what the brief doesn't cover, a test changed only when wrong, the
+      report's contents; one writer per set of files; experiments with
+      limits; a build under the owner's test is frozen; nothing joins
+      `main` without the owner's word. 13.4: tests show nothing on screen.
+- [ ] POLICY.md 7: the retry's "Why" corrected (the window hang was
+      Alfar's second `glfwInit`, fixed in its 0.8.0).
+- [ ] After the night's timings: B (test jobs from the cores), C (tsan on
+      the Mac only for Mac-only tests; leaning no), D (the Mac's release
+      job only when releasing; recommended no).
 
 Until 2026-09-28 these lived in SimpleLocalServer's `PENDING.md`, the
 project that piloted the policy. Numbers like #38 refer to the issues found
