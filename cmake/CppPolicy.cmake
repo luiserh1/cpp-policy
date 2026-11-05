@@ -273,10 +273,19 @@ function(cpp_policy_apply target)
 
     # clang-tidy always uses the policy's configuration, whatever .clang-tidy the project has.
     if(CPP_POLICY_CLANG_TIDY AND NOT as_dependency)
-        _cpp_policy_tidy_config(config)
-        set_target_properties(${target} PROPERTIES CXX_CLANG_TIDY
-            "${CPP_POLICY_CLANG_TIDY_EXE};--config-file=${config}")
+        _cpp_policy_tidy_command(command)
+        set_target_properties(${target} PROPERTIES CXX_CLANG_TIDY "${command}")
     endif()
+endfunction()
+
+# clang-tidy as the build runs it: through tidy_cache.cmake, which skips a file that passed
+# with the same inputs.
+function(_cpp_policy_tidy_command out)
+    _cpp_policy_tidy_config(config)
+    set(command "${CMAKE_COMMAND}" -P "${CPP_POLICY_ROOT}/cmake/scripts/tidy_cache.cmake" --
+        "${CMAKE_SOURCE_DIR}" "${CMAKE_BINARY_DIR}" "${CPP_POLICY_CLANG_TIDY_EXE}"
+        "--config-file=${config}")
+    set(${out} "${command}" PARENT_SCOPE)
 endfunction()
 
 # The policy's .clang-tidy as clang-tidy reads it: a copy in the build folder, named after a
@@ -482,8 +491,7 @@ function(_cpp_policy_verify_targets)
         get_target_property(as_dependency ${target} CPP_POLICY_LIBRARY_DEPENDENCY)
         if(CPP_POLICY_CLANG_TIDY AND NOT as_dependency)
             get_target_property(tidy ${target} CXX_CLANG_TIDY)
-            _cpp_policy_tidy_config(config)
-            set(expected "${CPP_POLICY_CLANG_TIDY_EXE};--config-file=${config}")
+            _cpp_policy_tidy_command(expected)
             if(target IN_LIST test_targets)
                 list(APPEND expected "${CPP_POLICY_TEST_TIDY_CHECKS}")
             endif()

@@ -1,0 +1,127 @@
+# clang-tidy, skipped for a file that already passed with the same inputs (POLICY.md 8).
+# The build runs it in clang-tidy's place:
+#   cmake -P tidy_cache.cmake -- <source dir> <build dir> <clang-tidy> <its options>... <file>
+#         -- <compile command>
+# The key is everything clang-tidy reads for that file: the program itself (its path, size and
+# time), its options, the policy's configuration, the compile command, and the path and
+# contents of every file the compile includes, as the compiler lists them now. Only passes are
+# kept: a file with a finding is checked again every time. The source and build folders are
+# replaced by placeholders, so two checkouts of one commit (a developer's and a CI runner's)
+# share their entries.
+# The cache is CPP_POLICY_TIDY_CACHE, or a folder in the user's cache; "off" turns it off.
+cmake_minimum_required(VERSION 3.29)
+
+set(args "")
+set(after_marker FALSE)
+math(EXPR last "${CMAKE_ARGC} - 1")
+foreach(index RANGE 1 ${last})
+    set(argument "${CMAKE_ARGV${index}}")
+    if(after_marker)
+        list(APPEND args "${argument}")
+    elseif(argument STREQUAL "--")
+        set(after_marker TRUE)
+    endif()
+endforeach()
+list(POP_FRONT args source_dir build_dir)
+
+# clang-tidy's own command, up to the file; then the compile command.
+list(FIND args "--" split)
+list(SUBLIST args 0 ${split} tidy)
+math(EXPR first_compile "${split} + 1")
+list(SUBLIST args ${first_compile} -1 compile)
+
+if(DEFINED ENV{CPP_POLICY_TIDY_CACHE})
+    set(cache "$ENV{CPP_POLICY_TIDY_CACHE}")
+elseif(APPLE)
+    set(cache "$ENV{HOME}/Library/Caches/cpp-policy/tidy")
+elseif(WIN32)
+    set(cache "$ENV{LOCALAPPDATA}/cpp-policy/tidy")
+elseif(DEFINED ENV{XDG_CACHE_HOME})
+    set(cache "$ENV{XDG_CACHE_HOME}/cpp-policy/tidy")
+else()
+    set(cache "$ENV{HOME}/.cache/cpp-policy/tidy")
+endif()
+
+macro(run_tidy_and_exit)
+    execute_process(COMMAND ${tidy} -- ${compile} RESULT_VARIABLE code)
+    if(code EQUAL 0 AND DEFINED entry)
+        file(MAKE_DIRECTORY "${shard_dir}")
+        file(WRITE "${entry}.${scratch_name}" "${key}")
+        file(RENAME "${entry}.${scratch_name}" "${entry}")
+    endif()
+    cmake_language(EXIT ${code})
+endmacro()
+
+if(cache STREQUAL "off")
+    run_tidy_and_exit()
+endif()
+
+# The files the compile reads now: the compile command, writing only its dependencies.
+set(listing_command "")
+set(skip_next FALSE)
+foreach(argument IN LISTS compile)
+    if(skip_next)
+        set(skip_next FALSE)
+    elseif(argument MATCHES "^-(o|MT|MF|MQ)$")
+        set(skip_next TRUE)
+    elseif(NOT argument MATCHES "^-(c|MD|MMD)$")
+        list(APPEND listing_command "${argument}")
+    endif()
+endforeach()
+string(SHA256 scratch_name "${args}")
+set(listing "${cache}/tmp/${scratch_name}.d")
+file(MAKE_DIRECTORY "${cache}/tmp")
+execute_process(COMMAND ${listing_command} -M -MF "${listing}"
+    RESULT_VARIABLE listed OUTPUT_QUIET ERROR_QUIET)
+if(NOT listed EQUAL 0)
+    # The compile itself will fail and say why: no key is needed for that.
+    file(REMOVE "${listing}")
+    run_tidy_and_exit()
+endif()
+file(READ "${listing}" dependencies)
+file(REMOVE "${listing}")
+string(REPLACE "\\\n" " " dependencies "${dependencies}")
+string(REPLACE "\\ " "<space>" dependencies "${dependencies}")
+string(REGEX REPLACE "^[^:]*: *" "" dependencies "${dependencies}")
+string(REGEX REPLACE "[ \t\r\n]+" ";" dependencies "${dependencies}")
+
+list(GET tidy 0 tidy_exe)
+file(REAL_PATH "${tidy_exe}" tidy_file)
+file(SIZE "${tidy_file}" tidy_size)
+file(TIMESTAMP "${tidy_file}" tidy_time "%Y-%m-%dT%H:%M:%S" UTC)
+set(key "program ${tidy_file} ${tidy_size} ${tidy_time}\ntidy ${tidy}\ncompile ${compile}\n")
+foreach(option IN LISTS tidy)
+    if(option MATCHES "^--config-file=(.*)$")
+        file(SHA256 "${CMAKE_MATCH_1}" config_hash)
+        string(APPEND key "config ${config_hash}\n")
+    endif()
+endforeach()
+foreach(dependency IN LISTS dependencies)
+    if(dependency STREQUAL "")
+        continue()
+    endif()
+    string(REPLACE "<space>" " " path "${dependency}")
+    file(SHA256 "${path}" hash)
+    string(APPEND key "file ${path} ${hash}\n")
+endforeach()
+
+# Placeholders for the two folders, the longer first when one holds the other.
+string(LENGTH "${source_dir}" source_length)
+string(LENGTH "${build_dir}" build_length)
+if(build_length GREATER source_length)
+    string(REPLACE "${build_dir}" "<build>" key "${key}")
+    string(REPLACE "${source_dir}" "<source>" key "${key}")
+else()
+    string(REPLACE "${source_dir}" "<source>" key "${key}")
+    string(REPLACE "${build_dir}" "<build>" key "${key}")
+endif()
+string(SHA256 fingerprint "${key}")
+string(SUBSTRING "${fingerprint}" 0 2 shard)
+set(shard_dir "${cache}/${shard}")
+set(entry "${shard_dir}/${fingerprint}")
+
+if(EXISTS "${entry}")
+    file(TOUCH_NOCREATE "${entry}")
+    cmake_language(EXIT 0)
+endif()
+run_tidy_and_exit()
