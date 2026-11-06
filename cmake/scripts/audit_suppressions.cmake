@@ -44,6 +44,9 @@ macro(report file line message)
 endmacro()
 
 cpp_policy_collect_sources("${SOURCE_DIR}" "${EXCLUDED_DIRS}" files)
+if(NOT DEFINED FILES)
+    cpp_policy_drop_drafts("${SOURCE_DIR}" "${BUILD_DIR}" "${files}" files)
+endif()
 # A source file may have 350 lines; a test source, under tests/, 500: it is mostly tables of
 # cases and expected text, and its length doesn't mean mixed responsibilities (POLICY.md 11.3).
 set(max_file_lines 350)

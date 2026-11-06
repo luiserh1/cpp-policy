@@ -463,6 +463,18 @@ Check each C++ file right after editing it with `sh tools/hooks/tidy-files
     `std::bad_alloc`, the policy's `.clang-tidy` doesn't count it as an
     escaping exception (`bugprone-exception-escape`), so such members are
     fine everywhere.
+  - **An optional's value put back in an optional** (`return *number;`
+    from a function that returns `std::optional`) is
+    `bugprone-optional-value-conversion` with libstdc++ only: it passed on
+    macOS and failed on Linux three times in Alfar. Return the optional
+    itself, or build the new one from the value you mean.
+  - **A `std::array`'s iterator kept in a variable:** it is a pointer in
+    libc++ and libstdc++ and a class in the Microsoft library, so `const
+    auto*` didn't compile on Windows, and `readability-qualified-auto`
+    refused `const auto` on macOS. The policy's `.clang-tidy` now stops that
+    check at a type alias (`IgnoreAliasing: false`): write
+    `const auto found = std::ranges::find(table, value);`, which passes on
+    every system. A plain pointer declared with `auto` is still reported.
 
 ## 3. Error handling
 
@@ -566,7 +578,12 @@ discussed and changed in `cpp-policy`. It is never silenced locally.
 The following files define enforcement and must not be weakened in a project:
 
 - `.clang-tidy`, `.clang-format`
-- `CMakePresets.json` and any CMake code that sets compile flags
+- `CMakePresets.json` and any CMake code that sets compile flags or link
+  options (`target_link_options()`, `-Wl,...`). Naming a library or a
+  system framework to link (`target_link_libraries(... "-framework
+  AudioToolbox")`) is not a flag but a dependency: an agent asks the owner
+  before adding one, as for any dependency (1.1), and then writes it. Alfar
+  asked which of the two its two macOS frameworks were.
 - the git hooks in `tools/hooks/`, and any other `tools/` scripts
 - with dependencies, `tools/vcpkg/` (how vcpkg builds them, section 1.1)
 - `AGENTS.md`, agent settings (`.claude/settings.json`)
@@ -637,11 +654,18 @@ Test presets:
 - **A test that times out gets one more run,** in every test preset
   (CTest's `after-timeout`), and the gate's last lines and CI name each test
   that needed it: "timed out and passed on a second run".
-  - *Why:* about one launch in a thousand of Alfar's window tests never
-    starts: the main thread waits inside GLFW's start-up for macOS, seen
-    with the screen locked. A gate launches some 350 of them, so about one
-    gate in four failed at night on a fault in nobody's code, at 20 minutes
-    or more each for an unattended agent.
+  - *Why:* a test that is near its limit on a quiet machine passes it when
+    other work shares the machine: two of Alfar's tests took 21.5 s alone and
+    34 to 65 s at a load of 50 to 70. Such a failure says nothing about the
+    code, and costs an unattended agent 20 minutes or more each time.
+  - It was introduced for a different reason, which turned out wrong: Alfar
+    took a window test that never started for a fault in GLFW's start-up on
+    macOS. It was Alfar's own: a second `glfwInit` in one process, which
+    AppKit doesn't finish. Alfar fixed it in its 0.8.0 (0 hangs in 24,000
+    launches, where there had been 12 in 12,000).
+  - **A test that holds a scratch folder** (13.4) gets its second run only
+    if the killed run's lock is free at once: the lock names the process
+    that holds it, which is gone.
   - *What it costs:* a deadlock that happens only sometimes is also a
     timeout, and now passes on its second run. The line that names it is
     all that shows it. **A test named there more than once is a finding:**
@@ -666,8 +690,15 @@ Test presets:
     ThreadSanitizer watches.
   - A project doesn't choose which test programs run under `tsan`: a
     program left out would be watched by nobody.
-- CTest gets four jobs. Every test still runs alone unless the project calls
+- CTest gets eight jobs. Every test still runs alone unless the project calls
   `cpp_policy_parallel_tests()` (13.2).
+  - *Why eight:* Alfar's 1,152 tests, on the owner's Mac (10 cores, quiet),
+    took 275 and 280 s at four, 197 and 200 s at eight, 184 s at ten; under
+    `tsan`, 1,013 s at four and 628 s at eight. Ten gained 7% over eight and
+    brought the slowest tests nearer their limits (39 of 60 s in `check`).
+  - A preset can say "as many as the machine has cores" only from presets
+    version 11, which needs CMake 4.3; the policy's minimum is 3.29. A runner
+    with fewer than eight cores runs eight anyway, each test more slowly.
 - The `dev` and `check` test presets turn on AddressSanitizer's leak
   detection (`ASAN_OPTIONS=detect_leaks=1`) and apply the policy's
   suppression list for false positives in the OS (section 5). Detection is on
@@ -750,14 +781,36 @@ function table, plus lld-link's ASLR and no-execute defaults
 |---|---|---|
 | Editor (clangd) | While typing | clang-tidy diagnostics, formatting |
 | `tools/hooks/tidy-files` | After editing C++ files, run by whoever edited them (agent or person) | What the gate will say about those files, without the tests: the format, the audit's rules about one file (length, suppressions, `// boundary:`, test-case names) and clang-tidy, a few seconds each. A header is checked through a source that includes it, with that source's flags |
-| Git pre-commit | On commit | Suppression audit, format check, and clang-tidy on the staged C++ files (`tidy-files`); warns when files have unstaged changes, since it checks the working folder |
+| Git pre-commit | On commit | `tidy-files` on the staged files only (the format, the audit's rules about one file, clang-tidy); nothing at all for a commit without a C++ file; warns when a staged file has unstaged changes, since it checks the working folder |
 | Git commit-msg | On commit | The message follows section 8.2 |
 | Git pre-push | On push | The full gate (below); refuses to run with uncommitted changes, so it tests exactly what is pushed |
-| CI (GitHub Actions) | On push | The same gate on Linux, Windows and macOS, through cpp-policy's reusable `gate.yml`, pinned to the same commit as the build (the audit checks it); on GitHub's machines or the owner's own (README) |
+| CI (GitHub Actions) | On push, to any branch | The same gate on Linux, Windows and macOS, through cpp-policy's reusable `gate.yml`, pinned to the same commit as the build (the audit checks it); on GitHub's machines or the owner's own (README) |
 
 The git hooks come from cpp-policy (`tools/hooks/`); projects copy them
 unchanged and enable them once per clone with `git config core.hooksPath
 tools/hooks`. Configuration warns while a clone hasn't done so.
+
+- **The commit hook checks what is committed, and the gate the whole
+  tree.** A half-written file that isn't part of a commit doesn't stop it:
+  in Alfar one did, after eight minutes. A commit of documents alone
+  configures and builds nothing: in a build folder that had fallen behind,
+  a commit of `AGENTS.md` once waited 10 to 25 minutes for vcpkg.
+- **`tidy-files` says how many files it has, then names each one** as
+  clang-tidy starts on it: a run over 36 files in Alfar said nothing for
+  ten minutes. When a `CMakeLists.txt` changed since the last configure, it
+  configures again first, as the build would.
+- **The gate's audit and format check skip drafts:** files git doesn't
+  track that no target compiles. They are named, as not checked. A new
+  source that the build compiles is checked, tracked or not. A half-written
+  file failed the gate twice in Alfar, though nothing compiled it.
+
+**A stage reaches `main` through CI.** A stage ends on a branch of its own,
+which is pushed; CI runs on it, and the stage joins `main` once CI is green
+on every system and the owner has said so. A private repository's branches
+are not published by this. From 2026-10-15 to 11-03, Alfar's agents pushed
+`main` alone, so 190 commits were checked on macOS only; Linux and Windows
+then found six faults in its release commit, `main` held it red for 22
+hours, and its Linux size had grown 21% unmeasured.
 
 In CI, a run that a newer push to the same branch made obsolete is
 cancelled (`gate.yml`): stopped on a branch; on the default branch the run
@@ -771,7 +824,10 @@ push, and a release is tagged on the commit whose run is green
 adds what a machine shared by several unattended agents needs:
 - **One gate at a time on the machine;** a second waits for the first. Four
   agents in four folders ran four gates at once in Alfar: one that takes 5
-  minutes alone took 25.
+  minutes alone took 25. The lock is one per user and machine, for every
+  project and checkout on it; `CPP_POLICY_GATE_LOCK` names another file.
+  CI's jobs don't take it, so on a machine that is also a runner, a CI job
+  and a local gate can run together.
 - **The machine stays awake** (macOS and Linux). A test that sleeps with the
   machine passes its time limit and is reported as failed: Alfar lost about
   2.5 hours to one such gate, and a merge was committed after it.
@@ -792,9 +848,13 @@ adds what a machine shared by several unattended agents needs:
   the push follows: on Alfar that was the same ten minutes twice, minutes
   apart. Any new commit, or a gate that fails, forgets it.
   - The hook is not turned off for a project whose CI runs the gate on the
-    same machine: the hook is what keeps a red commit off a main line that
-    agents push to directly, and CI is the layer that doesn't depend on
-    the agent. What repeats is this second local run, and that is gone.
+    same machine: the hook is what keeps a red commit from being pushed,
+    and CI is the layer that doesn't depend on the agent. What repeats is
+    this second local run, and that is gone. CI's own run on the same Mac
+    stays too: it starts from a clean checkout in a clean folder, so it
+    finds a file never committed or a leftover in a stale build folder,
+    which a local gate can't. The tidy cache (below) should make it cheap;
+    in a real CI job that is not measured yet.
 
 pre-push runs the gate through it.
 
@@ -833,6 +893,33 @@ fault in them shouldn't wait for the compiler), build with clang-tidy, and
 tests under sanitizers. It is the only definition of "passes the policy". Every other
 layer is a faster subset of it.
 
+**The tidy cache.** clang-tidy is two thirds of a check build (Alfar's took
+984 s with it and 325 s without, on a quiet Mac), and a developer's gate and a CI runner on the same
+machine checked the same commit twice. The build runs clang-tidy through
+`cmake/scripts/tidy_cache.cmake`, which remembers each file that passed,
+under a fingerprint of everything clang-tidy reads for it: the program
+(its path, size and date), its options, the policy's configuration, the
+compile command, and the path and contents of every file the compile
+includes, listed by the compiler on each run. A file whose fingerprint has
+passed before isn't checked again; a file with a finding is checked every
+time. The source and build folders are replaced by placeholders, so two
+checkouts of one commit share their entries, except when either folder's
+path matches the configuration's `ExcludeHeaderFilterRegex` (a project
+under an `external/` folder), where clang-tidy would see the headers
+differently.
+- Alfar's check build, on a quiet Mac: 984 s without the cache, 1,006 s
+  filling it, and **361 s in a second folder with it full**, against 325 s
+  with no clang-tidy at all.
+- The cache is one per user and machine: `~/Library/Caches/cpp-policy/tidy`
+  on macOS, `~/.cache/cpp-policy/tidy` on Linux,
+  `%LOCALAPPDATA%\cpp-policy\tidy` on Windows. `CPP_POLICY_TIDY_CACHE`
+  names another folder, or `off`. Entries are empty files; those unused for
+  30 days are removed by a configure, at most once a day.
+- GitHub's own machines start empty each time and gain nothing from it.
+- The self-test `tidy/cache` changes each input in turn and checks that
+  only the files it concerns are checked again, and that a finding fails
+  the build whatever the cache holds.
+
 A passing gate proves the policy on the system that ran it, with that
 system's standard library and headers: libc++ on macOS, libstdc++ on Linux,
 the Microsoft library on Windows. clang-tidy reads each one, and they differ
@@ -859,7 +946,9 @@ every commit there failed before any check ran.
   `revert`. The scope is optional, lower case (`hooks`, `audit`, `server`). A
   `!` before the colon marks a breaking change.
 - A blank line, then a body that says why the change was made. Trailers such
-  as `Co-Authored-By:` don't count as the body.
+  as `Co-Authored-By:` don't count as the body. The body holds the reasons
+  about the change itself; a reason that someone changing the code later
+  will need goes in the code (11.4).
 - Release commits are `chore(release): <version>`.
 - Messages git writes itself pass unchecked: merges, reverts, `fixup!`,
   `squash!` and `amend!`.
@@ -896,7 +985,16 @@ These rules rely on review (and on agents following `AGENTS.md`):
   and after numbers, rely on review
 - How tests are written (section 13.4): test names, labels and skipped
   tests are checked; `REQUIRE` versus `CHECK`, one behavior per test, fakes,
-  no sleeps and testing through public headers rely on review
+  no sleeps, nothing on screen, testing through public headers and real
+  data used by hand rely on review
+- Design (section 15): what something is comes from measurement or data,
+  figures shown to users are measured, one way per problem, a fix for the
+  data at hand says so
+- Documents (sections 11.4 and 11.5): accuracy of every document and of the
+  text a program shows, the options rejected in the changelog, no code for
+  old formats nobody depends on
+- How agents work for the owner (section 9): reviewed by the owner, as
+  `AGENTS.md` states them
 
 Every other rule in section 2, and the function size limits of section 11.3,
 has a sample in `tests/bad/` proving clang-tidy rejects it (one of them in a
@@ -933,6 +1031,38 @@ as `#pragma once` and suppressions, have fixtures in `tests/audit/`.
   settings, and CI runs the gate again on a clean machine. Agent settings are a
   guide, not a security boundary.
 
+**How agents work for the owner.** `AGENTS.md` has a section, "Working for
+the owner", that `upgrade.sh` keeps as the release states it. Its rules
+come from a review of three weeks of Alfar's work with its agents
+(2026-10-24), of every complaint the owner had made more than once:
+- **The project's rules win over an agent's own habits,** and a collision
+  is named to the owner. A project file can't override an agent's safety
+  rules, and doesn't try: the rule is about how to work.
+- **Done only after checking where the result lives,** saying which; an
+  unmeasured cause is a guess; another agent's report is not proof. Alfar's
+  agent once blamed a delay on writing to disk; measured, the write took
+  0.5 ms.
+- **Build, don't operate:** the owner didn't want agents "spending most of
+  the time trying to use the tool instead of developing it".
+- **What must outlive the conversation goes into files:** decisions into
+  `CHANGELOG.md` as they are made, with the options rejected (11.5), and
+  the state of the work into a "Now" section at the top of `ROADMAP.md`. A
+  fresh session with only the files must be able to carry on.
+- **Nothing waits unattended** on a permission prompt or a question.
+- **Delegated work** happens in its own working copy, never in the owner's
+  data, with a commit per step: an Alfar agent that was stopped mid-task
+  left uncommitted work behind, and agents wrote into the owner's projects.
+  It stops at a decision its brief doesn't cover, changes a test only when
+  the test was wrong, and reports what it did, checked, decided and left.
+- **One writer per set of files;** an experiment states its limits before
+  it starts.
+- **A build the owner is testing is frozen.** Alfar's agent twice built
+  changes in the middle of the owner's test.
+- **Nothing joins `main` without the owner's word,** after CI is green on
+  the stage's branch (section 8).
+- **Linking a library or a framework is a dependency,** so the agent asks
+  first; link options are flags, which agents never change (section 6).
+
 ## 10. Versioning
 
 - `cpp-policy` uses semantic versioning. Projects pin the **commit** of a
@@ -942,10 +1072,11 @@ as `#pragma once` and suppressions, have fixtures in `tests/audit/`.
   machine that configures a project.
 - Projects upgrade with `tools/upgrade.sh <tag>` (README, "Upgrading"): it
   moves both pins and the copied policy files together and checks the result.
-  It also brings the release's text on when the gate runs, into the section
-  "Before you say you are done" of `AGENTS.md`, and updates the changelog's
-  `Policy:` line (11.5). The rest of `AGENTS.md` is the project's: lines a
-  project adds to that one section are replaced, so they go elsewhere.
+  It also brings the release's text into `AGENTS.md`, from "## Before you
+  say you are done" up to "## Never" (when the gate runs, and how agents
+  work for the owner), and updates the changelog's `Policy:` line (11.5).
+  The rest of `AGENTS.md` is the project's: lines a project adds inside that
+  part are replaced, so they go elsewhere.
 - The version is defined once, in `project(cpp_policy VERSION ...)` in
   `CMakeLists.txt`. A release commit sets it, adds the release to
   `CHANGELOG.md` (each change with its reason), updates the tag in the
@@ -1121,11 +1252,18 @@ declared. Files directly in `src/` (`main.cpp`) are the top.
 *Enforcement:* the audit fails on any source file over 350 lines (the review
 threshold), outside excluded directories. The target of 250 is left to review.
 
-### 11.4 Comment accuracy
+### 11.4 Comment and document accuracy
 
 - Comments describe the **current** behavior, never its history ("used to",
   "now also").
-- When code changes, related comments change in the same commit.
+- When code changes, related comments change in the same commit, **and so
+  does every document and every text the program shows its users** (its
+  help, its messages). A change of wording isn't finished until a search
+  for the old wording finds nothing. Alfar shipped sentences in its own
+  help that were no longer true.
+- **A reason goes where its reader will look:** in the code when someone
+  changing that code later needs it; in the commit message when it is about
+  the change itself (8.2).
 - Prefer describing meaning over repeating values that live in constants
   ("at most `max_message_bytes`", not "at most 4096 bytes").
 - Temporary behavior is marked with `TODO:` and enough context for someone
@@ -1144,6 +1282,25 @@ Two files record a project's work, each with one job:
 
 The commit that finishes a piece of work also records it in `CHANGELOG.md`
 (under "Unreleased" until the release).
+
+- **A decision is recorded with the options it rejected.** When a change
+  chose between options, its changelog entry names the ones not taken and
+  why; a later entry that reverses it names the entry it replaces. The
+  changelog is dated and only added to, so it is the project's record of
+  decisions: no separate decision log, which would be a third place for
+  reasons beside the changelog and the commits, and go stale. A glossary of
+  the project's own terms is welcome where it has some; it is not required.
+- **Documents written by hand that describe the current state go stale;**
+  the others don't (the changelog is added to, a list a script checks fails
+  loudly). So they are kept few and short, and reread when a stage closes.
+- **No code for old formats nobody depends on.** Until someone outside the
+  project depends on a format (a file, a configuration, a library's
+  interface), there is no code to read its old versions: data in an old
+  format is converted once, with the owner's word, and the old reader is
+  not kept. Alfar had code for presets "made before 0.8.0" when no release
+  had been used by anyone, which the owner called technical debt. The test
+  is who depends on it, not the version number: ToneMatcher's library had
+  a user at 0.9.
 
 **The version is written once,** in `project(<Name> VERSION ...)` in
 `CMakeLists.txt`. A program that prints its version gets it from there, as
@@ -1167,11 +1324,17 @@ in cpp-policy's `CHANGELOG.md`, and git history has every upgrade commit.
 SimpleLocalServer's changelog had about 170 lines of "Upgraded to
 cpp-policy vX" over nine upgrades that changed nothing in `src/`.
 
-`ROADMAP.md` has up to three parts,
+`ROADMAP.md` has up to four parts,
 in this order:
 
 ```markdown
 # Roadmap
+
+## Now
+
+Pairing code: the server prints it; checking it on the device is half done
+(`src/pairing/`), its tests are written. Open: is a code valid for one
+device or for all? Next: the check, then the phone test.
 
 ## 0.4.0 (in progress)
 
@@ -1200,6 +1363,9 @@ in this order:
 - Access from outside the local network: the server is for one home.
 ```
 
+- **"Now"** is the state of the work, rewritten at the end of each stage or
+  session: done, half done, open questions, the next step. A fresh session
+  with only the files must be able to carry on from it (section 9).
 - **A version section** exists while that version is being worked on: a
   one-sentence goal and three lists.
   - **Scope** says what the version delivers, stated as behavior, and each
@@ -1398,7 +1564,10 @@ cpp_policy_confine_includes(zlib.h TO NONE)   # only the library includes it
 
 - **A release, pinned by commit,** with the version in a comment, like
   cpp-policy's own pin (section 10).
-  `sh tools/upgrade.sh --library <name> <tag>` moves it and runs the gate.
+  `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh --library <name>
+  <tag>` moves it and runs the gate: the script is in the build folder's
+  copy of the policy, as for a policy upgrade (section 10); a project has no
+  `tools/upgrade.sh` of its own.
   Moving it by hand is the same change: the commit and the version in its
   comment, one line, and then the gate. The script exists to get the commit
   of a tag right.
@@ -1564,9 +1733,9 @@ cpp_policy_add_tests(integration window SOURCES test_walk.cpp LIBRARIES gui
   cpp_policy_parallel_tests()
   ```
 
-  - Unit and integration tests then run four at a time (the presets' number
-    of jobs). On Alfar, integration tests were 381 of the gate's 389 seconds
-    of tests.
+  - Unit and integration tests then run eight at a time (the presets' number
+    of jobs, section 7). On Alfar, integration tests were 381 of the gate's
+    389 seconds of tests.
   - **Still alone:** benchmarks, whose measures another test would disturb;
     the tests of a `SLOW` program; any test added with `add_test()`; and the
     tests of a program declared `ALONE`, for tests that share something two
@@ -1574,6 +1743,19 @@ cpp_policy_add_tests(integration window SOURCES test_walk.cpp LIBRARIES gui
   - Before turning it on, make each test use a folder and a port of its own,
     or mark its program `ALONE`. Tests that run together also share the
     processors: one that was near its limit alone will pass it.
+- **In the release workflow, a unit program's test cases run in a random
+  order.** They run one after another in one process, so a case that leaves
+  state behind (a `static` inside the code under test) can make a later one
+  fail, or pass, depending on order; "no state shared between test cases"
+  (13.4) can't see state inside the code. In Alfar a test passed alone and
+  failed in the run that way. The order comes from a seed kept in the build
+  folder, chosen at its first configure and printed at every configure:
+  `cpp-policy: unit test cases run in a random order, seed 1234567890`.
+  Configuring with `-DCPP_POLICY_TEST_SEED=<seed>` repeats that order. CI
+  starts from a new folder, so each run has a new seed. The check workflow,
+  which agents run most, keeps the order of the source, so its failures stay
+  easy to read. Integration and benchmark tests run one case per process,
+  where order doesn't matter.
 - **A test that isn't a doctest program** is added with `add_test()`, named
   and labelled the same way. Examples: running the finished program with
   arguments, or a script. Configuration fails for a test without a
@@ -1638,11 +1820,27 @@ Projects add it to `vcpkg.json` like any dependency (section 1.1).
   - No personal or private data, and nothing a licence forbids
     redistributing: the repository may become public, and a library's
     users fetch all of it.
+  - **Where size matters, the data is generated at real size** by the test
+    (as the memory tests of 13.5 do), not kept small for convenience.
+- **Real data is used by hand, never by the gate.** A claim about speed or
+  quality is checked once on real data at real size, by whoever makes it:
+  the figures, and where the data was, go in the commit or the changelog,
+  never the data. Such a run finds its data through an environment
+  variable, and is not a test the gate runs: CI doesn't have the data.
 - **Tests that run several at a time (13.2) share nothing by name.** Each
   test case that writes files uses a folder named after itself or with a
   random name, under the build folder. Two test cases with the same folder
   name pass alone and fail together now and then; a helper that makes these
   folders should refuse one that is already in use.
+  - **Its lock names the process that holds it,** and a lock whose process
+    is gone is free at once. A test killed at its time limit leaves its lock
+    behind; ToneMatcher's helper, which judged locks by age, kept it for 15
+    minutes, so the second run after a timeout (section 7) always failed on
+    it, with a message that named the wrong cause. The gate's own lock
+    works this way.
+- **Tests and checks show nothing on the owner's screen:** no visible
+  window, no sound, no notification. A test that needs a window opens a
+  hidden one.
 - **`REQUIRE` only for what the rest of the test depends on;** `CHECK` for
   everything else, so one run reports every failure. For example,
   `REQUIRE(result.has_value())` comes before `*result`, and
@@ -1712,6 +1910,13 @@ cpp_policy_size_budget(my_tool MACOS 109568 LINUX 93184 WINDOWS 285696)
   it has no LINUX budget (with 5% headroom: M)" after the link, in CI's log
   as well. The owner approves the first numbers like any later one. A
   program that ships has all three.
+- **A development program has no budget, and says so:**
+  `cpp_policy_tool(frame_recorder "records what the window draws in every
+  frame, for its tests")`, after `cpp_policy_apply()`. It is built and
+  checked like the rest and never shipped, and every configure prints its
+  reason. Alfar linked such a program by hand outside the build, where
+  nothing checked it, because nothing said where it belonged. A program with
+  both a budget and this marker fails at configure.
 - **A program that isn't built on a system says `NOT_BUILT` in its place:**
   `cpp_policy_size_budget(my_window MACOS 5308416 LINUX NOT_BUILT WINDOWS
   NOT_BUILT)`. Alfar's window program exists on macOS only, and every
@@ -1850,6 +2055,19 @@ the end (528 MB on 92 images) while its `export` passed its test.
   - The budget is for records, not for content. Memory that grows with the
     size of the inputs (a decoded image, a whole output) is streamed, paged
     or capped, as below, whatever the budget.
+- **A command with one input of any size that must hold all of it** (a
+  mesh, a whole document) has a budget per unit of that input instead: a
+  triangle, a pixel, a line. Its test runs the command on S units, then on
+  5S, and the second reading is at most the first plus 4S × the budget.
+  The unit and its budget are named constants in the test. There is no
+  default, since a byte per pixel and a kilobyte per triangle are both
+  reasonable: each budget is approved by the owner, with a line in
+  `CHANGELOG.md`, like the ones above. Alfar's `alfar model` keeps 768
+  bytes per triangle, and had no rule to measure it against.
+- **Trying a memory test while writing it:** `peak_heap_bytes()` measures
+  nothing in the check build, whose sanitizers replace the allocator. Build
+  and run the one test in the release build: `cmake --preset release`,
+  `cmake --build --preset release`, `ctest --preset release -R "<test>"`.
 - **Why not the operating system's peak:** it depends on what the allocator
   did with freed blocks, and that depends on timing. A program that
   allocates and frees six 1 MB buffers per round, with no leak, measured on
@@ -2164,3 +2382,28 @@ is what a user can do; and the frontends, which only present it.
 
 *Enforcement:* the `struct`/`class` split by clang-tidy; the rest relies on
 review (section 8.1).
+
+### 15.7 Decisions in code
+
+Four rules from Alfar's review of its first three weeks (2026-10-24), each
+about code that worked where it was written and failed later:
+
+- **What something is comes from measuring it, or from data that says
+  so,** never from its name, its number or its position. Code doesn't
+  decide that a photo shows an object because the file is called
+  `object-13`: logic tied to names works in the project it was written for
+  and silently gives wrong results in the next. A configuration that says
+  "this file is the sky" is data, and code may act on it. Names are what
+  the user sees.
+- **A figure shown to users that depends on the machine** (a time, a speed,
+  an estimate) **is measured at run time, or not shown.** Alfar showed a
+  time estimate that was a constant. Constants inside the code, such as the
+  test limits of section 7, are not concerned.
+- **One way per problem:** before adding a second mechanism for something,
+  reuse the first, or replace it in the same piece of work. Section 11.2 is
+  the same rule for helpers.
+- **A fix that works only for the data at hand says so,** in a `TODO:` with
+  enough context (11.4) and in `ROADMAP.md`, so that a general solution is
+  owed rather than assumed.
+
+*Enforcement:* review (section 8.1).

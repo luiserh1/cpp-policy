@@ -5,7 +5,8 @@
 #
 # - configure warns while core.hooksPath is not set, and stops warning once it is;
 # - pre-push runs the gate on a clean working folder and refuses a dirty one;
-# - pre-commit warns about unstaged changes and still runs its checks;
+# - pre-commit checks the staged files only, and warns about a staged file with unstaged
+#   changes;
 # - commit-msg accepts and rejects messages by its rules.
 # On Windows the scripts run under the sh of Git for Windows, as git runs them there.
 # A stub `cmake` on PATH stands in for the real gate, so only the hooks' own logic runs.
@@ -123,22 +124,47 @@ run(${with_stub} tools/hooks/pre-push)
 string(FIND "${out}" "uncommitted changes" found)
 expect("NOT;code;EQUAL;0;AND;found;GREATER;-1" "pre-push must refuse a working folder with uncommitted changes")
 
+# pre-commit hands the staged files to tidy-files, a stub here, and nothing else: a changed
+# file that isn't staged is neither checked nor named.
+file(READ "${repo}/tools/hooks/tidy-files" tidy_files)
+file(WRITE "${repo}/tools/hooks/tidy-files" "#!/bin/sh\necho \"stub tidy-files $*\"\n")
 run(${with_stub} tools/hooks/pre-commit)
+string(FIND "${out}" "stub tidy-files" checked)
+string(FIND "${out}" "tracked.txt" named)
+expect("code;EQUAL;0;AND;checked;EQUAL;-1;AND;named;EQUAL;-1"
+    "pre-commit with nothing staged must check nothing and name no unstaged file")
+file(WRITE "${repo}/notes.txt" "a document\n")
+run("${GIT_EXECUTABLE}" add notes.txt)
+run(${with_stub} tools/hooks/pre-commit)
+string(FIND "${out}" "stub" ran)
+expect("code;EQUAL;0;AND;ran;EQUAL;-1"
+    "pre-commit with no C++ file staged must run neither tidy-files nor cmake")
+run("${GIT_EXECUTABLE}" reset --quiet -- notes.txt)
+file(REMOVE "${repo}/notes.txt")
+file(WRITE "${repo}/staged.cpp" "first\n")
+run("${GIT_EXECUTABLE}" add staged.cpp)
+run(${with_stub} tools/hooks/pre-commit)
+string(FIND "${out}" "stub tidy-files staged.cpp" checked)
+string(FIND "${out}" "tracked.txt" named)
 string(FIND "${out}" "unstaged changes" warned)
-string(FIND "${out}" "stub cmake --build --preset ${preset} " checked)
-expect("code;EQUAL;0;AND;warned;GREATER;-1;AND;checked;GREATER;-1"
-    "pre-commit must warn about unstaged changes and still run its checks")
+expect("code;EQUAL;0;AND;checked;GREATER;-1;AND;named;EQUAL;-1;AND;warned;EQUAL;-1"
+    "pre-commit must check the staged file only, without a warning")
+file(WRITE "${repo}/staged.cpp" "second\n")
+run(${with_stub} tools/hooks/pre-commit)
+string(FIND "${out}" "unstaged changes too" warned)
+string(FIND "${out}" "  staged.cpp" named)
+expect("code;EQUAL;0;AND;warned;GREATER;-1;AND;named;GREATER;-1"
+    "pre-commit must name a staged file that has unstaged changes too")
+run("${GIT_EXECUTABLE}" reset --quiet -- staged.cpp)
+file(REMOVE "${repo}/staged.cpp")
+file(WRITE "${repo}/tools/hooks/tidy-files" "${tidy_files}")
 
-# Under Git for Windows, uname reports MINGW64_NT-...; both hooks must then use the
-# win-check preset, which the `check` preset's condition disables there. A stub uname
+# Under Git for Windows, uname reports MINGW64_NT-...; pre-push and the gate must then use
+# the win-check preset, which the `check` preset's condition disables there. A stub uname
 # stands in for that shell, so the case is covered on every platform; on Windows the runs
 # above already had the real one.
 file(WRITE "${WORK}/stub/uname" "#!/bin/sh\necho MINGW64_NT-10.0-19045\n")
 file(CHMOD "${WORK}/stub/uname" PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE)
-run(${with_stub} tools/hooks/pre-commit)
-string(FIND "${out}" "stub cmake --build --preset win-check " checked)
-expect("code;EQUAL;0;AND;checked;GREATER;-1"
-    "pre-commit must use the win-check preset under Git for Windows")
 run("${GIT_EXECUTABLE}" checkout -- tracked.txt)
 run(${with_stub} tools/hooks/pre-push)
 string(FIND "${out}" "stub cmake --workflow --preset win-check" found)
@@ -206,11 +232,15 @@ string(FIND "${out}" "VCPKG_ROOT is not set" found)
 string(FIND "${out}" "stub cmake" started)
 expect("code;EQUAL;2;AND;found;GREATER;-1;AND;started;EQUAL;-1"
     "without VCPKG_ROOT the gate must stop before the workflow and name the variable")
+file(WRITE "${repo}/code.cpp" "int main() {}\n")
+run("${GIT_EXECUTABLE}" add vcpkg.json code.cpp)
 run(${with_stub} tools/hooks/pre-commit)
 string(FIND "${out}" "VCPKG_ROOT is not set" found)
 string(FIND "${out}" "stub cmake" started)
 expect("code;EQUAL;2;AND;found;GREATER;-1;AND;started;EQUAL;-1"
     "without VCPKG_ROOT pre-commit must stop before its checks and name the variable")
+run("${GIT_EXECUTABLE}" reset --quiet -- vcpkg.json code.cpp)
+file(REMOVE "${repo}/code.cpp")
 set(ENV{VCPKG_ROOT} "${WORK}")
 run(${with_stub} tools/hooks/gate)
 string(FIND "${out}" "gate: passed" found)

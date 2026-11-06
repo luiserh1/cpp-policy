@@ -62,6 +62,11 @@ CheckOptions:
   # node containers allocate when moved, so without this every class holding a std::map is
   # reported on Windows only. The name must be unqualified: qualified forms don't match.
   bugprone-exception-escape.IgnoredExceptions: 'bad_array_new_length'
+  # A std::array's iterator is a pointer in libc++ and libstdc++ and a class in MSVC's library,
+  # so `const auto*` didn't compile on Windows and `const auto` was refused here (Alfar). The
+  # check now stops at a type alias such as std::array<T, N>::const_iterator: `const auto`
+  # passes on every system, and a plain pointer declared with auto is still reported.
+  readability-qualified-auto.IgnoreAliasing: false
   # Ignoring an error-carrying return value is a bug.
   bugprone-unused-return-value.CheckedReturnTypes: '::std::error_code;::std::error_condition;::std::errc;::std::expected'
   # Function size (POLICY.md 11.3); cognitive complexity keeps its default of 25. Code inside

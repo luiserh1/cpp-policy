@@ -7,7 +7,8 @@
 # - a finding in a header fails it, and names the file;
 # - third-party code (a nested third_party/) is skipped, as clang-tidy's header filter does;
 # - a source the build doesn't compile (another platform's) is skipped with a note;
-# - pre-commit fails while a file with findings is staged, and passes once it isn't.
+# - pre-commit fails while a file with findings is staged, and passes once it isn't;
+# - the gate's audit and format check skip a draft (untracked, compiled by nothing).
 
 cmake_minimum_required(VERSION 3.29)
 find_package(Git REQUIRED)
@@ -167,5 +168,19 @@ expect("code;EQUAL;0" "pre-commit must pass once bad.hpp isn't staged")
 expect_output("tidy-files: OK (3 files)" "pre-commit must run tidy-files on the staged files")
 string(FIND "${out}" "does not refer to an existing path" split)
 expect("split;EQUAL;-1" "a staged name with a space must not be split")
+
+# The gate's audit and format check leave drafts alone: a file git doesn't track and nothing
+# compiles. Once it is tracked, they check it.
+file(WRITE "${project}/src/app/draft.cpp"
+    "int   half_written( ) {\n    try { return 1; } catch (...) { return 0; }\n}\n")
+run(cmake --build --preset check --target policy-audit policy-format-check)
+expect("code;EQUAL;0" "an untracked draft that nothing compiles must not fail the gate's checks")
+expect_output("as drafts" "the draft must be named as not checked")
+expect_output("src/app/draft.cpp" "the draft must be named")
+run(${git} add src/app/draft.cpp)
+run(cmake --build --preset check --target policy-audit)
+expect("NOT;code;EQUAL;0" "a tracked file must be audited even when nothing compiles it")
+run(${git} rm --cached --quiet src/app/draft.cpp)
+file(REMOVE "${project}/src/app/draft.cpp")
 
 message("tidy_files: OK")

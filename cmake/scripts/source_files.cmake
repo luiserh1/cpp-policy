@@ -55,6 +55,55 @@ function(cpp_policy_collect_sources root excluded out)
     set(${out} "${result}" PARENT_SCOPE)
 endfunction()
 
+# Drops the drafts from `files` (relative to `root`): files git doesn't track that no target of
+# the build in `build_dir` compiles. An agent's half-written file failed the gate's audit and
+# format check twice in Alfar, though nothing compiled it. A new source the build compiles is
+# kept, tracked or not; outside a git checkout nothing is dropped. Names what it dropped.
+function(cpp_policy_drop_drafts root build_dir files out)
+    set(${out} "${files}" PARENT_SCOPE)
+    find_program(CPP_POLICY_GIT git)
+    if(NOT CPP_POLICY_GIT OR NOT EXISTS "${build_dir}/compile_commands.json")
+        return()
+    endif()
+    execute_process(COMMAND "${CPP_POLICY_GIT}" -c core.quotePath=false ls-files --others
+                            --exclude-standard
+        WORKING_DIRECTORY "${root}" RESULT_VARIABLE failed OUTPUT_VARIABLE untracked
+        ERROR_QUIET)
+    if(failed OR untracked STREQUAL "")
+        return()
+    endif()
+    string(REPLACE "\n" ";" untracked "${untracked}")
+    file(READ "${build_dir}/compile_commands.json" database)
+    string(JSON entries LENGTH "${database}")
+    set(compiled "")
+    if(entries GREATER 0)
+        math(EXPR last "${entries} - 1")
+        foreach(index RANGE ${last})
+            string(JSON path GET "${database}" ${index} file)
+            if(EXISTS "${path}")
+                file(REAL_PATH "${path}" path)
+                list(APPEND compiled "${path}")
+            endif()
+        endforeach()
+    endif()
+    set(kept "")
+    set(dropped "")
+    file(REAL_PATH "${root}" real_root)
+    foreach(file IN LISTS files)
+        if(file IN_LIST untracked AND NOT "${real_root}/${file}" IN_LIST compiled)
+            list(APPEND dropped "${file}")
+        else()
+            list(APPEND kept "${file}")
+        endif()
+    endforeach()
+    if(dropped)
+        list(JOIN dropped ", " names)
+        message("cpp-policy: not checked, as drafts (git doesn't track them and nothing "
+                "compiles them): ${names}")
+    endif()
+    set(${out} "${kept}" PARENT_SCOPE)
+endfunction()
+
 # Reads a file as a list of lines. Characters that CMake lists treat specially
 # (";", "[", "]", "\") are replaced by placeholders so line numbers stay exact.
 function(cpp_policy_read_lines path out)

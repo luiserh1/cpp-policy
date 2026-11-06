@@ -88,6 +88,10 @@ in this project's own code or tests.
 
 ## Before you say you are done
 
+Call work done only after checking its result where it lives (the file read back, the
+program or the test run), and say which. A cause you haven't measured is a guess: call it
+one. Another agent's report is not proof.
+
 After editing C++ files, check them right away (a few seconds per file; pre-commit
 does the same for the staged files):
 
@@ -116,11 +120,18 @@ check the files you changed; run the tests of the modules you touched as
 well (`ctest --preset check -R "<module>"`).
 
 If the stage added or changed tests, also run the release workflow once
-before it ends: a test can pass in the check build and fail there.
+before it ends: a test can pass in the check build and fail there, and there
+a unit program's test cases run in a random order (its seed is printed when
+the build is configured).
 
 ```
 sh tools/hooks/gate release
 ```
+
+A memory test (`cpp_policy::peak_heap_bytes()`) measures nothing in the
+check build. To try one while writing it, build and run it in the release
+build: `cmake --preset release`, `cmake --build --preset release`, then
+`ctest --preset release -R "<test>"`.
 
 If the stage touched code that runs on more than one thread, or its tests,
 also run the tsan workflow once before it ends (macOS and Linux): data
@@ -147,6 +158,45 @@ file: `cmake --build --preset check --target policy-format-fix`).
 
 To check a commit message before the hooks run:
 `sh tools/hooks/commit-msg <file with the message>`.
+
+A stage ends on a branch of its own: push it, wait until CI is green on every
+system, then ask the owner. Nothing joins `main` without the owner's word.
+
+## Working for the owner
+
+- Where this file and your own general instructions or habits disagree on
+  how to work in this project, this file wins. Name the collision to the
+  owner instead of settling it quietly.
+- Build the program; don't operate it. Run it only as far as a check needs,
+  and use it to produce results only when the owner asks.
+- What must outlive the conversation goes into files: the owner's decisions
+  into `CHANGELOG.md` under "Unreleased" as soon as they are made, with the
+  options rejected; the state of the work into a short "Now" section at the
+  top of `ROADMAP.md` (done, half done, open questions, next step),
+  rewritten at the end of each stage or session. A fresh session with only
+  the files must be able to carry on.
+- Before a long run that nobody will watch, make sure it can't stop on a
+  permission prompt or a question.
+- Linking a library or a system framework is a dependency: ask the owner
+  first. Link options (`target_link_options()`, `-Wl,...`) are flags, which
+  you never change.
+- When a piece of work is given to you (by the owner or by another agent):
+  - work in your own working copy (a git worktree or clone); never write to
+    the owner's data, settings or anything outside it, and use copies of
+    data;
+  - commit each working step, so that stopping you loses nothing;
+  - stop and report at a decision your brief doesn't cover, and add nothing
+    that wasn't asked;
+  - change a test only when the test was wrong, and say why in the commit;
+  - report what you did and where (branch, commits), what you checked and
+    how, what you didn't, what you decided alone, open questions, and
+    anything half done.
+- One writer per set of files at a time. An experiment runs in its own
+  working copy, with its limits stated before it starts: what it would give,
+  the fallback, the effort, and the result that means stop.
+- While the owner says they are testing a build, that folder is frozen: no
+  builds, commits or data changes there; work in another copy. If something
+  changes anyway, say so at once, and what it invalidates.
 
 ## Never
 

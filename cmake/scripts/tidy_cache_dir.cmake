@@ -1,0 +1,20 @@
+# Where the tidy cache is (POLICY.md 8), for tidy_cache.cmake and for CppPolicy.cmake, which
+# prunes it: CPP_POLICY_TIDY_CACHE when set ("off" turns the cache off), or else a folder in
+# the user's cache, one per user and machine, shared by every checkout on it.
+function(cpp_policy_tidy_cache_dir out)
+    if(DEFINED ENV{CPP_POLICY_TIDY_CACHE})
+        set(dir "$ENV{CPP_POLICY_TIDY_CACHE}")
+    elseif(CMAKE_HOST_APPLE)
+        set(dir "$ENV{HOME}/Library/Caches/cpp-policy/tidy")
+    elseif(CMAKE_HOST_WIN32)
+        set(dir "$ENV{LOCALAPPDATA}/cpp-policy/tidy")
+    elseif(DEFINED ENV{XDG_CACHE_HOME})
+        set(dir "$ENV{XDG_CACHE_HOME}/cpp-policy/tidy")
+    else()
+        set(dir "$ENV{HOME}/.cache/cpp-policy/tidy")
+    endif()
+    if(NOT dir STREQUAL "off")
+        file(TO_CMAKE_PATH "${dir}" dir)
+    endif()
+    set(${out} "${dir}" PARENT_SCOPE)
+endfunction()

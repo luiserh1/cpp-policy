@@ -1,24 +1,36 @@
 #!/bin/sh
-# cpp-policy pre-commit hook: suppression audit, format check and clang-tidy on the staged C++
-# files (POLICY.md 8).
+# cpp-policy pre-commit hook: the format, the audit's rules about one file and clang-tidy, on
+# the staged files only (POLICY.md 8). The whole tree is the gate's: a half-written file that
+# isn't part of the commit doesn't stop it (in Alfar, one did after eight minutes).
 # Copy unchanged into the project's tools/hooks/ and enable once per clone with:
 #   git config core.hooksPath tools/hooks
 set -e
 
-# The checks read the files on disk, but git commits the staged version. Say so
-# when the two differ, so a pass or failure isn't mistaken for the commit's.
-unstaged=$(git diff --name-only)
-if [ -n "$unstaged" ]; then
-    echo "pre-commit: warning: checking the working folder; these files have unstaged changes:"
-    echo "$unstaged" | sed 's/^/  /'
+# Deleted files aren't listed. quotePath off: git would otherwise write a name with special
+# characters in quotes.
+staged=$(git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMR)
+if [ -z "$staged" ]; then
+    exit 0
 fi
 
-# The check presets are per platform: `check` is disabled on Windows (Git for
-# Windows runs hooks with its own sh, where uname reports MINGW or MSYS).
-case "$(uname -s)" in
-    MINGW*|MSYS*|CYGWIN*) preset=win-check ;;
-    *) preset=check ;;
-esac
+# The checks read the files on disk, but git commits the staged version. Say so for a staged
+# file that has unstaged changes too, so a pass or failure isn't mistaken for the commit's.
+both=$(git -c core.quotePath=false diff --name-only | STAGED=$staged awk '
+    BEGIN { n = split(ENVIRON["STAGED"], names, "\n"); for (i = 1; i <= n; i++) staged[names[i]] = 1 }
+    $0 in staged')
+if [ -n "$both" ]; then
+    echo "pre-commit: warning: these staged files have unstaged changes too; their working"
+    echo "pre-commit: version is the one checked:"
+    echo "$both" | sed 's/^/  /'
+fi
+
+# A commit with no C++ file (a document, a CMakeLists.txt) has nothing for tidy-files, and
+# doesn't configure or build anything: in a build folder that fell behind, that once took 10
+# to 25 minutes before a commit of AGENTS.md alone.
+if ! printf '%s\n' "$staged" | grep -Eq '\.(cpp|cc|cxx|h|hpp|hh|hxx|ipp|ixx|cppm)$'; then
+    exit 0
+fi
+
 # A project with a vcpkg.json can't configure without VCPKG_ROOT, and a change to
 # CMakeLists.txt configures again: said here, since ninja's own message doesn't name it.
 if [ -f vcpkg.json ] && [ -z "${VCPKG_ROOT:-}" ]; then
@@ -26,20 +38,12 @@ if [ -f vcpkg.json ] && [ -z "${VCPKG_ROOT:-}" ]; then
     echo "pre-commit: (VCPKG_ROOT=<vcpkg folder> git commit ...)" >&2
     exit 2
 fi
-if [ ! -f "build/$preset/CMakeCache.txt" ]; then
-    cmake --preset "$preset" >/dev/null
-fi
-cmake --build --preset "$preset" --target policy-audit policy-format-check
 
-# clang-tidy on the staged files (tidy-files skips those that aren't C++), so findings turn up
-# at each commit rather than all at once at the gate. Deleted files aren't listed.
-# quotePath off: git would otherwise write a name with special characters in quotes.
-staged=$(git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMR)
-if [ -n "$staged" ]; then
-    # One name per line, split only there and without expanding wildcards: source files have
-    # no spaces (POLICY.md 2.7), but a test asset may.
-    IFS='
+# tidy-files checks what the gate checks about each file (it skips those that aren't C++), so
+# findings turn up at each commit rather than all at once at the gate. One name per line,
+# split only there and without expanding wildcards: source files have no spaces (POLICY.md
+# 2.7), but a test asset may.
+IFS='
 '
-    set -f
-    sh tools/hooks/tidy-files $staged
-fi
+set -f
+sh tools/hooks/tidy-files $staged

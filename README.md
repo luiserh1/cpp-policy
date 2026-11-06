@@ -9,7 +9,7 @@ The rules are in [POLICY.md](POLICY.md).
 From a clone of cpp-policy checked out at the release you want:
 
 ```
-git -C cpp-policy checkout v0.40.0
+git -C cpp-policy checkout v0.41.0
 sh cpp-policy/tools/new-project.sh ~/code/MyTool MyTool            # VCPKG_ROOT must be set
 cd ~/code/MyTool && sh tools/hooks/gate
 ```
@@ -40,7 +40,7 @@ can't ship a template that fails its own policy.
 include(FetchContent)
 FetchContent_Declare(cpp_policy
     GIT_REPOSITORY https://github.com/luiserh1/cpp-policy.git
-    GIT_TAG        <commit>)   # v0.40.0, the latest release; see CHANGELOG.md
+    GIT_TAG        <commit>)   # v0.41.0, the latest release; see CHANGELOG.md
 FetchContent_MakeAvailable(cpp_policy)
 
 add_library(app_core STATIC src/model/board.cpp)
@@ -77,7 +77,7 @@ and this repository's CMake code runs on every machine that configures the
 project (POLICY.md 10). The commit is the line ending in `^{}`:
 
 ```
-git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.40.0*'
+git ls-remote https://github.com/luiserh1/cpp-policy 'refs/tags/v0.41.0*'
 ```
 
 Don't add `GIT_SHALLOW`: it only works with branch and tag names.
@@ -87,7 +87,7 @@ Don't add `GIT_SHALLOW`: it only works with branch and tag names.
 From the project's root, with a clean working folder:
 
 ```
-sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.40.0
+sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.41.0
 ```
 
 Any copy of this repository's `tools/upgrade.sh` works (from v0.10.1 on): it
@@ -162,7 +162,7 @@ permissions:
   contents: read
 jobs:
   gate:
-    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@<commit> # v0.40.0
+    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@<commit> # v0.41.0
     with:
       systems: '["linux", "windows", "macos"]'
       vcpkg: true          # if the project has a vcpkg.json
@@ -230,6 +230,21 @@ one repository):
 The repository's Settings, Actions, Runners then shows it as Idle. To remove
 it: `./svc.sh uninstall`, then `./config.sh remove` with the token GitHub shows.
 
+**A runner that shares its machine with local builds needs more time.** A
+job is stopped after 45 minutes. Alfar's macOS check job took 22 minutes
+alone, and was stopped at 45 while a local build ran beside it. Give it more
+in the project's workflow, under `with:`:
+
+```yaml
+      timeout_minutes: 90
+```
+
+On such a machine, CI and your local gates share the tidy cache (POLICY.md
+8), so a CI check job on a commit your gate has just checked can skip
+clang-tidy for the files it finds there. Between two local folders of
+Alfar's, that took a check build from 984 s to 361 s; in a real CI job it
+hasn't been measured yet.
+
 ## Options (set by presets)
 
 | Option | Default | Meaning |
@@ -241,6 +256,11 @@ it: `./svc.sh uninstall`, then `./config.sh remove` with the token GitHub shows.
 | `CPP_POLICY_EXCEPTIONS` | `ON` | Exceptions and RTTI |
 | `CPP_POLICY_CONFINED_DIRS` | `src/lowlevel` | Where suppressions are allowed |
 | `CPP_POLICY_EXCLUDED_DIRS` | `build;out;.git;third_party;external;vcpkg_installed` | Skipped by audit/format |
+| `CPP_POLICY_RANDOM_TEST_ORDER` | `OFF` (`ON` in the release presets) | A unit program's test cases run in a random order (POLICY.md 13.2) |
+| `CPP_POLICY_TEST_SEED` | chosen at the first configure | The seed of that order; set it to repeat one |
+
+Environment variables: `CPP_POLICY_TIDY_CACHE` (the tidy cache's folder, or
+`off`; POLICY.md 8) and `CPP_POLICY_GATE_LOCK` (the gate's lock file).
 
 ## Requirements
 

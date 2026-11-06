@@ -28,6 +28,26 @@ set(CPP_POLICY_CONFINED_DIRS "src/lowlevel" CACHE STRING
     "Directories (relative to the project root) where suppressions and low-level code are allowed")
 set(CPP_POLICY_EXCLUDED_DIRS "build;out;.git;third_party;external;vcpkg_installed" CACHE STRING
     "Directories (relative to the project root) that the audit and format checks skip")
+# The release presets turn it on (POLICY.md 13.2): a unit program's test cases run in a random
+# order, from a seed kept in the build folder, so that state one case leaves behind for the
+# next shows. Configuring with -DCPP_POLICY_TEST_SEED=<seed> repeats an order.
+option(CPP_POLICY_RANDOM_TEST_ORDER "Run each unit program's test cases in a random order" OFF)
+set(CPP_POLICY_TEST_SEED "" CACHE STRING "The seed of the random test order (empty: a new one)")
+if(CPP_POLICY_RANDOM_TEST_ORDER)
+    if(CPP_POLICY_TEST_SEED STREQUAL "")
+        string(RANDOM LENGTH 9 ALPHABET 0123456789 seed)
+        string(REGEX REPLACE "^0+" "" seed "1${seed}")
+        set(CPP_POLICY_TEST_SEED "${seed}" CACHE STRING
+            "The seed of the random test order (empty: a new one)" FORCE)
+    endif()
+    if(NOT CPP_POLICY_TEST_SEED MATCHES "^[0-9]+$")
+        message(FATAL_ERROR "cpp-policy: CPP_POLICY_TEST_SEED must be a number "
+            "('${CPP_POLICY_TEST_SEED}')")
+    endif()
+    message(NOTICE "cpp-policy: unit test cases run in a random order, seed "
+        "${CPP_POLICY_TEST_SEED}; configure with -DCPP_POLICY_TEST_SEED=${CPP_POLICY_TEST_SEED} "
+        "to repeat it (POLICY.md 13.2)")
+endif()
 set(CPP_POLICY_TSAN_TIME_FACTOR 3 CACHE INTERNAL
     "A test's time limit in the tsan build is this many times its limit elsewhere (POLICY.md 7)")
 set(CPP_POLICY_TEST_KINDS unit integration benchmark CACHE INTERNAL "Test kinds (POLICY.md 13)")
@@ -279,13 +299,44 @@ function(cpp_policy_apply target)
 endfunction()
 
 # clang-tidy as the build runs it: through tidy_cache.cmake, which skips a file that passed
-# with the same inputs.
+# with the same inputs (POLICY.md 8). On a Mac where a developer's gate and a CI runner check
+# the same commit, CI's check build of Alfar took 361 s instead of 984 s; filling the cache
+# cost 2%.
 function(_cpp_policy_tidy_command out)
     _cpp_policy_tidy_config(config)
     set(command "${CMAKE_COMMAND}" -P "${CPP_POLICY_ROOT}/cmake/scripts/tidy_cache.cmake" --
         "${CMAKE_SOURCE_DIR}" "${CMAKE_BINARY_DIR}" "${CPP_POLICY_CLANG_TIDY_EXE}"
         "--config-file=${config}")
     set(${out} "${command}" PARENT_SCOPE)
+endfunction()
+
+# Entries of the tidy cache unused for 30 days are removed, at most once a day, by whichever
+# configure comes first.
+function(_cpp_policy_prune_tidy_cache)
+    include("${CPP_POLICY_ROOT}/cmake/scripts/tidy_cache_dir.cmake")
+    cpp_policy_tidy_cache_dir(cache)
+    if(cache STREQUAL "off" OR NOT IS_DIRECTORY "${cache}")
+        return()
+    endif()
+    string(TIMESTAMP now "%s" UTC)
+    set(stamp "${cache}/pruned")
+    if(EXISTS "${stamp}")
+        file(TIMESTAMP "${stamp}" pruned "%s" UTC)
+        math(EXPR age "${now} - ${pruned}")
+        if(age LESS 86400)
+            return()
+        endif()
+    endif()
+    file(TOUCH "${stamp}")
+    file(GLOB entries "${cache}/??/*" "${cache}/tmp/*")
+    foreach(entry IN LISTS entries)
+        file(TIMESTAMP "${entry}" used "%s" UTC)
+        math(EXPR age "${now} - ${used}")
+        string(FIND "${entry}" "${cache}/tmp/" scratch)
+        if(age GREATER 2592000 OR (scratch EQUAL 0 AND age GREATER 86400))
+            file(REMOVE "${entry}")
+        endif()
+    endforeach()
 endfunction()
 
 # The policy's .clang-tidy as clang-tidy reads it: a copy in the build folder, named after a
@@ -1362,6 +1413,10 @@ function(cpp_policy_add_tests kind module)
         return()
     endif()
 
+    set(order_seed "")
+    if(CPP_POLICY_RANDOM_TEST_ORDER)
+        set(order_seed "${CPP_POLICY_TEST_SEED}")
+    endif()
     # Registered after cpp_policy_apply(): on Windows, its post-build step copies the ASan
     # runtime that the program needs to list its tests.
     set(ctest_file "${CMAKE_CURRENT_BINARY_DIR}/${target}_tests.cmake")
@@ -1369,7 +1424,7 @@ function(cpp_policy_add_tests kind module)
         BYPRODUCTS "${ctest_file}"
         COMMAND "${CMAKE_COMMAND}" "-DEXECUTABLE=$<TARGET_FILE:${target}>" "-DKIND=${kind}"
                 "-DMODULE=${module}" "-DTIMEOUT=${timeout}" "-DSERIAL=${serial}"
-                "-DENVIRONMENT=${arg_ENVIRONMENT}"
+                "-DENVIRONMENT=${arg_ENVIRONMENT}" "-DSEED=${order_seed}"
                 "-DWORKING_DIR=${CMAKE_CURRENT_BINARY_DIR}" "-DCTEST_FILE=${ctest_file}"
                 -P "${CPP_POLICY_ROOT}/cmake/scripts/doctest_tests.cmake"
         COMMENT "cpp-policy: registering the tests of ${target}"
@@ -1422,6 +1477,43 @@ function(cpp_policy_test_support)
 endfunction()
 
 # ---------------------------------------------------------------------------
+# A development program (POLICY.md 13.5): built and checked like the rest, never shipped, so
+# it has no size budget. The reason is printed at every configure, like the policy's other
+# exceptions.
+#   cpp_policy_tool(frame_recorder "records what the window draws in every frame, for tests")
+# Alfar linked such a program by hand outside the build, where nothing checked it, not knowing
+# where it belonged.
+# ---------------------------------------------------------------------------
+function(cpp_policy_tool target)
+    if(NOT ARGC EQUAL 2 OR NOT TARGET ${target})
+        message(FATAL_ERROR "cpp-policy: usage: cpp_policy_tool(<program target> "
+            "\"<what it is for>\")")
+    endif()
+    set(reason "${ARGV1}")
+    get_target_property(type ${target} TYPE)
+    get_target_property(applied ${target} CPP_POLICY_APPLIED)
+    get_target_property(budget ${target} CPP_POLICY_SIZE_BUDGET)
+    if(NOT type STREQUAL "EXECUTABLE")
+        message(FATAL_ERROR "cpp-policy: cpp_policy_tool(): '${target}' isn't a program")
+    elseif(NOT applied)
+        message(FATAL_ERROR "cpp-policy: cpp_policy_tool(${target}) comes after "
+            "cpp_policy_apply(${target})")
+    elseif(budget)
+        message(FATAL_ERROR "cpp-policy: '${target}' has a size budget, which is for a "
+            "program that ships; a development program has none")
+    endif()
+    string(STRIP "${reason}" stripped)
+    string(LENGTH "${stripped}" length)
+    if(length LESS 10)
+        message(FATAL_ERROR "cpp-policy: cpp_policy_tool(${target}) needs its reason: what "
+            "the program is for, in a few words ('${reason}')")
+    endif()
+    set_target_properties(${target} PROPERTIES CPP_POLICY_TOOL "${reason}")
+    message(NOTICE "cpp-policy: '${target}' is a development program, not shipped, with no "
+        "size budget: ${reason}")
+endfunction()
+
+# ---------------------------------------------------------------------------
 # Size budgets (POLICY.md 13.5): the most a program may weigh, stripped, on each system.
 #   cpp_policy_size_budget(my_tool MACOS 109568 LINUX 93184 WINDOWS 285696)
 # In Release builds without sanitizers it adds the test benchmark/size/<program>, which
@@ -1440,9 +1532,14 @@ function(cpp_policy_size_budget target)
             "[MACOS <bytes>|NOT_BUILT] [LINUX <bytes>|NOT_BUILT] [WINDOWS <bytes>|NOT_BUILT])")
     endif()
     get_target_property(type ${target} TYPE)
+    get_target_property(tool ${target} CPP_POLICY_TOOL)
     if(NOT type STREQUAL "EXECUTABLE")
         message(FATAL_ERROR "cpp-policy: cpp_policy_size_budget(): '${target}' isn't a program")
+    elseif(tool)
+        message(FATAL_ERROR "cpp-policy: '${target}' is a development program "
+            "(cpp_policy_tool), which has no size budget")
     endif()
+    set_target_properties(${target} PROPERTIES CPP_POLICY_SIZE_BUDGET TRUE)
     if(APPLE)
         set(system MACOS)
     elseif(WIN32)
@@ -1508,6 +1605,9 @@ function(cpp_policy_add_checks)
         return()
     endif()
     cmake_language(DEFER DIRECTORY "${CMAKE_SOURCE_DIR}" CALL _cpp_policy_verify_targets)
+    if(CPP_POLICY_CLANG_TIDY)
+        _cpp_policy_prune_tidy_cache()
+    endif()
     _cpp_policy_check_git_hooks()
     _cpp_policy_check_dependencies()
 

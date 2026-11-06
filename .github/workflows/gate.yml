@@ -41,6 +41,13 @@ on:
         description: 'JSON list of systems that run on the owner''s self-hosted runners instead of GitHub''s'
         type: string
         default: '[]'
+      timeout_minutes:
+        description: >-
+          The longest a job may run before it is stopped. More where a runner shares its machine
+          with local builds: Alfar's macOS check job took 22 minutes alone and was stopped at 45
+          beside one (README, "Continuous integration").
+        type: number
+        default: 45
     secrets:
       library_token:
         description: >-
@@ -92,7 +99,7 @@ jobs:
        || matrix.system == 'linux' && 'ubuntu-24.04'
        || matrix.system == 'windows' && 'windows-2025'
        || 'macos-26' }}
-    timeout-minutes: 45
+    timeout-minutes: ${{ inputs.timeout_minutes }}
     env:
       # 'true' on the owner's machine: nothing is installed or reset there.
       SELF_HOSTED: ${{ contains(fromJSON(inputs.self_hosted), matrix.system) }}

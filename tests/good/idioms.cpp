@@ -1,7 +1,9 @@
 #include "idioms.hpp"
 
+#include <algorithm>
 #include <array>
 #include <charconv>
+#include <iterator>
 #include <memory>
 #include <system_error>
 
@@ -26,6 +28,13 @@ Rgb palette_color(int index) {
         Rgb{255, 0, 0},
     };
     return palette.at(static_cast<std::size_t>(index));
+}
+
+int table_position(int value) {
+    static constexpr std::array table{2, 3, 5, 7};
+    const auto found = std::ranges::find(table, value);
+    return found == table.end() ? -1
+                                : static_cast<int>(std::ranges::distance(table.begin(), found));
 }
 
 } // namespace policy_sample

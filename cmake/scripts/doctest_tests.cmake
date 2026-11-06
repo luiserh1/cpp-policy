@@ -2,7 +2,8 @@
 # runs it after each build of the program:
 #
 #   cmake -DEXECUTABLE=<program> -DKIND=<kind> -DMODULE=<module> -DTIMEOUT=<seconds>
-#         [-DSERIAL=<TRUE|FALSE>] [-DENVIRONMENT=<VAR=value;...>] -DWORKING_DIR=<dir>
+#         [-DSERIAL=<TRUE|FALSE>] [-DENVIRONMENT=<VAR=value;...>] [-DSEED=<number>]
+#         -DWORKING_DIR=<dir>
 #         -DCTEST_FILE=<file>
 #         -P doctest_tests.cmake
 #
@@ -114,8 +115,14 @@ if(KIND STREQUAL "unit" AND cases)
     # and of a crash.
     list(REMOVE_DUPLICATES unit_labels)
     set(test "${KIND}/${MODULE}/all test cases")
+    # With a seed, in a random order (the release presets): doctest runs the cases one after
+    # another in one process, so a case that leaves state behind shows only in some orders.
+    set(order "")
+    if(NOT "${SEED}" STREQUAL "")
+        set(order " --order-by=rand --rand-seed=${SEED}")
+    endif()
     string(APPEND script
-        "add_test([==[${test}]==] [==[${EXECUTABLE}]==] --no-intro=true --no-version=true)\n"
+        "add_test([==[${test}]==] [==[${EXECUTABLE}]==] --no-intro=true --no-version=true${order})\n"
         "set_tests_properties([==[${test}]==] PROPERTIES LABELS [==[${unit_labels}]==]"
         " TIMEOUT ${TIMEOUT}${alone} WORKING_DIRECTORY [==[${WORKING_DIR}]==]")
     if(NOT "${ENVIRONMENT}" STREQUAL "")

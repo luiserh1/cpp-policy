@@ -3,6 +3,139 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.41.0 (2026-11-06)
+
+A minor release, and one that **can make passing tests fail** (before 1.0 a
+minor release may; POLICY.md 10). It takes in everything decided with the
+owner from Alfar's reports of 2026-10-24 and 11-04 and the experiments
+report of 10-26. The owner's plan: after it, the policy stays frozen until
+every project has upgraded, libraries first.
+
+### Upgrading a project
+
+From v0.38.0, v0.39.0 or v0.40.0 alike; v0.39.0 and v0.40.0 asked for no
+work beyond `upgrade.sh`.
+
+**Work beyond `upgrade.sh`:** none is required to start. Then:
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.41.0`. Besides
+   the pins and the copied files (`CMakePresets.json`, `.clang-tidy`,
+   `tools/hooks/`), it replaces `AGENTS.md` from "## Before you say you are
+   done" up to "## Never", which now holds a new section, "Working for the
+   owner".
+2. **What can fail the gate after it, and is the project's to fix:**
+   - **The release workflow runs each unit program's test cases in a random
+     order.** A case that leaves state behind for the next (a `static` in
+     the code under test) now fails in some orders. The seed is printed at
+     configure; `-DCPP_POLICY_TEST_SEED=<seed>` repeats it. Run
+     `sh tools/hooks/gate release` once after upgrading.
+   - **Tests run eight at a time, not four.** A test near its time limit
+     can pass it on a busy machine; the gate already names those over two
+     thirds of their limit.
+3. **From then on, a stage ends on its own branch:** pushed, green in CI on
+   every system, then merged with the owner's word (`AGENTS.md`). Every
+   project's CI already runs on a push to any branch. In a public
+   repository the branches are public too.
+4. When it is first used, `ROADMAP.md` gets a "Now" section at its top.
+5. Optional: `timeout_minutes` in the project's call of `gate.yml`, for a
+   runner that shares its machine with local builds (README); and
+   `cpp_policy_tool()` for a development program.
+
+### Added
+
+- **The tidy cache** (POLICY.md 8): the build runs clang-tidy through
+  `cmake/scripts/tidy_cache.cmake`, which skips a file that passed with the
+  same inputs (the program, its options and configuration, the compile
+  command and every file the compile includes). *Why:* clang-tidy is two
+  thirds of a check build, and on the owner's Mac a developer's gate and a
+  CI runner checked the same commit twice. Alfar's check build on a quiet
+  Mac: 984 s without it, 1,006 s filling it, 361 s in a second folder with
+  it full (325 s with no clang-tidy at all). Folders whose path matches the
+  configuration's excluded headers keep entries of their own. The self-test
+  `tidy/cache` changes each input in turn.
+  - *Rejected:* tidying each shared file on Linux only (the experiments
+    report's proposal A). It would have missed findings that depend on the
+    Microsoft library, which Alfar met in shared files.
+- **`cpp_policy_tool(<target> "<reason>")`** (13.5): a development program,
+  built and checked, with no size budget and its reason printed at every
+  configure. *Why:* Alfar linked one by hand outside the build, where
+  nothing checked it.
+- **A memory budget per unit of input** (13.5), for a command with one
+  input of any size that must hold all of it: S units, then 5S. No default;
+  the owner approves each. *Why:* only batch commands had a rule.
+- **`timeout_minutes` in `gate.yml`,** default 45. *Why:* Alfar's macOS
+  check job was stopped at 45 minutes beside a local build; the limit was a
+  fixed number. *Rejected:* a higher fixed limit for self-hosted runners.
+- **A random order for unit test cases in the release workflow** (13.2),
+  from a seed kept in the build folder. *Why:* in Alfar a test passed alone
+  and failed in the run, through a `static` in the code under test.
+  *Rejected:* the same in the check workflow, which agents run most.
+- **`AGENTS.md`, "Working for the owner"** (POLICY.md 9), from Alfar's
+  review of its work with agents: the project's rules over an agent's
+  habits, done only after checking where the result lives, build and don't
+  operate, decisions and state written to files, nothing waiting on a
+  prompt, delegated work in its own copy with a commit per step and a
+  report, one writer per set of files, a build under the owner's test
+  frozen, and nothing joining `main` without the owner's word.
+- **Rules for review** (POLICY.md 8.1): design (15.7: meaning from
+  measurement or data, not names; figures shown to users measured; one way
+  per problem; a fix for the data at hand says so), documents (11.4 and
+  11.5: every document and text the program shows kept accurate, rejected
+  options in the changelog, no code for old formats nobody depends on, few
+  current-state documents), tests (13.4: real data by hand and never in the
+  gate, data generated at real size, nothing on screen).
+  - *Rejected:* a separate decision log (a third place for reasons), and
+    "no test twice on one machine" (CI's clean checkout finds what a local
+    gate can't).
+
+### Changed
+
+- **A stage reaches `main` through CI on its own branch** (POLICY.md 8).
+  *Why:* Alfar's agents pushed `main` alone, so 190 commits were checked on
+  macOS only; six faults reached its release commit, red for 22 hours.
+  *Rejected:* a Linux gate in a container on the Mac (Linux only, and
+  something to install); pushing `main` once per stage (faults still land
+  on it).
+- **CTest gets eight jobs** (POLICY.md 7). *Why:* on Alfar's 1,152 tests,
+  quiet Mac: 275 s at four, 197 s at eight, 184 s at ten; `tsan` 1,013 s at
+  four, 628 s at eight. *Rejected:* as many as the cores, which needs
+  presets version 11 and CMake 4.3; ten, for 7% more and slow tests nearer
+  their limits.
+- **The commit hook checks the staged files only,** through `tidy-files`,
+  and does nothing for a commit without a C++ file. *Why:* a commit failed
+  on two half-written files that weren't part of it, and a commit of
+  `AGENTS.md` alone waited 10 to 25 minutes on a stale build folder.
+- **`tidy-files` says how many files it has, then names each,** and
+  configures again first when a `CMakeLists.txt` changed. *Why:* 36 files
+  took ten minutes in silence.
+- **The gate's audit and format check skip drafts** (untracked, compiled by
+  nothing), and name them. *Why:* a half-written file failed the gate twice.
+- **`readability-qualified-auto` stops at a type alias**
+  (`IgnoreAliasing: false`). *Why:* a `std::array`'s iterator is a pointer
+  on macOS and Linux and a class on Windows, so no declaration passed on
+  all three; `const auto` now does. It should only remove findings (it stops
+  the check earlier); not tried on every project.
+- **POLICY.md 7: the reason for the retry after a timeout.** The window
+  test that "never started" was Alfar's own second `glfwInit`, fixed in its
+  0.8.0; the retry stays for tests near their limit on a busy machine.
+- **POLICY.md 13.4: a scratch folder's lock names its process** and is free
+  once that process is gone. *Why:* ToneMatcher's helper kept a killed
+  test's lock for 15 minutes, so the retry after a timeout always failed.
+  ToneMatcher changes its helper in a step of its own.
+- **POLICY.md 6: linking a library or a framework is a dependency** (ask
+  the owner), and link options are flags (never). *Why:* Alfar asked which
+  its macOS frameworks were.
+- **POLICY.md 2.10:** `bugprone-optional-value-conversion` fires with
+  libstdc++ only. **POLICY.md 8:** the gate's lock is machine-wide, and CI
+  jobs don't take it. **POLICY.md 11.7:** the real path of
+  `upgrade.sh --library`.
+
+### Decided and not done
+
+- *Rejected:* tsan on the Mac only for tests Linux can't run (it would
+  give up macOS-only races in shared code), and the Mac's release job only
+  when releasing (the only place its size budgets and memory tests run).
+
 ## 0.40.0 (2026-10-13)
 
 A minor release: new, optional, and nothing that passes stops passing. From

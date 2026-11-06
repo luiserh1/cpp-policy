@@ -4,6 +4,11 @@ Open work on @PROJECT_NAME@: what comes next, and why. Finished work goes to
 `CHANGELOG.md`, with its reason, in the commit that finishes it. The layout
 follows cpp-policy's POLICY.md, section 11.5.
 
+## Now
+
+*Rewritten at the end of each stage or session (AGENTS.md, "Working for the
+owner"): what is done, what is half done, open questions, the next step.*
+
 ## 0.1.0 (in progress)
 
 **Goal:** *what the first version is for, in one sentence.*

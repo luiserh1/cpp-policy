@@ -16,8 +16,9 @@
 #   - the copies of .clang-tidy, .clang-format, CMakePresets.json and tools/hooks/;
 #   - with a vcpkg.json, the copies of tools/vcpkg/, and the lines in CMakeLists.txt that load
 #     vcpkg (the ones releases before v0.15.0 gave become an include of tools/vcpkg/setup.cmake);
-#   - in AGENTS.md, the section "Before you say you are done" (when the gate runs), which
-#     becomes the release's; the rest of the file is the project's and is left alone;
+#   - in AGENTS.md, everything from "## Before you say you are done" up to "## Never" (when
+#     the gate runs, and how agents work for the owner), which becomes the release's; the rest
+#     of the file is the project's and is left alone;
 #   - in CHANGELOG.md, the line "Policy: cpp-policy v<version>." (POLICY.md 11.5).
 # An older copy hands over to the release's own upgrade.sh, which knows what the release
 # changed. It then shows the diff and the release's CHANGELOG entry and runs the gate. It commits

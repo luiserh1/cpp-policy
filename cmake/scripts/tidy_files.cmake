@@ -35,8 +35,10 @@ function(read_compiled out)
         math(EXPR last "${entries} - 1")
         foreach(index RANGE ${last})
             string(JSON path GET "${database}" ${index} file)
-            file(REAL_PATH "${path}" path)
-            list(APPEND compiled "${path}")
+            if(EXISTS "${path}")
+                file(REAL_PATH "${path}" path)
+                list(APPEND compiled "${path}")
+            endif()
         endforeach()
     endif()
     set(${out} "${compiled}" PARENT_SCOPE)
@@ -127,6 +129,19 @@ set(skipped 0)
 set(failed "")
 set(other_failures "")
 
+# How many there are, said first, and each file named as clang-tidy starts on it: a run over
+# 36 files took over ten minutes in Alfar and said nothing until it ended.
+set(total 0)
+foreach(file IN LISTS FILES)
+    file(REAL_PATH "${file}" path BASE_DIRECTORY "${SOURCE_DIR}")
+    cmake_path(GET path EXTENSION LAST_ONLY extension)
+    if(EXISTS "${path}" AND extension IN_LIST extensions)
+        math(EXPR total "${total} + 1")
+    endif()
+endforeach()
+message("tidy-files: ${total} C++ files to check: format and audit, then clang-tidy one by one")
+set(position 0)
+
 # The checks that need no compiler first: they take a second, and the build would report
 # them only at its end.
 execute_process(
@@ -160,6 +175,7 @@ foreach(file IN LISTS FILES)
         continue()
     endif()
     file(RELATIVE_PATH relative "${SOURCE_DIR}" "${path}")
+    math(EXPR position "${position} + 1")
     cpp_policy_in_dirs("${relative}" "${EXCLUDED_DIRS}" excluded)
     if(relative MATCHES "^\\.\\./" OR excluded OR "/${relative}" MATCHES "${third_party}")
         continue()
@@ -219,6 +235,7 @@ foreach(file IN LISTS FILES)
             endif()
         endif()
     endif()
+    message("tidy-files: [${position}/${total}] ${relative}")
     execute_process(
         COMMAND "${CLANG_TIDY}" "--config-file=${TIDY_CONFIG}" ${test_option} ${only}
                 --quiet -p "${BUILD_DIR}" "${target}"

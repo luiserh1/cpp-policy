@@ -42,4 +42,7 @@ private:
 // The pixel at the given index of a fixed palette.
 [[nodiscard]] Rgb palette_color(int index);
 
+// The position of a value in a fixed table, or -1: a std::array's iterator kept as `auto`.
+[[nodiscard]] int table_position(int value);
+
 } // namespace policy_sample

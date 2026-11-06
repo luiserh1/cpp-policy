@@ -127,6 +127,13 @@ add_test(NAME tidy/rebuild_on_config_change
             "-DMAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tidy_rebuild/run.cmake")
 
+# --- The tidy cache skips clang-tidy only for a file whose inputs are all unchanged
+add_test(NAME tidy/cache
+    COMMAND "${CMAKE_COMMAND}" "-DPOLICY_ROOT=${CPP_POLICY_ROOT}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/tidy_cache" "-DCXX=${CMAKE_CXX_COMPILER}"
+            "-DMAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tidy_cache/run.cmake")
+
 # --- tidy-files and pre-commit's clang-tidy step, in a project configured through the presets
 add_test(NAME hooks/tidy_files
     COMMAND "${CMAKE_COMMAND}" "-DPOLICY_ROOT=${CPP_POLICY_ROOT}"

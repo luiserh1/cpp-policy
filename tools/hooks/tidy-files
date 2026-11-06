@@ -48,6 +48,15 @@ case $policy in
         ;;
 esac
 
+# A CMakeLists.txt changed since the last configure (a new source, other flags): CMake
+# configures again, as a build would, so that the files are checked as the build will
+# compile them. When nothing changed, this takes a fraction of a second.
+if ! refreshed=$(cmake --build --preset "$preset" --target build.ninja 2>&1); then
+    echo "$refreshed" >&2
+    echo "tidy-files: configuring again (cmake --preset $preset) failed" >&2
+    exit 1
+fi
+
 # CMake lists are separated by ";".
 files=$(printf '%s;' "$@")
 if [ "$format" = yes ]; then

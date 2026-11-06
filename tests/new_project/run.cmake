@@ -125,13 +125,26 @@ function(check_tests)
     endif()
 endfunction()
 
-# The release workflow: the memory test and the size budget run, and pass.
+# The release workflow: unit test cases in a random order from a seed it names, and the memory
+# test and the size budget run, and pass.
 function(check_release)
     set(dest "${WORK}/MyTool")
     string(REPLACE "check" "release" release "${PRESET}")
     step("${dest}" "configuring ${release}" "${CMAKE_COMMAND}" --preset ${release}
         "-DFETCHCONTENT_SOURCE_DIR_CPP_POLICY=${POLICY_ROOT}")
+    if(NOT out MATCHES "unit test cases run in a random order, seed ([0-9]+)")
+        message(FATAL_ERROR "new_project: ${release} doesn't say its test order's seed:\n${out}")
+    endif()
+    set(seed "${CMAKE_MATCH_1}")
     step("${dest}" "building ${release}" "${CMAKE_COMMAND}" --build --preset ${release})
+    step("${dest}" "listing the unit tests" "${CMAKE_CTEST_COMMAND}" --preset ${release} -N -V
+        -L unit)
+    string(FIND "${out}" "\"--order-by=rand\"" ordered)
+    string(FIND "${out}" "\"--rand-seed=${seed}\"" seeded)
+    if(ordered EQUAL -1 OR seeded EQUAL -1)
+        message(FATAL_ERROR "new_project: ${release}'s unit tests don't run in the order of "
+            "seed ${seed}:\n${out}")
+    endif()
     step("${dest}" "testing ${release}" "${CMAKE_CTEST_COMMAND}" --preset ${release})
     foreach(test IN ITEMS "benchmark/app/memory stays flat as the number of greetings grows"
                           "benchmark/app/the heap stays flat as the number of greetings grows"

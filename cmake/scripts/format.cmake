@@ -14,6 +14,9 @@ include("${CMAKE_CURRENT_LIST_DIR}/source_files.cmake")
 include("${CONFIG}")
 
 cpp_policy_collect_sources("${SOURCE_DIR}" "${EXCLUDED_DIRS}" files)
+if(NOT DEFINED FILES)
+    cpp_policy_drop_drafts("${SOURCE_DIR}" "${BUILD_DIR}" "${files}" files)
+endif()
 if(DEFINED FILES)
     # Only the named files, and of those only the project's sources.
     set(chosen "")
