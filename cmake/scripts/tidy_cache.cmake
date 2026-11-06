@@ -39,9 +39,13 @@ list(GET tidy -1 source)
 
 cpp_policy_tidy_cache_dir(cache)
 
+# Files are checked several at a time, and on Windows two appends at once lost a line: the
+# log is written under a lock.
 function(note what)
     if(DEFINED ENV{CPP_POLICY_TIDY_CACHE_LOG})
-        file(APPEND "$ENV{CPP_POLICY_TIDY_CACHE_LOG}" "${what} ${source}\n")
+        set(log "$ENV{CPP_POLICY_TIDY_CACHE_LOG}")
+        file(LOCK "${log}.lock" GUARD FUNCTION TIMEOUT 60)
+        file(APPEND "${log}" "${what} ${source}\n")
     endif()
 endfunction()
 
