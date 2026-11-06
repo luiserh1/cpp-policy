@@ -126,7 +126,6 @@ expect("NOT;code;EQUAL;0;AND;found;GREATER;-1" "pre-push must refuse a working f
 
 # pre-commit hands the staged files to tidy-files, a stub here, and nothing else: a changed
 # file that isn't staged is neither checked nor named.
-file(READ "${repo}/tools/hooks/tidy-files" tidy_files)
 file(WRITE "${repo}/tools/hooks/tidy-files" "#!/bin/sh\necho \"stub tidy-files $*\"\n")
 run(${with_stub} tools/hooks/pre-commit)
 string(FIND "${out}" "stub tidy-files" checked)
@@ -157,7 +156,8 @@ expect("code;EQUAL;0;AND;warned;GREATER;-1;AND;named;GREATER;-1"
     "pre-commit must name a staged file that has unstaged changes too")
 run("${GIT_EXECUTABLE}" reset --quiet -- staged.cpp)
 file(REMOVE "${repo}/staged.cpp")
-file(WRITE "${repo}/tools/hooks/tidy-files" "${tidy_files}")
+# Through git: rewriting the file left it changed on Windows, and pre-push then refused.
+run("${GIT_EXECUTABLE}" checkout -- tools/hooks/tidy-files)
 
 # Under Git for Windows, uname reports MINGW64_NT-...; pre-push and the gate must then use
 # the win-check preset, which the `check` preset's condition disables there. A stub uname

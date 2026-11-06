@@ -154,7 +154,10 @@ foreach(dependency IN LISTS dependencies)
     string(APPEND key "file ${dependency} ${hash}\n")
 endforeach()
 
-# Placeholders for the two folders, the longer first when one holds the other.
+# Placeholders for the two folders, the longer first when one holds the other. On Windows
+# CMake gives clang-tidy the file with backslashes and the folders with slashes: the key uses
+# slashes throughout, or the folders would never be found in it.
+string(REPLACE "\\" "/" key "${key}")
 set(shared TRUE)
 if(NOT excluded STREQUAL "" AND ("${source_dir}/" MATCHES "${excluded}"
                                  OR "${build_dir}/" MATCHES "${excluded}"))
