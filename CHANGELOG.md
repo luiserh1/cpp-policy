@@ -62,7 +62,9 @@ work beyond `upgrade.sh`.
   nothing checked it.
 - **A memory budget per unit of input** (13.5), for a command with one
   input of any size that must hold all of it: S units, then 5S. No default;
-  the owner approves each. *Why:* only batch commands had a rule.
+  the owner approves each. *Why:* only batch commands had a rule; Alfar's
+  `alfar model` keeps 768 bytes per triangle, and had nothing to measure it
+  against.
 - **`timeout_minutes` in `gate.yml`,** default 45. *Why:* Alfar's macOS
   check job was stopped at 45 minutes beside a local build; the limit was a
   fixed number. *Rejected:* a higher fixed limit for self-hosted runners.
@@ -83,7 +85,14 @@ work beyond `upgrade.sh`.
   11.5: every document and text the program shows kept accurate, rejected
   options in the changelog, no code for old formats nobody depends on, few
   current-state documents), tests (13.4: real data by hand and never in the
-  gate, data generated at real size, nothing on screen).
+  gate, data generated at real size, nothing on screen). *Why*, for
+  design: Alfar's review of its first three weeks (2026-10-24) found code
+  that worked where it was written and failed later, among it a time
+  estimate shown to users that was a constant. For
+  documents: Alfar shipped sentences in its own help that were no longer
+  true, and had code for presets "made before 0.8.0" when no release had
+  been used by anyone, which the owner called technical debt; ToneMatcher's
+  library, by contrast, had a user at 0.9.
   - *Rejected:* a separate decision log (a third place for reasons), and
     "no test twice on one machine" (CI's clean checkout finds what a local
     gate can't).
@@ -100,7 +109,7 @@ work beyond `upgrade.sh`.
   quiet Mac: 275 s at four, 197 s at eight, 184 s at ten; `tsan` 1,013 s at
   four, 628 s at eight. *Rejected:* as many as the cores, which needs
   presets version 11 and CMake 4.3; ten, for 7% more and slow tests nearer
-  their limits.
+  their limits (39 of 60 s in `check`).
 - **The commit hook checks the staged files only,** through `tidy-files`,
   and does nothing for a commit without a C++ file. *Why:* a commit failed
   on two half-written files that weren't part of it, and a commit of
@@ -116,8 +125,11 @@ work beyond `upgrade.sh`.
   all three; `const auto` now does. It should only remove findings (it stops
   the check earlier); not tried on every project.
 - **POLICY.md 7: the reason for the retry after a timeout.** The window
-  test that "never started" was Alfar's own second `glfwInit`, fixed in its
-  0.8.0; the retry stays for tests near their limit on a busy machine.
+  test that "never started" was Alfar's own second `glfwInit`, which AppKit
+  doesn't finish, fixed in its 0.8.0 (0 hangs in 24,000 launches, where
+  there had been 12 in 12,000). The retry stays for tests near their limit
+  on a busy machine: two of Alfar's tests took 21.5 s alone and 34 to 65 s
+  at a load of 50 to 70.
 - **POLICY.md 13.4: a scratch folder's lock names its process** and is free
   once that process is gone. *Why:* ToneMatcher's helper kept a killed
   test's lock for 15 minutes, so the retry after a timeout always failed.
@@ -223,7 +235,9 @@ report on its v0.4.0.
   cost of clarity** (POLICY.md 13.5, and `AGENTS.md` in new projects).
   *Why:* the owner wants the budget to make agents look for what a change
   doesn't need, and doesn't want code made harder to read to fit a number;
-  then the agent asks for the budget to be raised. Text only.
+  then the agent asks for the budget to be raised. cli-cpparser's v0.4.0
+  came back under its Windows budget by writing its usage text without
+  `std::format`, which the owner judged no worse to read. Text only.
 
 ### Seen in a project
 
@@ -353,8 +367,10 @@ ToneMatcher.
   At `-O1` the same tests take 757 s and two pass 60 s; ThreadSanitizer
   still costs two to three times what the check build does, so the limit
   that catches a hung test in `check` was the real limit of every test
-  under `tsan`. Measured on a copy of Alfar; POLICY.md 7 has the figures,
-  `-O2` included, and why a project doesn't choose which programs run.
+  under `tsan`. Measured on a copy of Alfar, 911 tests on one Mac: at `-O2`,
+  589 s, with the same two tests at 57 s; no level reported a race. With this
+  release's tree all 911 pass in 866 s, the longest at 108 s of its 180, on a
+  machine doing other work.
 - **A stage that touches code that runs on more than one thread, or its
   tests, runs `sh tools/hooks/gate tsan` once before it ends** (POLICY.md
   8, and `AGENTS.md` in new projects). *Why:* nothing told Alfar's agents
@@ -399,7 +415,8 @@ too). A project whose CI runs macOS on GitHub moves from `macos-15` to
   27 and failed to compile in CI on macOS 15, where libc++'s headers refuse
   it. ToneMatcher's library has the same call and was only ever built on
   the owner's Mac. The owner chose 26 over 15: the programs are the owner's
-  own tools, and the older floor means writing by hand what the library has.
+  own tools, and the older floor means writing by hand what the library has
+  (65 lines in cli-cpparser for that one function).
 - **A system with no size budget yet passes and says the number to set;**
   every configure names the systems still without one. A new project starts
   with none. *Why:* the template's budgets were the sample program's, and
@@ -496,7 +513,10 @@ passing.
   checks a `setjmp` wrapper of a C library meets (2); that a
   `peak_memory_bytes()` test must first show its work rises above the
   starting peak (13.5); that a library's pin may be moved by hand (11.7).
-  *Why:* each found by Alfar while adding libjpeg-turbo.
+  *Why:* each found by Alfar while adding libjpeg-turbo. One of its test
+  programs started at a peak of 9.7 MB, and 5 inputs and 50 gave the same
+  reading to the byte: a leak of a decoder's whole state per input would
+  have passed.
 
 ### Measured, by Alfar
 
@@ -628,7 +648,9 @@ its owner about tests' time. Everything here is optional: a minor release.
   `find_package()` is called, and what the first build after a library
   replaces copied code costs. 11.7's example for a user is `TO NONE` and a
   line per module.
-  *Why:* each was a question Alfar had to answer by trying.
+  *Why:* each was a question Alfar had to answer by trying. Its first build
+  after the library replaced copied code: 738 objects in 15 minutes, and 30
+  minutes for the commit hook on 320 files.
 - POLICY.md 11.7: a library's test support goes in a module of its own in
   the top layer, and may be headers only; the release commit (changelog and
   version) comes before the tag, which goes on it once its CI is green.
@@ -641,6 +663,11 @@ its owner about tests' time. Everything here is optional: a minor release.
   built files byte for byte the same, 120 s before and 124 s after.
 - The gate's tests on the same code: about 580 s with v0.26.5 (1,634 CTest
   tests), 389 s with v0.31.0 (642). Unit tests went from about 180 s to 8.
+
+### Seen in projects since
+
+- `cpp_policy_parallel_tests()`: ToneMatcher's tests from 41 s to 14 s;
+  Alfar's from 756 s to 217 s, with no program `ALONE` (0.33.3).
 
 ## 0.32.0 (2026-10-09)
 
@@ -689,6 +716,17 @@ minor release.
 no library, so its CI runs that step only as far as "This project uses no
 library". The first real run will be Alfar's, once the owner has created
 the token. If it fails to fetch, the job's log says which address.
+
+### Seen in projects since
+
+- The token in a real CI run: Alfar's Linux and Windows jobs fetched
+  ToneMatcher's library with it (2026-10-12).
+- A project that offers a library and uses another: ToneMatcher v0.6.0
+  uses cli-cpparser's, green on three systems at its first configure, with
+  the library on a newer cpp-policy than its user, as the floor allows. Its
+  program got smaller (macOS 15,024 bytes, Linux 8,120).
+- Two libraries in one project: Alfar, with ToneMatcher's and
+  cli-cpparser's (2026-10-13).
 
 ## 0.31.0 (2026-10-09)
 
@@ -739,19 +777,29 @@ lines: a minor release.
 - 11.7: `CMakeLists.txt` doesn't repeat `library.cmake`'s `find_package()`
   calls; every header of a library can be included by its user, and how to
   keep something inside meanwhile (a class with a hidden state, which is
-  also how a C library's type stays out of a header).
+  also how a C library's type stays out of a header: ToneMatcher's
+  `lowlevel::Deflater` keeps `zlib.h` in one source file, since a forward
+  declaration of `z_stream_s` is refused for its name).
 - 15.6: reading and writing files are functions apart from the entry, and
-  may live beside it.
+  may live beside it, as in ToneMatcher's library, which reads no file in
+  its entry and offers `load_pipeline_config()` next to it.
 - 13.5 and `heap_bytes.hpp`: how to measure what one operation adds to the
   heap (the peak is absolute; subtract the live bytes read before it), and
   three notes on giving a C library an allocator (only a stream takes one,
   so `compress`/`uncompress` are replaced; allocate with `std::nothrow`;
   test that the memory arrives). ToneMatcher did it as 13.5 said and
   reported what the text had left out, including a test that passed for
-  the wrong reason.
-- 14.2: the instruction-count trial's first results. A real change showed
-  as 0.08% on the one benchmark it touched; moving 46 files between folders
-  and targets changed the others by at most 99 instructions.
+  the wrong reason (the first version of its allocator test). With the
+  allocator, writing a 1 x 1 PNG raised its heap by more than 200,000 bytes,
+  against 448 without; its two operating-system tests were removed and the
+  heap tests passed unchanged within the same budgets.
+- 14.2: the instruction-count trial's first results, on ToneMatcher. The
+  same code on two runs differed by 1 to 3,011 instructions in 1.4 to 5.2
+  billion. A real change (zlib's memory through `operator new`, and a new
+  decompression loop) showed as 0.08% on the one benchmark that reads and
+  writes PNGs, and under 0.0001% on the other three; its time, 344 to
+  371 ms, would alone have said nothing. Moving 46 files between folders
+  and targets changed the counts by at most 99 instructions.
 
 ## 0.30.0 (2026-10-09)
 
@@ -886,7 +934,8 @@ hooks, including `tools/hooks/gate`.
 - POLICY.md 13.5: a C library that takes an allocator (zlib's `zalloc`) is
   given one that uses `operator new`, so the heap test counts its memory
   and the operating-system test isn't needed. Suggested to ToneMatcher,
-  whose two such tests failed four times without finding a leak.
+  whose two such tests failed four times in two weeks without finding a
+  leak.
 - `ROADMAP.md`: this release, and what comes after it (libraries).
 
 ### Not tried on a real project yet
@@ -961,7 +1010,7 @@ options in a test's environment (Alfar does): see step 2.
 - **Test sources, under `tests/`, may have 500 lines** (POLICY.md 11.3);
   product code keeps 350. `tidy-files` says so from 50 lines before either
   limit. The owner chose it: about a third of Alfar's forced splits were
-  test files.
+  test files, and four full builds stopped on tests alone.
 - **Test-case names are read from the source text** by the audit and
   `tidy-files`, with the allowed characters in the message. They were found
   only when the test program registered its tests, after compiling and
@@ -978,7 +1027,8 @@ options in a test's environment (Alfar does): see step 2.
   for a test program that opens a window: LeakSanitizer reports what the
   operating system keeps for the life of the process. Every configure
   prints that it is off, and why; it is refused for unit tests. *Why:* this
-  was the one rule Alfar could not meet. Entries in `lsan.supp` by library
+  was the one rule Alfar could not meet: its window tests got 949 reports,
+  3.5 MB, none from the project, GLFW or Dear ImGui. Entries in `lsan.supp` by library
   would also hide a project's own leak under a callback, so the honest
   option is a switch that shows.
 - **A prefix in `cpp_policy_confine_includes()`** (`imgui*`), for a library
@@ -1026,7 +1076,9 @@ cancels runs that a newer push made obsolete.
   whether CI is consistent enough to check performance. It isn't for time:
   a job gets whatever processors are free. The server administrator
   measured that instruction counts repeat to 0.001% between an idle and a
-  fully loaded machine, while time moved by a third. The owner chose to
+  fully loaded machine, while time moved by a third (20 runs of each on the
+  home server: a fixed loop of 4.9 billion instructions, spread 0.000%,
+  time +33%; ToneMatcher's `diff` heap test, 79 billion, 0.001%, +35%). The owner chose to
   open the counters on one labelled runner and to run a trial on one
   project before any budget rule (2026-10-02).
 - **The audit and `upgrade.sh` treat every cpp-policy workflow a project
@@ -1079,7 +1131,9 @@ call to be pinned to the build's commit.
   in fixed steps, up to 7.7%, on an idle machine, and load doesn't make it
   worse. *Why:* the server administrator measured it after the owner asked
   whether CI fails because the server is busy, and found that none of 24
-  failed runs was caused by capacity. The wording here had helped spread
+  failed runs was caused by capacity. On Linux: 0 to 1% idle, 0% in 20 of
+  20 with every processor busy (load average 84); on Windows, steps of
+  about 3, 4.4 and 8%, up to 8.8% under load. The wording here had helped spread
   that explanation. The macOS reproduction in 13.5 stands: there, load did
   change which of two levels a run landed on.
 - Load costs time (up to twice on Windows); a test near its time limit, or
@@ -1213,7 +1267,9 @@ the policy. Text only: a patch release.
   and out, errors as values and no exception crossing it, one function per
   thing a user can do, no second copy of the types, no logic in frontends.
 - **13.4, a port uses the original as its reference:** tests compare with
-  the original's saved output on the same inputs.
+  the original's saved output on the same inputs. (Later, ToneMatcher's
+  Gaussian blur compared exactly with scipy's float32 output caught
+  differences a "looks right" test would not.)
 - **9, a new project is created with `tools/new-project.sh`,** never by
   hand; and a rule that seems wrong for a project is reported to the owner
   for cpp-policy, not worked around.
@@ -1282,7 +1338,8 @@ measure and design".
   front; single-threaded by default. *Why:* issue #27. It is written as
   guidance checked in review, because it is judgement and both projects
   already work this way (71 `struct`s, 25 `class`es, no derived class or
-  virtual function between them). The one mechanical part, a type's data
+  virtual function between them; ToneMatcher uses `std::map` and
+  `std::set` fifteen times). The one mechanical part, a type's data
   being all public or all private, was already a clang-tidy check.
   SimpleLocalServer's review (0.24.2) said no rule about the code had got
   in its way; this section is meant to keep that true. The owner agreed the
@@ -1321,7 +1378,10 @@ Nothing that passed fails: a patch release.
   not tried on a server. On SimpleLocalServer it failed with +45% on Linux
   and +20% on Windows, without a leak: cpp-httplib allocates a table in each
   pool thread on first use, and Linux needed 13,000 messages to reach them
-  all. The notice for v0.24.0 said N could be much smaller and no warm-up
+  all. With rounds of 1,000 messages the live heap was flat from round 2 on
+  macOS, round 5 on Windows and round 14 on Linux (about 700 bytes per pool
+  thread), and then identical to the byte for the rest of 30 rounds. The
+  notice for v0.24.0 said N could be much smaller and no warm-up
   curve was needed; that was wrong. The new recipe is SimpleLocalServer's
   own fix.
 - **13.5, what is exact:** `live_heap_bytes()` always; `peak_heap_bytes()`
@@ -1408,6 +1468,10 @@ minor release (POLICY.md 10).
   here with a program that only allocates and frees 1 MB buffers: the
   operating system's peak grew +80% idle and anywhere from +1% to +81% under
   load, because it depends on whether the allocator reuses a freed block.
+  Measured on macOS, six 1 MB buffers per round, from 10 rounds to 50: +80
+  to +82% in 6 of 6 idle runs; +1% to +81% over 12 runs with 14 busy
+  processes; 0.0% in 8 of 8 with eight warm-up runs. With eight warm-up
+  runs ToneMatcher's `diff` test still failed 1 run in 10 on a loaded Mac.
   macOS's peak physical footprint moved the same way. A count of live bytes
   can't vary. The owner chose it (2026-10-01).
   - It doesn't see memory a C library takes with `malloc()`, or mapped
@@ -1605,7 +1669,7 @@ copy a number that fails. A patch release (POLICY.md 10).
   11,000 messages, then stays flat to 50,000 (run 36842331640). With
   N = 15,000, growth up to 50,000 is 0% on Linux, 0.5% on Windows and 4% on
   macOS. All 8 jobs pass (run 36842841438), and a sink that keeps 64 bytes
-  per message still fails. (SimpleLocalServer's report of 2026-10-01.)
+  per message still fails (9.8 → 19.0 MB). (SimpleLocalServer's report of 2026-10-01.)
 - A client that reuses connections sets `TCP_NODELAY`. *Why:* on Linux,
   Nagle's algorithm with delayed acknowledgment cost about 44 ms per request
   over a kept-alive connection: 200 messages took 8,881 ms, against 7 ms

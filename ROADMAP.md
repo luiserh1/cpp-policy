@@ -2,14 +2,17 @@
 
 Open work on cpp-policy itself: what comes next, and why. What's done is in
 `CHANGELOG.md`, with the reasons; items are removed from here in the commit
-that resolves them. The layout is the one POLICY.md 11.5 gives projects.
+that resolves them. The layout is the one POLICY.md 11.5 gives projects,
+with one part of its own first: the freeze.
 
-## Frozen after 0.41.0
+## Frozen after 0.42.0
 
-The owner's plan (2026-11-05): 0.41.0 took in the whole queue; the policy
-now stays frozen until every project has upgraded, top-down (cli-cpparser
-and ToneMatcher, then Alfar, SimpleLocalServer and GalleryOrganizer).
-Fixes that make passing code fail are the only exception. Meanwhile:
+The owner's plan (2026-11-07): 0.42.0 takes in what the review of
+2026-11-06 found, and nothing else. The policy then stays frozen until every
+project has upgraded to it, top-down (cli-cpparser and ToneMatcher, then
+Alfar, SimpleLocalServer and GalleryOrganizer). The freeze has two
+exceptions: a defect of the policy that makes correct code fail, and a need
+that blocks a project. Meanwhile:
 
 - [ ] ToneMatcher's scratch folder lock names its process (POLICY.md 13.4),
       in ToneMatcher's own step after its upgrade.
@@ -21,20 +24,12 @@ Fixes that make passing code fail are the only exception. Meanwhile:
 - [ ] "As many jobs as the machine has cores" once CMake 4.3 (presets
       version 11) can be the minimum.
 
-Until 2026-09-28 these lived in SimpleLocalServer's `PENDING.md`, the
-project that piloted the policy. Numbers like #38 refer to the issues found
-in the walkthroughs of that time.
-
 ## Later
 
 ### Libraries, after their first use
 
 Releases A and B (0.30.0, 0.32.0) are out. Open:
 
-- [x] The token in a real CI run: Alfar's Linux and Windows jobs fetched
-      ToneMatcher's library with it (2026-10-12).
-- [x] `cpp_policy_parallel_tests()` in real projects (0.33.0): ToneMatcher
-      41 s to 14 s; Alfar 756 s to 217 s, no program `ALONE`.
 - [ ] Alfar on Windows and Linux: it has its remote and CI since
       2026-10-12, and both systems are being made green (its own code's
       findings; a full list is promised). libjpeg-turbo and parallel tests
@@ -43,13 +38,9 @@ Releases A and B (0.30.0, 0.32.0) are out. Open:
       when a project needs one. cli-cpparser (v0.1.0, public) is a library
       with a small example program in `src/`, and nothing in 11.7 got in
       its way.
-- [x] A project that offers a library and uses another: ToneMatcher v0.6.0
-      uses cli-cpparser, at the first configure and green on three systems;
-      the library was on a newer cpp-policy than its user, as the floor
-      allows. Its program got smaller (macOS 15,024 bytes, Linux 8,120).
-- [x] Two libraries in one project: Alfar, with ToneMatcher's and
-      cli-cpparser (2026-10-13). Still untried: `upgrade.sh --library` with
-      two libraries present, and two libraries that share a vcpkg package.
+- [ ] `upgrade.sh --library` with two libraries present, and two libraries
+      that share a vcpkg package: untried (two libraries in one project
+      work, in Alfar).
 
 ### From Alfar's report, not yet designed
 
@@ -95,6 +86,21 @@ Releases A and B (0.30.0, 0.32.0) are out. Open:
 
 - **Instruction counts** (ToneMatcher, since 2026-10-08): whether a budget
   rule is worth writing, once the counts have been seen over real commits.
+  Time can't be compared in CI; the number of instructions a benchmark
+  executes can (POLICY.md 14.2).
+  - How a project takes part: it calls `benchmark.yml` next to the gate,
+    pinned to the same commit. On the owner's Linux runner labelled
+    `benchmark` it runs the benchmark tests, and keeps their output, with
+    nanobench's `ins/<unit>` column, in the job's summary and as an
+    artifact. It checks nothing. `benchmark.yml` stays while ToneMatcher
+    uses it.
+  - Only that runner shows the counts: the processor's counters are closed
+    by default, opening them is a security setting of the machine, and
+    Windows and macOS don't give a program them without elevated rights.
+  - What a count doesn't see: time in the kernel (disk, starting a
+    process), and waiting. It includes child processes. It is valid for one
+    processor family and one toolchain build, so a toolchain window
+    (POLICY.md 10.1) changes it.
   - Seen so far: the same code repeats to about 3,000 instructions in
     billions; a rewrite of the PNG row filters showed as -43% on one
     benchmark; untouched benchmarks moved by 3, 413 and 788 instructions
@@ -108,8 +114,9 @@ Releases A and B (0.30.0, 0.32.0) are out. Open:
 - **MPL-2.0** (Eigen, Ceres): left open until a project needs it
   (2026-10-08).
 - **An owner's exception for one named package's license,** with a reason
-  printed at every configure (asked by Alfar, 2026-10-11): when a license
-  comes up that the owner would accept for one project but not for all.
+  printed at every configure (asked by Alfar, 2026-10-11): built when a
+  project needs one, that is, when a license comes up that the owner would
+  accept for one project but not for all (decided 2026-11-07).
 
 - **Rules for optimization levels** (raised 2026-10-12, to deliberate).
   Today the presets decide and no section says why as a whole: `-O0` in
