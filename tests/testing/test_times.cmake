@@ -1,5 +1,6 @@
 # scripts/test_times.cmake on a made-up build folder (POLICY.md 13.2): it must name the
-# passing tests that used two thirds or more of their own limit, and no other.
+# passing tests that used two thirds or more of their own limit, and no other; and remember
+# a test that needed a second run, failing the second time (POLICY.md 7).
 #
 #   cmake -DPOLICY_ROOT=<dir> -DWORK=<dir> -P test_times.cmake
 
@@ -54,6 +55,40 @@ endif()
 if(NOT output MATCHES "timed out and passed on a second run: \"integration/app/hung at start\""
    OR NOT output MATCHES "gate: 1 test\\(s\\) needed a second run")
     message(FATAL_ERROR "testing/test_times: the test that ran twice must be named:\n${output}")
+endif()
+# With REMEMBER, a test that needed a second run is remembered in the user's cache, and the
+# second time it needs one fails (POLICY.md 7). The cache is a folder of this test's own.
+set(ENV{HOME} "${WORK}/home")
+set(ENV{XDG_CACHE_HOME} "${WORK}/home/.cache")
+set(ENV{LOCALAPPDATA} "${WORK}/home/AppData")
+file(WRITE "${WORK}/CMakeCache.txt" "CMAKE_PROJECT_NAME:STATIC=fixture\n")
+foreach(round IN ITEMS first second)
+    execute_process(COMMAND "${CMAKE_COMMAND}" "-DBUILD_DIR=${WORK}" -DREMEMBER=ON
+        -P "${POLICY_ROOT}/cmake/scripts/test_times.cmake"
+        RESULT_VARIABLE code_${round} OUTPUT_VARIABLE out ERROR_VARIABLE err)
+    set(output_${round} "${out}${err}")
+endforeach()
+file(GLOB_RECURSE memory "${WORK}/home/fixture.txt")
+if(NOT code_first EQUAL 0 OR output_first MATCHES "before, too")
+    message(FATAL_ERROR "testing/test_times: a first second run must pass:\n${output_first}")
+endif()
+if(NOT memory)
+    message(FATAL_ERROR "testing/test_times: the test that ran twice must be remembered")
+endif()
+file(READ "${memory}" remembered)
+if(NOT remembered MATCHES "^[0-9]+-[0-9]+-[0-9]+ integration/app/hung at start\n$")
+    message(FATAL_ERROR "testing/test_times: one line, the date and the name:\n${remembered}")
+endif()
+if(code_second EQUAL 0
+   OR NOT output_second MATCHES "needed a second run before, too: \"integration/app/hung at start\""
+   OR NOT output_second MATCHES "tell the owner")
+    message(FATAL_ERROR "testing/test_times: a second time must fail:\n${output_second}")
+endif()
+# Without REMEMBER (CI), nothing is remembered and it passes.
+execute_process(COMMAND "${CMAKE_COMMAND}" "-DBUILD_DIR=${WORK}"
+    -P "${POLICY_ROOT}/cmake/scripts/test_times.cmake" RESULT_VARIABLE code)
+if(NOT code EQUAL 0)
+    message(FATAL_ERROR "testing/test_times: without REMEMBER it must pass")
 endif()
 # A build folder with no test run says nothing.
 file(REMOVE "${WORK}/Testing/Temporary/LastTest.log")

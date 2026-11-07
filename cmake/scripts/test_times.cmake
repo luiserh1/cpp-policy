@@ -2,15 +2,18 @@
 # its 60 seconds passes for weeks and then fails on a busy machine, and nothing had said so.
 # The gate's launcher and CI run it after the tests:
 #
-#   cmake -DBUILD_DIR=<build/preset> [-DSHARE=<percent, 67 by default>] -P test_times.cmake
+#   cmake -DBUILD_DIR=<build/preset> [-DSHARE=<percent, 67 by default>] [-DREMEMBER=ON]
+#         -P test_times.cmake
 #
 # It reads the limits from the test files CTest itself reads, and the times from CTest's log
-# of the last run. It prints one line per such test and always succeeds: the limit is what
-# fails a test.
+# of the last run. It prints one line per such test: the limit is what fails a test.
 #
 # It also names the tests that timed out and passed on their second run: the presets give a
-# test that timed out one more run (POLICY.md 7), and a test that needs it more than once is
-# a finding that nothing else would show.
+# test that timed out one more run (POLICY.md 7). With REMEMBER (the gate's launcher), each
+# is remembered on this machine, across working copies, in
+# <cpp_policy_cache_root>/retried/<project>.txt, one line each: the date, then the name. A
+# test named there already fails: needing the second run twice is a finding, which a
+# deadlock that happens only sometimes would otherwise pass as. Only then does it fail.
 
 cmake_minimum_required(VERSION 3.29)
 
@@ -78,7 +81,7 @@ file(STRINGS "${log}" lines
 set(name "")
 set(seconds "")
 set(found 0)
-set(again 0)
+set(retried "")
 foreach(line IN LISTS lines)
     if(line MATCHES "^[0-9]+/[0-9]+ Test: (.*)$")
         set(name "${CMAKE_MATCH_1}")
@@ -96,7 +99,7 @@ foreach(line IN LISTS lines)
         string(MD5 key "${name}")
         if(failed_${key})
             message("gate: timed out and passed on a second run: \"${name}\" (POLICY.md 7)")
-            math(EXPR again "${again} + 1")
+            list(APPEND retried "${name}")
         endif()
         if(DEFINED limit_${key})
             math(EXPR threshold "${limit_${key}} * ${SHARE} / 100")
@@ -109,11 +112,53 @@ foreach(line IN LISTS lines)
         set(name "")
     endif()
 endforeach()
+list(LENGTH retried again)
 if(again GREATER 0)
-    message("gate: ${again} test(s) needed a second run. Once is chance (a library that "
-        "hangs at start); a test named here again is a finding: say so to the owner")
+    message("gate: ${again} test(s) needed a second run. Once is chance (a busy machine); "
+        "the gate remembers it, and a second time fails it")
 endif()
 if(found GREATER 0)
     message("gate: ${found} passing test(s) used ${SHARE}% or more of their limit. Make "
         "them shorter or split them; or, with a reason, SLOW in cpp_policy_add_tests()")
+endif()
+
+if(REMEMBER AND again GREATER 0)
+    include("${CMAKE_CURRENT_LIST_DIR}/tidy_cache_dir.cmake")
+    cpp_policy_cache_root(root)
+    set(project "")
+    if(EXISTS "${BUILD_DIR}/CMakeCache.txt")
+        file(STRINGS "${BUILD_DIR}/CMakeCache.txt" project REGEX "^CMAKE_PROJECT_NAME:STATIC=")
+        string(REGEX REPLACE "^[^=]*=" "" project "${project}")
+    endif()
+    if(project STREQUAL "")
+        set(project unnamed)
+    endif()
+    set(memory "${root}/retried/${project}.txt")
+    set(known "")
+    if(EXISTS "${memory}")
+        file(STRINGS "${memory}" entries)
+        foreach(entry IN LISTS entries)
+            if(entry MATCHES "^[0-9-]+ (.+)$")
+                string(MD5 key "${CMAKE_MATCH_1}")
+                set(known_${key} TRUE)
+            endif()
+        endforeach()
+    endif()
+    string(TIMESTAMP today "%Y-%m-%d")
+    set(repeated 0)
+    foreach(name IN LISTS retried)
+        string(MD5 key "${name}")
+        if(known_${key})
+            message("gate: needed a second run before, too: \"${name}\" (POLICY.md 7)")
+            math(EXPR repeated "${repeated} + 1")
+        else()
+            file(APPEND "${memory}" "${today} ${name}\n")
+        endif()
+    endforeach()
+    if(repeated GREATER 0)
+        message("gate: ${repeated} test(s) needed a second run on this machine before. That is a "
+            "finding: tell the owner. The record is ${memory}; a test's line goes once its "
+            "cause is fixed")
+        cmake_language(EXIT 1)
+    endif()
 endif()

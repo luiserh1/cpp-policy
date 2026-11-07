@@ -187,6 +187,21 @@ expect("code;EQUAL;0;AND;found;GREATER;-1" "a lock left by a gate that is gone m
 if(EXISTS "$ENV{CPP_POLICY_GATE_LOCK}")
     message(FATAL_ERROR "hooks: the gate left its lock behind")
 endif()
+# A lock folder that names no process, made over a minute ago, is taken over too.
+file(MAKE_DIRECTORY "$ENV{CPP_POLICY_GATE_LOCK}")
+execute_process(COMMAND "${SH_EXECUTABLE}" -c "touch -t 202001010000 \"$1\"" touch
+    "$ENV{CPP_POLICY_GATE_LOCK}")
+run(${with_stub} tools/hooks/gate)
+string(FIND "${out}" "named no process for over a minute; taking it over" found)
+expect("code;EQUAL;0;AND;found;GREATER;-1" "an old lock that names no process must be taken over")
+# A lock path that is a file can never become a lock: the gate fails at once.
+set(folder_lock "$ENV{CPP_POLICY_GATE_LOCK}")
+set(ENV{CPP_POLICY_GATE_LOCK} "${WORK}/gate.lock.file")
+file(WRITE "$ENV{CPP_POLICY_GATE_LOCK}" "")
+run(${with_stub} tools/hooks/gate)
+string(FIND "${out}" "is a file; CPP_POLICY_GATE_LOCK names a folder" found)
+expect("code;EQUAL;2;AND;found;GREATER;-1" "a lock path that is a file must fail the gate at once")
+set(ENV{CPP_POLICY_GATE_LOCK} "${folder_lock}")
 file(WRITE "${WORK}/stub/cmake" "#!/bin/sh\necho \"stub cmake $*\"\nexit 3\n")
 run(${with_stub} tools/hooks/gate)
 string(FIND "${out}" "gate: FAILED (win-check, exit code 3)" found)

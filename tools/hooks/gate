@@ -11,7 +11,8 @@
 #   machine passes its time limit and is reported as failed.
 # - It ends with one line, "gate: passed" or "gate: FAILED", and returns the workflow's own
 #   exit code, so that a command chained after it can't hide the result. Before that line it
-#   names the passing tests that used two thirds or more of their time limit.
+#   names the passing tests that used two thirds or more of their time limit, and the tests
+#   that needed a second run; one that needed it before on this machine fails the gate.
 # - A workflow that failed is remembered (build/cpp_policy_gate_failed_<workflow>) until it
 #   passes here again, and pre-push refuses meanwhile: a commit chained after a failed
 #   release workflow went in unnoticed (cli-cpparser), and only the check workflow runs
@@ -51,12 +52,27 @@ fi
 
 # The lock is a folder: mkdir either creates it or fails, on every system. It holds the
 # process number of its owner, so that a lock left by a gate that was killed is taken over.
+# A lock folder that names no process (its gate was stopped before writing the number) is
+# taken over once it is a minute old. A path mkdir can never create fails at once.
 lock=${CPP_POLICY_GATE_LOCK:-/tmp/cpp-policy-gate-$(id -u).lock}
+if [ -e "$lock" ] && [ ! -d "$lock" ]; then
+    echo "gate: FAILED ($preset): the lock $lock is a file; CPP_POLICY_GATE_LOCK names a folder" >&2
+    exit 2
+fi
+if [ ! -d "$(dirname "$lock")" ] || [ ! -w "$(dirname "$lock")" ]; then
+    echo "gate: FAILED ($preset): the lock $lock can't be created: its folder is missing or read-only" >&2
+    exit 2
+fi
 waited=0
 while ! mkdir "$lock" 2>/dev/null; do
     owner=$(cat "$lock/pid" 2>/dev/null || true)
     if [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; then
         echo "gate: the gate that held the lock (process $owner) is gone; taking it over"
+        rm -rf "$lock"
+        continue
+    fi
+    if [ -z "$owner" ] && [ -n "$(find "$lock" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then
+        echo "gate: the lock has named no process for over a minute; taking it over"
         rm -rf "$lock"
         continue
     fi
@@ -88,13 +104,15 @@ fi
 code=$?
 
 # A passing test that used most of its time limit is named here, before the last line: it
-# is the next one to fail on a busy machine (POLICY.md 13.2). The script is the policy's
-# copy that the build fetched.
+# is the next one to fail on a busy machine (POLICY.md 13.2). A test that needed a second run
+# is remembered on this machine, and needing it again fails the gate (POLICY.md 7). The
+# script is the policy's copy that the build fetched.
 config=build/$preset/cpp_policy_config.cmake
 if [ $code -eq 0 ] && [ -f "$config" ]; then
     policy=$(sed -n 's/^set(POLICY_ROOT \[==\[\(.*\)\]==\])$/\1/p' "$config")
     if [ -n "$policy" ] && [ -f "$policy/cmake/scripts/test_times.cmake" ]; then
-        cmake "-DBUILD_DIR=build/$preset" -P "$policy/cmake/scripts/test_times.cmake" || true
+        cmake "-DBUILD_DIR=build/$preset" -DREMEMBER=ON -P "$policy/cmake/scripts/test_times.cmake" ||
+            code=1
     fi
 fi
 
