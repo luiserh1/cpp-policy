@@ -3,6 +3,158 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.42.0 (2026-11-07)
+
+A minor release, and one that **can make passing code fail** (before 1.0 a
+minor release may; POLICY.md 10). It takes in only what the owner decided
+on 2026-11-07 from the review of the policy of 2026-11-06: holes closed,
+traps fixed, and POLICY.md cut in place. No project upgraded to 0.41.0;
+each goes straight to 0.42.0, which carries 0.41.0's changes too. After it
+the policy is frozen again, with two exceptions: a defect of the policy
+that makes correct code fail, and a need that blocks a project.
+
+### Upgrading a project
+
+From v0.38.0, v0.39.0 or v0.40.0 alike. Read 0.41.0's entry as well: its
+changes come with this release.
+
+**Work beyond `upgrade.sh`:** one, once: `AGENTS.md` is pruned by hand.
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.42.0`. An
+   older copy hands over to this release's own. Besides the pins and the
+   copied files, it now copies `.claude/settings.json`, and ends with the
+   local gate through its launcher.
+2. **`AGENTS.md`:** everything above the heading `## This project` is now
+   the policy's, and each upgrade replaces it. A file without that heading
+   (every project's today) gets this release's part, then the heading, then
+   its whole old content under a comment. Under the heading, keep what is
+   the project's own (its sections and lines that aren't in the policy's
+   part), delete the rest and the comment, and commit. Later upgrades leave
+   what is under the heading alone.
+3. **What can fail after it, and is the project's to fix:**
+   - From 0.41.0: the release workflow runs each unit program's test cases
+     in a random order, and tests run eight at a time. Run
+     `sh tools/hooks/gate release` once after upgrading.
+   - A test that times out and passes on its second run is remembered on
+     the machine; the next time that test needs a second run, the local
+     gate fails. That is a finding for the owner, not something to retry.
+   - A test preset's run that matches no test fails (`-R` with a wrong
+     name), where it passed.
+   - Configuration checks options and definitions inside generator
+     expressions and `SHELL:`, and rejects `-U_FORTIFY_SOURCE` unless
+     `-D_FORTIFY_SOURCE=3` follows it. It fails a project that sets
+     `CPP_POLICY_CONFINED_DIRS` or `CPP_POLICY_EXCLUDED_DIRS`.
+   - The audit treats `#pragma clang system_header` and
+     `[[clang::no_sanitize]]` as suppressions (confined directories only,
+     with a reason), and fails a project whose workflows don't call
+     cpp-policy's `gate.yml`.
+   - `CPP_POLICY_GATE_LOCK` naming a file fails at once.
+
+   Searched in the five projects on 2026-11-07: no project's own code uses
+   the patterns configuration and the audit now reject, none sets the
+   directories, and every one's CI calls `gate.yml`.
+4. From 0.41.0: a stage ends on its own branch, pushed and green in CI
+   before the owner merges it; `ROADMAP.md` gets a "Now" section when it is
+   first used.
+
+### Fixed: holes
+
+- **Generator expressions and `SHELL:` no longer hide options**
+  (POLICY.md 6). `$<$<CONFIG:Release>:-fno-stack-protector>`,
+  `SHELL:-fcf-protection=none` and `$<1:_FORTIFY_SOURCE=1>` passed
+  configuration, because whole options were compared. `-U_FORTIFY_SOURCE`
+  is allowed only before a definition that keeps the level, as the policy's
+  own triplets have it. Bypass fixtures `genex_options`, `unfortified`.
+- **The confined and excluded directories are fixed** (POLICY.md 4 and 6).
+  A project could add one with a line, and an excluded directory then
+  skipped every check with nothing printed. A library's `lowlevel` folder
+  is still added on its own. Bypass fixtures `excluded_dirs`,
+  `confined_dirs`.
+- **`#pragma clang system_header` and `[[clang::no_sanitize]]` are
+  suppressions** (POLICY.md 5): the first silences every warning in the rest
+  of its file and the second turns a sanitizer off, and the audit saw
+  neither.
+- **The audit requires a workflow that calls `gate.yml`.** It checked the
+  pins of the workflows a project calls, but a project that called none
+  passed.
+- **`upgrade.sh` copies `.claude/settings.json`,** a policy file nothing
+  refreshed. POLICY.md 9 promised that what agents can't be stopped from
+  doing is caught afterwards; it now says what is caught, and what is only
+  copied (`AGENTS.md`, agent settings).
+
+### Fixed: traps
+
+- **A test that needed a second run is remembered,** machine-wide, in
+  `retried/<project>.txt` under the tidy cache's root; the second time, the
+  local gate fails. CI only names such tests. *Why:* "a test named twice is
+  a finding" relied on agents remembering, which they can't. *Rejected:*
+  removing the retry, which a busy machine still needs.
+- **`noTestsAction: error` in the test presets.** `ctest -R` with a name
+  that matched nothing printed "No tests were found" and passed. Three
+  texts said each test case was its own CTest test; a module's unit tests
+  are one, and the texts now say how to run one case.
+- **The launcher's lock:** a path that is a file, or that can't be
+  created, fails at once; a lock folder that names no process is taken
+  over once it is a minute old. Both waited forever.
+- **The launcher everywhere:** `upgrade.sh`, POLICY.md 9 and the template's
+  README ran `cmake --workflow` directly, without the lock, the last line or
+  the failure memory.
+- **The generated project's first commit has a body,** so the fallback
+  command `new-project.sh` prints passes the commit-msg hook.
+- README, the templates and comments corrected where they disagreed with
+  the code: vcpkg is required; `win-unit` builds `RelWithDebInfo`; the
+  template's layers run lowest first; the presets give CTest eight jobs;
+  the Windows build's `.clang-tidy` has one check off (W5).
+
+### Changed
+
+- **`AGENTS.md` has one part owned by the policy,** above `## This
+  project`, and `upgrade.sh` replaces all of it. *Why:* only the section on
+  the gate was refreshed, so projects kept older rules from the rest
+  (0.38.1's budget rule, among others), and nothing said so. *Rejected:* a
+  separate policy file that `AGENTS.md` points to, since some harnesses
+  read only `AGENTS.md`. The template also:
+  - points to POLICY.md's sections by situation, and says cpp-policy's
+    CHANGELOG is for revising rules, not for following them;
+  - names the confined directories, states 15.2's condition for
+    inheritance, and gives tests' 500-line limit;
+  - asks for a memory test for every server, a size budget (or
+    `NOT_BUILT`, or `cpp_policy_tool()`) for every program, and a
+    confinement line for every dependency, `NONE` included;
+  - says what the retry memory means, and to go through 8.1 at the end of
+    a stage.
+- **POLICY.md is cut in place, not split.** Each rule keeps one sentence of
+  reason ending with the release that brought it; the figures, tables and
+  project stories moved to that release's entry here. The toolchain
+  window's steps moved to `MAINTAINING.md`, the instruction-count trial to
+  its `ROADMAP.md` item, and section 9's copy of the working agreement to a
+  pointer to `AGENTS.md`. 8.1 lists every rule no tool checks, one line
+  each. "The owner" is defined once, as the person who decides for a
+  project. 2,409 lines became 2,250. *Why:* the file served four readers
+  (agents, the owner, cpp-policy's maintainer, and anyone asking why), and
+  is about 35,000 tokens (an estimate) for an agent that reads it whole.
+  *Rejected:* splitting it into several files.
+- **Two gates, named apart:** the *local gate* (`sh tools/hooks/gate`) and
+  the *CI gate* (`gate.yml`); *the audit* is `audit_suppressions.cmake`,
+  and the checks at configure time are the *configure checks*.
+- **POLICY.md 2: why `#pragma once`,** which departs from the Core
+  Guidelines (SF.8): the toolchain is Clang only, and its one weak spot,
+  two copies of a header, fails at compile time.
+- A `const_cast` sample in `tests/bad/`; 2.10's claim about samples is no
+  broader than they are.
+
+### Removed
+
+- `upgrade.sh`'s path for projects from before v0.15.0, and
+  `new-project.sh --vcpkg`. All five projects are on v0.38.0 or later, and
+  POLICY.md 11.5 asks for no code for formats nobody depends on.
+
+### Decided and not done
+
+- **An owner's exception for one package's license** is built when a
+  project needs one (`ROADMAP.md`).
+- `benchmark.yml` stays while ToneMatcher uses it.
+
 ## 0.41.0 (2026-11-06)
 
 A minor release, and one that **can make passing tests fail** (before 1.0 a
