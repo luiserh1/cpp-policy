@@ -177,19 +177,23 @@ for workflow in .github/workflows/*.yml .github/workflows/*.yaml; do
     fi
 done
 
-# 3. The files projects copy unchanged. The hooks must stay executable.
+# 3. The files projects copy unchanged. The hooks must stay executable. The agent settings are
+# the template's, which the release keeps under template/.
 mkdir -p .claude
-for name in .clang-tidy .clang-format CMakePresets.json .claude/settings.json; do
+for name in .clang-tidy .clang-format CMakePresets.json; do
     cp "$policy/$name" "$name"
 done
+cp "$policy/template/.claude/settings.json" .claude/settings.json
 mkdir -p tools/hooks
 for hook in "$policy"/tools/hooks/*; do
     cp "$hook" "tools/hooks/$(basename "$hook")"
     chmod 755 "tools/hooks/$(basename "$hook")"
 done
-for name in .clang-tidy .clang-format CMakePresets.json .claude/settings.json; do
+for name in .clang-tidy .clang-format CMakePresets.json; do
     cmp -s "$policy/$name" "$name" || fail "$name doesn't match $tag's copy after copying"
 done
+cmp -s "$policy/template/.claude/settings.json" .claude/settings.json ||
+    fail ".claude/settings.json doesn't match $tag's template/.claude/settings.json after copying"
 for hook in "$policy"/tools/hooks/*; do
     name="tools/hooks/$(basename "$hook")"
     cmp -s "$hook" "$name" || fail "$name doesn't match $tag's copy after copying"

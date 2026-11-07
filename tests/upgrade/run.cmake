@@ -62,8 +62,9 @@ endfunction()
 
 # Writes one release of the fake policy: every copied file says which release it is.
 function(release version changelog)
-    foreach(name IN ITEMS .clang-tidy .clang-format CMakePresets.json .claude/settings.json
-                     tools/hooks/pre-commit tools/hooks/pre-push)
+    # The agent settings live under template/, as in the real repository.
+    foreach(name IN ITEMS .clang-tidy .clang-format CMakePresets.json
+                     template/.claude/settings.json tools/hooks/pre-commit tools/hooks/pre-push)
         file(WRITE "${policy}/${name}" "# ${name} of ${version}\n")
     endforeach()
     file(WRITE "${policy}/CHANGELOG.md" "# Changelog\n\n${changelog}")
@@ -188,12 +189,15 @@ expect("pinned;GREATER;-1;AND;untouched;GREATER;-1" "the CI gate must be pinned 
 string(FIND "${ci}" "benchmark.yml@${new} # v2.0.0\n" pinned)
 expect("pinned;GREATER;-1" "the CI benchmark workflow must be pinned to v2.0.0's commit")
 
-foreach(name IN ITEMS .clang-tidy .clang-format CMakePresets.json .claude/settings.json
+foreach(name IN ITEMS .clang-tidy .clang-format CMakePresets.json
                      tools/hooks/pre-commit tools/hooks/pre-push)
     file(READ "${project}/${name}" content)
     set(wanted "# ${name} of 2.0.0\n")
     expect("content;STREQUAL;wanted" "${name} must be v2.0.0's copy")
 endforeach()
+file(READ "${project}/.claude/settings.json" content)
+set(wanted "# template/.claude/settings.json of 2.0.0\n")
+expect("content;STREQUAL;wanted" ".claude/settings.json must be v2.0.0's template/.claude/settings.json")
 # Windows has no executable bit: Git for Windows runs a hook whatever its mode.
 if(NOT CMAKE_HOST_WIN32)
     execute_process(COMMAND test -x "${project}/tools/hooks/pre-push" RESULT_VARIABLE code)
@@ -274,5 +278,74 @@ string(FIND "${cmake}" "cpp_policy_use_library(other\n    GIT_REPOSITORY file://
 string(FIND "${cmake}" "GIT_TAG        ${new}) # v2.0.0\n" policy_pin)
 expect("moved;GREATER;-1;AND;kept;GREATER;-1;AND;policy_pin;GREATER;-1"
     "only the named library's pin must move, to the release's commit:\n${cmake}")
+
+# --- The real layout: an upgrade to a release made of this repository's own files. The fake
+# releases above say where each file is; this one has them where cpp-policy keeps them, so a
+# path upgrade.sh gets wrong fails here.
+set(real "${WORK}/real/cpp-policy")
+set(real_project "${WORK}/real/project")
+file(MAKE_DIRECTORY "${real}" "${real_project}/.github/workflows")
+execute_process(COMMAND "${CMAKE_COMMAND}" -E env --unset=GIT_DIR "${GIT_EXECUTABLE}" ls-files
+    WORKING_DIRECTORY "${POLICY_ROOT}" OUTPUT_VARIABLE tracked RESULT_VARIABLE code)
+expect("code;EQUAL;0" "could not list this repository's files")
+string(REPLACE "\n" ";" tracked "${tracked}")
+foreach(name IN LISTS tracked)
+    if(NOT name STREQUAL "" AND EXISTS "${POLICY_ROOT}/${name}")
+        cmake_path(GET name PARENT_PATH folder)
+        file(MAKE_DIRECTORY "${real}/${folder}")
+        file(COPY_FILE "${POLICY_ROOT}/${name}" "${real}/${name}")
+    endif()
+endforeach()
+run("${real}" ${git} init --quiet)
+run("${real}" ${git} add --all)
+run("${real}" ${git} commit --quiet -m "this repository's files")
+run("${real}" ${git} tag v9.0.0)
+run("${real}" ${git} rev-parse HEAD)
+string(STRIP "${out}" real_commit)
+file(WRITE "${real_project}/CMakeLists.txt"
+    "cmake_minimum_required(VERSION 3.29)\n"
+    "project(fixture LANGUAGES CXX)\n"
+    "include(FetchContent)\n"
+    "FetchContent_Declare(cpp_policy\n"
+    "    GIT_REPOSITORY file://${real}/.git\n"
+    "    GIT_TAG        ${old}) # v1.0.0\n"
+    "FetchContent_MakeAvailable(cpp_policy)\n")
+file(WRITE "${real_project}/vcpkg.json" "{ \"name\": \"fixture\", \"dependencies\": [] }\n")
+file(WRITE "${real_project}/.github/workflows/ci.yml"
+    "jobs:\n  gate:\n    uses: someone/cpp-policy/.github/workflows/gate.yml@${old} # v1.0.0\n")
+file(WRITE "${real_project}/AGENTS.md" "${old_agents}")
+file(WRITE "${real_project}/CHANGELOG.md" "# Changelog\n\nPolicy: cpp-policy v1.0.0.\n")
+run("${real_project}" ${git} init --quiet)
+run("${real_project}" ${git} add --all)
+run("${real_project}" ${git} commit --quiet -m init)
+# Without --no-gate, the upgrade ends with the local gate, through its launcher; a stub cmake
+# stands in for the workflow.
+file(WRITE "${WORK}/stub/cmake" "#!/bin/sh\necho \"stub cmake $*\"\n")
+file(CHMOD "${WORK}/stub/cmake" PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE)
+# The launcher's lock is machine-wide, and this test may run inside a gate that holds it.
+run("${real_project}" "${CMAKE_COMMAND}" -E env "VCPKG_ROOT=${WORK}/vcpkg"
+    "CPP_POLICY_GATE_LOCK=${WORK}/gate.lock" ${SH_EXECUTABLE} -c
+    "PATH=\"$(cd \"$1\" && pwd):$PATH\" && export PATH && shift && exec sh \"$@\"" with-stub
+    "${WORK}/stub" "${POLICY_ROOT}/tools/upgrade.sh" v9.0.0)
+expect("code;EQUAL;0" "the upgrade to a release with this repository's layout must succeed")
+string(REGEX MATCH "stub cmake --workflow --preset (win-)?check[^\n]*\n[^\n]*gate: passed" gated
+    "${out}")
+set(none "")
+expect("NOT;gated;STREQUAL;none" "the upgrade must end with the local gate, through its launcher")
+foreach(pair IN ITEMS ".claude/settings.json=template/.claude/settings.json"
+                      ".clang-tidy=.clang-tidy" "tools/hooks/gate=tools/hooks/gate"
+                      "tools/vcpkg/setup.cmake=tools/vcpkg/setup.cmake")
+    string(REPLACE "=" ";" pair "${pair}")
+    list(GET pair 0 copy)
+    list(GET pair 1 source)
+    file(READ "${real_project}/${copy}" content)
+    file(READ "${real}/${source}" wanted)
+    expect("content;STREQUAL;wanted" "${copy} must be the release's ${source}")
+endforeach()
+file(READ "${real_project}/AGENTS.md" agents)
+string(FIND "${agents}" "\n## This project\n" heading)
+string(FIND "${agents}" "${old_agents}" kept)
+expect("heading;GREATER;-1;AND;kept;GREATER;heading"
+    "AGENTS.md must get the release's part, the heading, and the old file below it")
 
 message("upgrade: OK")
