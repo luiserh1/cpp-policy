@@ -237,6 +237,34 @@ run("${GIT_EXECUTABLE}" -c user.name=test -c user.email=test@example.com commit 
 run(${with_stub} tools/hooks/pre-push)
 string(FIND "${out}" "stub cmake --workflow" started)
 expect("code;EQUAL;0;AND;started;GREATER;-1" "pre-push must run the gate on a new commit")
+# After the workflow, the launcher hands the build to the policy's test_times.cmake with
+# REMEMBER, which keeps the tests that needed a second run (POLICY.md 7). Its failure fails
+# the gate; a workflow that failed keeps its own exit code, and is still recorded.
+file(MAKE_DIRECTORY "${repo}/build/win-check" "${WORK}/fake_policy/cmake/scripts")
+file(WRITE "${WORK}/fake_policy/cmake/scripts/test_times.cmake" "")
+file(WRITE "${repo}/build/win-check/cpp_policy_config.cmake"
+    "set(POLICY_ROOT [==[${WORK}/fake_policy]==])\n")
+run(${with_stub} tools/hooks/gate)
+string(FIND "${out}"
+    "stub cmake -DBUILD_DIR=build/win-check -DREMEMBER=ON -P ${WORK}/fake_policy/cmake/scripts/test_times.cmake"
+    remembered)
+expect("code;EQUAL;0;AND;remembered;GREATER;-1"
+    "the gate must hand the build to test_times.cmake with REMEMBER")
+file(WRITE "${WORK}/stub/cmake"
+    "#!/bin/sh\necho \"stub cmake $*\"\ncase \"$*\" in *test_times.cmake*) exit 1 ;; esac\n")
+run(${with_stub} tools/hooks/gate)
+string(FIND "${out}" "gate: FAILED (win-check" found)
+expect("NOT;code;EQUAL;0;AND;found;GREATER;-1"
+    "a test that needed a second run again (test_times.cmake failing) must fail the gate")
+file(WRITE "${WORK}/stub/cmake"
+    "#!/bin/sh\necho \"stub cmake $*\"\ncase \"$*\" in *--workflow*) exit 3 ;; esac\n")
+run(${with_stub} tools/hooks/gate)
+string(FIND "${out}" "-DREMEMBER=ON" remembered)
+expect("code;EQUAL;3;AND;remembered;GREATER;-1"
+    "a failed workflow must keep its exit code, and its retried tests must still be recorded")
+file(WRITE "${WORK}/stub/cmake" "#!/bin/sh\necho \"stub cmake $*\"\n")
+file(REMOVE_RECURSE "${repo}/build/win-check")
+file(REMOVE "${repo}/build/cpp_policy_gate_failed_win-check")
 # A project with a vcpkg.json and a shell without VCPKG_ROOT: the gate says so itself, at
 # once, and doesn't start the workflow.
 file(WRITE "${repo}/vcpkg.json" "{}\n")

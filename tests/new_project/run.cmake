@@ -68,6 +68,13 @@ function(generate_and_check)
     step("${dest}" "building the project (clang-tidy, audit, format check)"
         "${CMAKE_COMMAND}" --build --preset ${PRESET})
     step("${dest}" "testing the project" "${CMAKE_CTEST_COMMAND}" --preset ${PRESET})
+    # A run that selects no test fails: a mistyped -R must not pass (noTestsAction, POLICY.md
+    # 13.2).
+    execute_process(COMMAND "${CMAKE_CTEST_COMMAND}" --preset ${PRESET} -R "^no test has this name$"
+        WORKING_DIRECTORY "${dest}" RESULT_VARIABLE code OUTPUT_VARIABLE out ERROR_VARIABLE err)
+    if(code EQUAL 0)
+        message(FATAL_ERROR "new_project: a test run that matches no test passed:\n${out}${err}")
+    endif()
     # tidy-files checks a test source, and a test header in another folder of tests/, as the
     # build does: with the option test programs get.
     step("${dest}" "checking the test files with tidy-files" sh tools/hooks/tidy-files
