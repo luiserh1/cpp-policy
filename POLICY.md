@@ -259,8 +259,8 @@ include directives.
 guards because the pragma isn't standard. With one compiler on every system
 it works everywhere, it has no name to invent or to keep in step when a header
 is copied or renamed, and its one weak spot, two copies of the same header
-included together, stops the compile with a redefinition error (the rule
-since 0.1.0; this reason since 0.42.0).
+included together, stops the compile with a redefinition error (since
+0.1.0).
 
 **Modules are not used yet.** Code uses `#include`, not C++20 modules or
 C++23 `import std`. Reasons, as of LLVM 23 and CMake 4.4:
@@ -537,7 +537,8 @@ A suppression is any of:
   in any of their spellings (`[[clang::...]]`, `__attribute__((...))`,
   `__declspec(...)`): `no_sanitize` and its variants,
   `no_address_safety_analysis`, `disable_sanitizer_instrumentation`,
-  `no_stack_protector`, `nocf_check`, `safebuffers` and `guard(nocf)`. The
+  `no_stack_protector`, `stack_protector_ignore`, `nocf_check`, `safebuffers`
+  and `guard(nocf)`. The
   audit knows these names; one it doesn't know is still a suppression, and
   review's to find;
 - a sanitizer suppression: an entry in a sanitizer's suppression list.
@@ -553,10 +554,10 @@ Rules, enforced by the suppression audit (the `policy-audit` target,
    - `#pragma clang diagnostic ignored "-Wold-style-cast" // SIG_ERR is a C cast`;
    - `// clang-format off: columns aligned by hand`;
    - `#pragma clang system_header // the system API below warns, not ours`,
-     and the same trailing comment after a `no_sanitize` attribute.
-3. `NOLINT`, diagnostic pragmas, `system_header` and `no_sanitize` are **only
-   allowed inside confined areas** (section 4). `clang-format off` is allowed
-   anywhere, since it only affects layout.
+     and the same trailing comment after an attribute that turns a check off.
+3. `NOLINT`, diagnostic pragmas, `system_header` and the attributes that turn
+   a check off are **only allowed inside confined areas** (section 4).
+   `clang-format off` is allowed anywhere, since it only affects layout.
 4. Wildcard suppressions (`NOLINT(*)`, `NOLINT(cppcoreguidelines-*)`) are rejected.
 5. Sanitizer suppressions exist only in cpp-policy
    (`cmake/sanitizers/lsan.supp`, applied by the `dev` and `check` test
@@ -623,7 +624,8 @@ settings:
   and `clang-cl`'s `/GS-`, `/guard:cf-` and `/sdl-`; `CPP_POLICY_HARDENING`
   has no "off" value (7.2);
 - each of these also inside a generator expression, `SHELL:` or `-Wp,`
-  (`$<$<CONFIG:Release>:-fno-stack-protector>`), since 0.42.0;
+  (`$<$<CONFIG:Release>:-fno-stack-protector>`), and with the macro as a word
+  of its own (`-U _FORTIFY_SOURCE`), since 0.42.0;
 - no `SKIP_LINTING`, and no changes to `CXX_CLANG_TIDY`;
 - no change to the excluded directories (`build`, `out`, `.git`,
   `third_party`, `external`, `vcpkg_installed`), which every check skips, or
@@ -631,6 +633,13 @@ settings:
   had skipped every check with nothing printed (since 0.42.0).
 
 Configuration fails otherwise.
+
+Fortify is also checked where it takes effect: outside Debug, the policy
+forces a small header (`cmake/fortify/fortify_check.hpp`) into every compile
+of the project's own targets, and it stops the compile unless the macro is 3.
+The compiler applies every definition from the command line before it,
+whatever the spelling (a flag variable, a response file, `-Wp,`), so a route
+the configure checks don't read still fails the build (since 0.42.0).
 
 Projects can't change the rules locally:
 - their `.clang-tidy`, `.clang-format`, `CMakePresets.json`, git hooks

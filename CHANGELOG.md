@@ -44,17 +44,19 @@ changes come with this release.
      name), where it passed.
    - Configuration checks options and definitions inside generator
      expressions, `SHELL:` and `-Wp,`, and refuses `-U_FORTIFY_SOURCE` in a
-     project's own options (the policy defines fortify at 3 itself). It
+     project's own options (the policy defines fortify at 3 itself). A release
+     build whose fortify an option turns off by any other route fails to
+     compile, in `cmake/fortify/fortify_check.hpp`. Configuration also
      fails a project that sets `CPP_POLICY_CONFINED_DIRS` or
      `CPP_POLICY_EXCLUDED_DIRS`.
    - The audit treats `#pragma clang system_header` and the attributes that
      turn a sanitizer or a protection off (`no_sanitize` and its variants,
      `no_address_safety_analysis`, `disable_sanitizer_instrumentation`,
-     `no_stack_protector`, `nocf_check`, `safebuffers`, `guard(nocf)`) as
-     suppressions: confined directories only, with a reason. As with
-     `NOLINT`, a comment that names one outside a confined directory fails
-     too. The audit also fails a project whose workflows don't call
-     cpp-policy's `gate.yml`.
+     `no_stack_protector`, `stack_protector_ignore`, `nocf_check`,
+     `safebuffers`, `guard(nocf)`) as suppressions: confined directories only,
+     with a reason. As with `NOLINT`, a comment that names one outside a
+     confined directory fails too. The audit also fails a project whose
+     workflows don't call cpp-policy's `gate.yml`.
    - `CPP_POLICY_GATE_LOCK` naming a file fails at once.
 
    Searched in the five projects on 2026-11-07: no project's own code uses
@@ -73,10 +75,23 @@ changes come with this release.
   options to the preprocessor and is looked into too. `-U_FORTIFY_SOURCE`
   is refused in a project's options: the policy defines the level itself,
   and a definition after it can sit under a condition that never holds.
+  The macro as a word of its own (`-U _FORTIFY_SOURCE`) is read as one.
   Bypass fixtures `genex_options`, `unfortified`,
-  `unfortified_conditional`. *Rejected:* allowing `-U` when
-  `-D_FORTIFY_SOURCE=3` follows under the same condition (more code, for
-  something no project writes).
+  `unfortified_conditional`, `unfortified_spellings`. *Rejected:* allowing
+  `-U` when `-D_FORTIFY_SOURCE=3` follows under the same condition (more
+  code, for something no project writes).
+- **Fortify is checked where it takes effect** (POLICY.md 6): outside Debug,
+  the policy forces `cmake/fortify/fortify_check.hpp` into every compile of a
+  project's own targets, and it stops the compile unless `_FORTIFY_SOURCE`
+  is 3. *Why:* the release's review switched fortify off through fifteen routes
+  the configure checks don't read, among them other spellings of the flag,
+  `CMAKE_CXX_FLAGS_RELEASE`, `add_definitions`, INTERFACE libraries and
+  response files. The compiler applies every command-line definition before a
+  forced include, whatever its spelling, so one check covers them all.
+  Self-test `fortify/compile_check`. *Rejected:* listing each spelling at
+  configure time, a list with no end. A compiler launcher, a rewritten compile
+  rule, or an `#undef` in a header still pass: they are deliberate, and
+  review's.
 - **The confined and excluded directories are fixed** (POLICY.md 4 and 6).
   A project could add one with a line, and an excluded directory then
   skipped every check with nothing printed. A library's `lowlevel` folder
@@ -86,9 +101,10 @@ changes come with this release.
   or a protection off are suppressions** (POLICY.md 5): the first silences
   every warning in the rest of its file, the others turn a sanitizer, the
   stack protector or control-flow checks off in a function, and the audit
-  saw none of them. Each name the audit knows has a fixture
-  (`silencer_spellings_outside`); a name it doesn't know is review's
-  (8.1).
+  saw none of them. Each name the audit knows is a line of the fixture
+  `silencer_spellings_outside`, and names that only begin like one are not
+  reported (`silencer_lookalike`); a name it doesn't know, or one put
+  together by a macro, is review's (8.1).
 - **The audit requires a workflow that calls `gate.yml`.** It checked the
   pins of the workflows a project calls, but a project that called none
   passed.
@@ -103,14 +119,17 @@ changes come with this release.
 
 - **A test that needed a second run is remembered,** machine-wide, in
   `retried/<project>.txt` in the user's cpp-policy cache folder (on a Mac,
-  `~/Library/Caches/cpp-policy`), also when the workflow failed for another
-  reason; the second time, the local gate fails. CI only names such tests. The
+  `~/Library/Caches/cpp-policy`), also when the tests ran and something
+  else failed; the second time, the local gate fails. The launcher clears
+  the previous run's test log first, so a workflow that stops before its
+  tests can't have that log read again. CI only names such tests. The
   self-test `hooks/behavior` checks that the launcher asks for it. *Why:* "a
   test named twice is a finding" relied on agents remembering, which they
   can't. *Rejected:* removing the retry, which a busy machine still needs.
 - **`noTestsAction: error` in the test presets.** `ctest -R` with a name
   that matched nothing printed "No tests were found" and passed
-  (`template/new_project` now runs one and requires it to fail). Three
+  (`template/new_project` now runs one and requires it to fail, and
+  `presets/no_tests_action` checks every test preset). Three
   texts said each test case was its own CTest test; a module's unit tests
   are one, and the texts now say how to run one case.
 - **The launcher's lock:** a path that is a file, or that can't be
@@ -151,7 +170,7 @@ changes come with this release.
   its `ROADMAP.md` item, and section 9's copy of the working agreement to a
   pointer to `AGENTS.md`. 8.1 lists every rule no tool checks, one line
   each. "The owner" is defined once, as the person who decides for a
-  project. 2,409 lines became 2,268. *Why:* the file served four readers
+  project. 2,409 lines became 2,277. *Why:* the file served four readers
   (agents, the owner, cpp-policy's maintainer, and anyone asking why), and
   is about 35,000 tokens (an estimate) for an agent that reads it whole.
   *Rejected:* splitting it into several files.
@@ -1563,7 +1582,8 @@ Nothing that passed fails: a patch release.
   own fix.
 - **13.5, what is exact:** `live_heap_bytes()` always; `peak_heap_bytes()`
   only for work on one thread. *Why:* SimpleLocalServer measured peaks
-  between 562,240 and 563,072 bytes over identical rounds.
+  between 562,240 and 563,072 bytes over identical rounds: a few hundred
+  bytes in 560,000.
 - **13.5, the operating system's peak test:** not required for sockets
   (kernel memory), and "rerun it" is gone: a project whose test fails
   without a cause and has no memory outside the C++ heap drops it. *Why:*
