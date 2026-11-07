@@ -30,7 +30,7 @@ enable_testing()
 add_subdirectory(tests)
 
 # Layers from the lowest up (POLICY.md 11.1); the audit checks every #include against them.
-# README.md ("Layout") and AGENTS.md describe what each layer holds.
+# README.md ("Layout") describes what each layer holds.
 cpp_policy_layers(
     LAYER lowlevel
     LAYER app)

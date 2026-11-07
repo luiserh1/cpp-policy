@@ -1304,8 +1304,8 @@ function(_cpp_policy_testing_library)
     cpp_policy_apply(cpp_policy_testing)
 endfunction()
 
-# Unit and integration tests several at a time (the presets give CTest 4 jobs). Without this
-# call every test runs alone, as before. Benchmarks always run alone, and so do the tests of
+# Unit and integration tests several at a time (the presets give CTest 8 jobs). Without this
+# call every test runs alone. Benchmarks always run alone, and so do the tests of
 # a program declared SLOW or ALONE (a fixed port, a shared folder). Call it before the first
 # cpp_policy_add_tests().
 function(cpp_policy_parallel_tests)

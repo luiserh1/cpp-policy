@@ -1,4 +1,5 @@
-# One doctest program per kind and module (cpp-policy POLICY.md 13). After each build, every
-# test case becomes a CTest test named <kind>/<module>/<test case>, labelled with its kind.
+# One doctest program per kind and module (cpp-policy POLICY.md 13.2), labelled with its kind.
+# A module's unit tests are one CTest test, "unit/<module>/all test cases"; to run one case by
+# hand: <program> --test-case="<name>".
 cpp_policy_add_tests(unit app SOURCES test_app.cpp LIBRARIES @TARGET@_core)
 cpp_policy_add_tests(unit lowlevel SOURCES test_lowlevel.cpp LIBRARIES @TARGET@_core)

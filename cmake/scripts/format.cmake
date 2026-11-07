@@ -4,10 +4,9 @@
 #
 # With FILES (a list of paths), only those of the project's sources are checked or fixed.
 #
-# Waiting W4 (POLICY.md 12): fix used to settle readability-trailing-comma too, by letting
-# clang-tidy apply its fixes between two formats. That check reports the comma after an empty
-# braced value (`f(a, T{}, b)`) and its fix removes it, which broke code, so the check is off
-# and fix only formats.
+# Fix only formats. readability-trailing-comma is off (waiting W4, POLICY.md 12): it reports
+# the comma after an empty braced value (`f(a, T{}, b)`), and its fix removes it, which breaks
+# code.
 
 cmake_minimum_required(VERSION 3.29)
 include("${CMAKE_CURRENT_LIST_DIR}/source_files.cmake")

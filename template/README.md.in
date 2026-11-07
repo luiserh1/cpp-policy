@@ -4,21 +4,21 @@ What @PROJECT_NAME@ does, in a sentence or two.
 
 ## Building
 
-Requirements: LLVM 23 (clang, clang-tidy, clang-format), CMake 3.29 or later
-and Ninja, plus vcpkg, with `VCPKG_ROOT` set to its folder.
-The cpp-policy README ("Setup per platform") says how to install them.
-
+Requirements: LLVM 23 (clang, clang-tidy, clang-format), CMake 3.29 or
+later, Ninja, and vcpkg with `VCPKG_ROOT` set to its folder. The cpp-policy
+README lists them ("Requirements") and says how to install LLVM and Ninja
+("Setup per platform").
 Dependencies come from vcpkg (`vcpkg.json`, pinned by its
-`builtin-baseline`); set `VCPKG_ROOT` before configuring.
+`builtin-baseline`).
 
 ```
-sh tools/hooks/gate                    # the gate: audit, format, build with clang-tidy, tests
-cmake --workflow --preset unit         # quick: no clang-tidy, -O1, unit tests only
-cmake --workflow --preset release      # optimized build, size budget, benchmarks
+sh tools/hooks/gate                    # the local gate: audit, format, build with clang-tidy, tests
+sh tools/hooks/gate release            # optimized build, size budget, benchmarks
+cmake --workflow --preset unit         # quick: no clang-tidy, optimized, unit tests only
 ```
 
 On Windows the presets carry a `win-` prefix (`win-check`, `win-unit`,
-`win-release`).
+`win-release`); `tools/hooks/gate` adds it itself.
 
 Enable the git hooks once per clone:
 
@@ -26,9 +26,9 @@ Enable the git hooks once per clone:
 git config core.hooksPath tools/hooks
 ```
 
-`pre-commit` runs the suppression audit, the format check and clang-tidy on
-the staged C++ files; `commit-msg` checks the message (Conventional Commits
-with a body that says why); `pre-push` runs the full gate. After editing C++
+`pre-commit` runs the audit, the format check and clang-tidy on the staged
+C++ files; `commit-msg` checks the message (Conventional Commits with a body
+that says why); `pre-push` runs the local gate. After editing C++
 files, `sh tools/hooks/tidy-files <file>...` checks just those files.
 
 This project follows [cpp-policy](https://github.com/luiserh1/cpp-policy),
@@ -36,20 +36,24 @@ pinned in `CMakeLists.txt` (@POLICY_TAG@). `.clang-tidy`, `.clang-format`,
 `CMakePresets.json` and `tools/hooks/` are its copies and must not be edited
 here; upgrade with its `tools/upgrade.sh`.
 
-Every push runs the gate in GitHub Actions (`.github/workflows/ci.yml`).
+Every push runs the CI gate, cpp-policy's `gate.yml`, in GitHub Actions
+(`.github/workflows/ci.yml`).
 
 ## Layout
 
-`src/` is split into layers, from the top down. Code may include headers from
-its own layer or a lower one:
+`src/` is split into layers, from the lowest up. Code may include headers
+from its own layer or a lower one:
 
 | Layer | Modules | Contents |
 |---|---|---|
-| 3 (top) | `main.cpp` | Program boundary |
-| 2 | `src/app/` | The program's logic |
 | 1 (bottom) | `src/lowlevel/` | Confined OS code |
+| 2 | `src/app/` | The program's logic |
+| 3 (top) | `main.cpp` | Program boundary |
 
 `tests/` has one doctest program per kind of test and module
-(`cpp_policy_add_tests()` in `tests/CMakeLists.txt`). CTest runs each test case
-on its own, named `<kind>/<module>/<test case>`: `ctest --preset dev -L unit`
-runs the unit tests, `-R <name>` one test.
+(`cpp_policy_add_tests()` in `tests/CMakeLists.txt`). A module's unit tests
+are one CTest test, `unit/<module>/all test cases`; each integration or
+benchmark test case is its own, `<kind>/<module>/<test case>`.
+`ctest --preset check -L unit` runs the unit tests; one unit test case runs
+by hand with `<program> --test-case="<name>"`. A `-R` that matches nothing
+fails.

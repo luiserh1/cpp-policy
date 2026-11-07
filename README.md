@@ -1,8 +1,10 @@
 # cpp-policy
 
 Shared, versioned C++ policy: a restricted modern C++23 subset enforced by
-Clang warnings, clang-tidy, a suppression audit and a format check.
-The rules are in [POLICY.md](POLICY.md).
+Clang warnings, clang-tidy, checks at configure time, an audit of the
+sources and a format check. The rules are in [POLICY.md](POLICY.md); how
+cpp-policy itself is maintained (moving the toolchain pins) is in
+[MAINTAINING.md](MAINTAINING.md).
 
 ## Starting a new project
 
@@ -21,10 +23,14 @@ The project is pinned to that release, in `CMakeLists.txt` and its CI
 workflow, and has the release's policy files, `AGENTS.md`, agent settings and
 git hooks (enabled), with a small program that shows the layers: `main.cpp`,
 an `app` module returning `std::expected`, a confined `lowlevel` module, and
-their doctest tests (POLICY.md 13). `ROADMAP.md` and `CHANGELOG.md` are ready for its first version
-(POLICY.md 11.5). It passes the gate as generated; replace the program with your own. The
-steps below say what each part is, for adding the policy to an existing
-project by hand.
+their doctest tests (POLICY.md 13). `ROADMAP.md` and `CHANGELOG.md` are
+ready for its first version (POLICY.md 11.5). It passes the local gate as
+generated; replace the program with your own.
+
+The sections below say what each part is. They are not a way to set a
+project up by hand: an existing project (a port) is generated too, and its
+code moved in (POLICY.md 9), so that it has `AGENTS.md` and every file the
+audit compares.
 
 *Why a generator and not a GitHub template repository:* a template repository
 is a second copy of the policy files and pins, and it would have to be
@@ -52,7 +58,7 @@ cpp_policy_apply(app)
 
 cpp_policy_size_budget(app MACOS 109568 LINUX 93184 WINDOWS 285696)  # stripped bytes (POLICY.md 13.5)
 
-enable_testing()            # doctest programs; each test case becomes a CTest test (POLICY.md 13)
+enable_testing()            # doctest programs, one per kind and module (POLICY.md 13.2)
 cpp_policy_add_tests(unit model SOURCES tests/test_board.cpp LIBRARIES app_core)
 
 cpp_policy_layers(          # the modules under src/, from the lowest layer up (POLICY.md 11.1)
@@ -67,8 +73,8 @@ cpp_policy_add_checks()     # once: policy-audit, policy-format-check, policy-fo
 
 Tests use doctest, from vcpkg: add it to `vcpkg.json` (POLICY.md 1.1).
 `cmake --workflow --preset unit` (`win-unit` on Windows) builds without
-clang-tidy, at `-O1`, and runs only the unit tests, for a quick check while
-working. Speed benchmarks use nanobench: add it to `vcpkg.json` and
+clang-tidy, optimized (`-O1`; `RelWithDebInfo` on Windows), and runs only
+the unit tests, for a quick check while working. Speed benchmarks use nanobench: add it to `vcpkg.json` and
 `cpp_policy_add_tests(benchmark …)` links it (POLICY.md 14.2).
 
 Pin the commit a release tag points to, with the tag in a comment, rather
@@ -92,29 +98,31 @@ sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.41.0
 
 Any copy of this repository's `tools/upgrade.sh` works (from v0.10.1 on): it
 fetches the release from the project's `GIT_REPOSITORY` and hands over to the
-release's own `upgrade.sh`, which knows what that release changed. It moves the `GIT_TAG` pin and the
-CI gate pins to the release's commit (with the tag in the comment), copies
-`.clang-tidy`, `.clang-format`, `CMakePresets.json`, `tools/hooks/` and, in a
-project with a `vcpkg.json`, `tools/vcpkg/`, replaces the section "Before you
-say you are done" of `AGENTS.md` with the release's, updates the `Policy:`
-line of `CHANGELOG.md`, checks every change, shows
-the diff and the release's CHANGELOG entry (follow its "Upgrading a project"
-steps), and runs the gate. It commits nothing. `--no-gate` skips the gate.
+release's own `upgrade.sh`, which knows what that release changed. It
+moves the `GIT_TAG` pin and the CI gate pins to the release's commit (with
+the tag in the comment), copies `.clang-tidy`, `.clang-format`,
+`CMakePresets.json`, `.claude/settings.json`, `tools/hooks/` and
+`tools/vcpkg/`, replaces the policy's part of `AGENTS.md` (everything above
+`## This project`) with the release's, updates the `Policy:` line of
+`CHANGELOG.md`, checks every change, shows the diff and the release's
+CHANGELOG entry (follow its "Upgrading a project" steps), and runs the local
+gate. It commits nothing. `--no-gate` skips the gate.
 These are policy files, so in a project that follows `AGENTS.md` the owner
 runs it, not an agent.
 
 Copy `.clang-tidy` and `.clang-format` into the project root unchanged. The
 copies are for editors: clangd and IDEs look for these files next to the
 sources, so they show the same warnings and formatting while you type. The
-build never reads them; it always uses this repository's copies. The audit
-fails if the copies differ, so the editor and the build can't disagree.
+build never reads them; it uses this repository's copies (on Windows with
+one check off, POLICY.md 12, W5). The audit fails if the copies differ, so
+the editor and the build can't disagree.
 
 Copy `CMakePresets.json` unchanged too; it defines the presets and workflows
-the gate and CI run. The audit fails if the presets differ from this
+the local gate and the CI gate run. The audit fails if the presets differ from this
 repository's.
 
-A project that uses vcpkg copies `tools/vcpkg/` unchanged and loads it in its
-`CMakeLists.txt`, before `project()`:
+Every project uses vcpkg (doctest comes from it): it copies `tools/vcpkg/`
+unchanged and loads it in its `CMakeLists.txt`, before `project()`:
 
 ```cmake
 include("${CMAKE_CURRENT_SOURCE_DIR}/tools/vcpkg/setup.cmake")
@@ -134,12 +142,12 @@ Copy `tools/hooks/` unchanged as well, and enable the hooks once per clone:
 git config core.hooksPath tools/hooks
 ```
 
-`pre-commit` runs the suppression audit, the format check and clang-tidy on the
-staged C++ files; `commit-msg` checks
-the message (Conventional Commits with a body that says why, POLICY.md 8.2);
-`pre-push` runs the full gate and refuses to start while there are
-uncommitted changes, so it tests exactly what is pushed. The audit fails if the hooks differ from these,
-and configuration warns while a clone hasn't enabled them.
+`pre-commit` runs the audit, the format check and clang-tidy on the staged
+C++ files; `commit-msg` checks the message (Conventional Commits with a body
+that says why, POLICY.md 8.2); `pre-push` runs the local gate and refuses to
+start while there are uncommitted changes, so it tests exactly what is
+pushed. The audit fails if the hooks differ from these, and configuration
+warns while a clone hasn't enabled them.
 
 `tools/hooks/tidy-files` isn't a git hook but a command: `sh
 tools/hooks/tidy-files <file>...` runs clang-tidy on just those files, a few
@@ -175,7 +183,7 @@ build uses. Move both in the same commit when upgrading.
 repositories; private ones spend the account's Actions minutes, and a macOS
 minute costs about ten Linux ones (Windows about two).
 
-**A library in a private repository** (POLICY.md 11.7). The gate can't fetch
+**A library in a private repository** (POLICY.md 11.7). The CI gate can't fetch
 it without a token. The owner does this once, in the browser:
 
 1. On GitHub, *Settings > Developer settings > Fine-grained tokens*: a token
@@ -190,23 +198,20 @@ it without a token. The owner does this once, in the browser:
          library_token: ${{ secrets.LIBRARY_TOKEN }}
    ```
 
-The gate gives the token to git for the job only, as a header sent to the
+The CI gate gives the token to git for the job only, as a header sent to the
 libraries' addresses and to no other; nothing is written to the runner. A
 fine-grained token expires: the job then fails to fetch, and the fix is a
 new token in the same secret.
 
-A newer push makes an older run of the same branch obsolete, and the gate
-cancels it: on a branch the older run is stopped; on the default branch the
-run in progress finishes and only runs still waiting behind it are dropped.
-A tag's run is never cancelled. Projects need nothing in their own workflow
-for this.
+The CI gate cancels runs that a newer push made obsolete (POLICY.md 8);
+projects need nothing in their own workflow for this.
 
 ### Your own machine as a runner
 
 `self_hosted: '["macos"]'` runs the macOS jobs on your own Mac instead
 (`"linux"` and `"windows"` work the same way). Its minutes are free. While
 the machine is off or asleep, its jobs wait; GitHub fails a job that waits
-more than 24 hours (re-run it from the Actions page). The gate installs and
+more than 24 hours (re-run it from the Actions page). The CI gate installs and
 resets nothing there: it uses the machine's LLVM 23, CMake and Ninja, and
 keeps a vcpkg copy of its own in the runner's folder.
 
@@ -231,19 +236,17 @@ The repository's Settings, Actions, Runners then shows it as Idle. To remove
 it: `./svc.sh uninstall`, then `./config.sh remove` with the token GitHub shows.
 
 **A runner that shares its machine with local builds needs more time.** A
-job is stopped after 45 minutes. Alfar's macOS check job took 22 minutes
-alone, and was stopped at 45 while a local build ran beside it. Give it more
-in the project's workflow, under `with:`:
+job is stopped after 45 minutes, and a check job that takes half of that
+alone can pass it while a local build runs beside it. Give it more in the
+project's workflow, under `with:`:
 
 ```yaml
       timeout_minutes: 90
 ```
 
 On such a machine, CI and your local gates share the tidy cache (POLICY.md
-8), so a CI check job on a commit your gate has just checked can skip
-clang-tidy for the files it finds there. Between two local folders of
-Alfar's, that took a check build from 984 s to 361 s; in a real CI job it
-hasn't been measured yet.
+8), so a CI check job on a commit your local gate has just checked can skip
+clang-tidy for the files it finds there.
 
 ## Options (set by presets)
 
@@ -254,13 +257,14 @@ hasn't been measured yet.
 | `CPP_POLICY_CLANG_TIDY` | `OFF` | Run clang-tidy during the build |
 | `CPP_POLICY_HARDENING` | `fast` | Standard library hardening: `fast` or `debug` |
 | `CPP_POLICY_EXCEPTIONS` | `ON` | Exceptions and RTTI |
-| `CPP_POLICY_CONFINED_DIRS` | `src/lowlevel` | Where suppressions are allowed |
-| `CPP_POLICY_EXCLUDED_DIRS` | `build;out;.git;third_party;external;vcpkg_installed` | Skipped by audit/format |
+| `CPP_POLICY_CONFINED_DIRS` | `src/lowlevel`, and a library's `lib/<name>/lowlevel` | Where suppressions are allowed. Fixed: configuration fails if a project changes it (POLICY.md 4) |
+| `CPP_POLICY_EXCLUDED_DIRS` | `build;out;.git;third_party;external;vcpkg_installed` | Skipped by the audit and the format check. Fixed, like the one above |
 | `CPP_POLICY_RANDOM_TEST_ORDER` | `OFF` (`ON` in the release presets) | A unit program's test cases run in a random order (POLICY.md 13.2) |
 | `CPP_POLICY_TEST_SEED` | chosen at the first configure | The seed of that order; set it to repeat one |
 
 Environment variables: `CPP_POLICY_TIDY_CACHE` (the tidy cache's folder, or
-`off`; POLICY.md 8) and `CPP_POLICY_GATE_LOCK` (the gate's lock file).
+`off`; POLICY.md 8) and `CPP_POLICY_GATE_LOCK` (the launcher's lock, a
+folder; POLICY.md 8).
 
 ## Requirements
 
@@ -269,6 +273,7 @@ Environment variables: `CPP_POLICY_TIDY_CACHE` (the tidy cache's folder, or
   installation (the last two check size budgets, POLICY.md 13.5)
 - CMake ≥ 3.29
 - Ninja
+- vcpkg, with `VCPKG_ROOT` set to its folder (POLICY.md 1.1)
 - On a Mac: macOS 26 or later. Every build is for macOS 26.0 (POLICY.md 1)
 
 ## Setup per platform
@@ -303,7 +308,7 @@ Things to know:
   `/usr/lib/llvm-23/bin` are what the presets use.
 - **Windows:** the LLVM that comes with Visual Studio may be older than 23.
   Use the official installer.
-- **Windows, self-hosted CI runners:** exactly the Microsoft toolset the gate
+- **Windows, self-hosted CI runners:** exactly the Microsoft toolset the CI gate
   pins (`MSVC_TOOLSET` in `gate.yml`, POLICY.md 1), and no other.
 - **Windows:** the `win-dev` and `win-check` presets build with AddressSanitizer,
   and the MSVC standard library then links `stl_asan.lib`. It comes with the
