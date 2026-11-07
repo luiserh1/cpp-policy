@@ -5,3 +5,4 @@ __attribute__((nocf_check)) int d(int x) { return x; } // reason given
 __declspec(safebuffers) int e(int x) { return x; } // reason given
 __declspec(guard(nocf)) int f(int x) { return x; } // reason given
 __attribute__((no_sanitize_address)) int g(int x) { return x; } // reason given
+int h(int x) { __attribute__((stack_protector_ignore)) int y = x; return y; } // reason given
