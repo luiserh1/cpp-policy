@@ -27,6 +27,9 @@ that blocks a project. Meanwhile:
       review of release-0.42): a sanitizer suppression list, which POLICY.md
       5 counts as a suppression. Not closed in 0.42.0, which takes in only
       what was decided.
+- [ ] UBSan on Windows, with ASan, in `win-check` (owner, 2026-11-07): it
+      was left out at 0.1.0 without being tried (POLICY.md 7.3), and the
+      documentation then said the two together link with `/MD`.
 
 ## Later
 

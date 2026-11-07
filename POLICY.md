@@ -765,10 +765,10 @@ project uses is compiled as a dependency, section 11.7): `-Wall -Wextra -Wpedant
 -Wsign-conversion -Wnull-dereference -Wdouble-promotion -Wformat=2
 -Wimplicit-fallthrough -Wzero-as-null-pointer-constant -Wextra-semi -Werror`.
 With `clang-cl`, `/W4` replaces `-Wall -Wextra` (in `clang-cl`, `-Wall` means
-`-Weverything`). Each warning on the list points at a kind of bug the subset
-bans (conversions that lose data, shadowing, old-style casts, null pointers)
-and rarely fires on correct code; as errors, none is left for later (since
-0.1.0).
+`-Weverything`). Each warning on the list points at a bug, or at code the
+subset bans (conversions that lose data, shadowing, old-style casts, null
+pointers), and rarely fires on correct code; as errors, none is left for later
+(since 0.1.0).
 
 One warning of `-Wextra` is off: `-Wmissing-designated-field-initializers`.
 It rejected `Options{.width = 4}` whenever another member had no default
@@ -801,8 +801,10 @@ What to know:
   Visual Studio component "C++ AddressSanitizer" for `stl_asan.lib` (README).
 - ASan does not work with the debug C runtime, so the Windows `dev` preset
   uses the release runtime (`/MD`) with debug info.
-- UBSan is not enabled on Windows (since 0.1.0). The code it would check
-  is the code macOS and Linux run it on, apart from confined Windows files.
+- UBSan is not enabled on Windows (since 0.1.0). At 0.1.0 its runtime was
+  documented as linking with the release runtime only together with ASan,
+  and it was left out rather than tried. The code it would check is the
+  code macOS and Linux run it on, apart from confined Windows files.
 - ThreadSanitizer isn't available with `clang-cl`, so Windows has no `tsan`
   workflow.
 
@@ -1000,7 +1002,7 @@ agent here at the end of each stage.
   and the roadmap's layout (11.5), a confine line for every dependency
   (11.6), a library release green on every system (11.7).
 - 13.4: `REQUIRE` versus `CHECK`, one behavior per test, fakes, no sleeps,
-  nothing on screen, tests through public headers, real data used by hand.
+  tests through public headers, real data used by hand.
 - 13.5: a size budget on every system for each shipped program, and a
   memory test for every server.
 - 14: measuring before optimizing, with numbers before and after.
@@ -1227,8 +1229,9 @@ declared. Files directly in `src/` (`main.cpp`) are the top.
 | Limit, test sources (under `tests/`) | 500 | The same |
 
 A file of one responsibility rarely needs more than 250 lines, and one past
-350 usually holds two; the limit makes the split happen when it is cheap
-(since 0.2.0, enforced since 0.6.0).
+350 usually holds two; the limit makes the split happen when it is cheap.
+An agent reads a file whole, and 250 lines fit in one careful read (since
+0.2.0, enforced since 0.6.0).
 
 - When a new feature would push a file past the target, split the file by
   responsibility first, then add the feature.
@@ -1816,9 +1819,6 @@ Projects add it to `vcpkg.json` like any dependency (section 1.1).
     behind, and a lock judged by age would make the second run after a
     timeout (section 7) fail on it (since 0.41.0). The launcher's own lock works
     this way.
-- **Tests and checks show nothing on the owner's screen:** no visible
-  window, no sound, no notification, since the owner works on the machine
-  while gates run. A test that needs a window opens a hidden one.
 - **`REQUIRE` only for what the rest of the test depends on;** `CHECK` for
   everything else, so one run reports every failure. For example,
   `REQUIRE(result.has_value())` comes before `*result`, and
@@ -2220,8 +2220,9 @@ those would do (W3 in section 12). This section will grow when they arrive.
 A program with more than one frontend (a command line and a window, or
 later a phone) has three parts, each one or more layers (11.1): the backend,
 which does the work and holds the dependencies (11.6); the interface, which
-is what a user can do; and the frontends, which only present it. A new
-frontend then adds presentation and nothing else (since 0.26.1).
+is what a user can do; and the frontends, which only present it. The
+dependencies then stay in the backend, and a new frontend adds presentation
+and nothing else (since 0.26.1).
 
 - **Plain data in and out:** the interface's functions take and return
   `struct`s of section 15.1, standard-library types, and nothing from a

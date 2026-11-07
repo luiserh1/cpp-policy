@@ -170,7 +170,7 @@ changes come with this release.
   its `ROADMAP.md` item, and section 9's copy of the working agreement to a
   pointer to `AGENTS.md`. 8.1 lists every rule no tool checks, one line
   each. "The owner" is defined once, as the person who decides for a
-  project. 2,409 lines became 2,277. *Why:* the file served four readers
+  project. 2,409 lines became 2,278. *Why:* the file served four readers
   (agents, the owner, cpp-policy's maintainer, and anyone asking why), and
   is about 35,000 tokens (an estimate) for an agent that reads it whole.
   *Rejected:* splitting it into several files.
@@ -188,6 +188,10 @@ changes come with this release.
 - `upgrade.sh`'s path for projects from before v0.15.0, and
   `new-project.sh --vcpkg`. All five projects are on v0.38.0 or later, and
   POLICY.md 11.5 asks for no code for formats nobody depends on.
+- "Tests and checks show nothing on the owner's screen" (POLICY.md 13.4,
+  since 0.41.0). The owner's decision of 2026-11-07: a rule for the owner's
+  comfort isn't a rule about the code, and nothing checked it. A project's
+  tests that open hidden windows can keep them.
 
 ### Decided and not done
 
