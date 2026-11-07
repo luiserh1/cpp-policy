@@ -1,0 +1,1 @@
+turns hardening off: -U_FORTIFY_SOURCE.*turns hardening off: -Wp,-U_FORTIFY_SOURCE.*turns hardening off: -Wp,-D_FORTIFY_SOURCE=1

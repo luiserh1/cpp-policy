@@ -283,7 +283,7 @@ function(cpp_policy_apply target)
         # Compiling with the flag instruments the calls; linking with it writes the table and
         # the PE flag, and lld-link, which CMake calls directly, won't do that on its own.
         # Stack cookies need nothing here: clang-cl compiles with -stack-protector 2 (strong)
-        # by default, and the audit rejects /GS-. tests/hardening/pe_flags.cmake checks the
+        # by default, and the configure checks reject /GS-. tests/hardening/pe_flags.cmake checks the
         # result on every sanitized or release build.
         target_compile_options(${target} PRIVATE $<$<NOT:$<CONFIG:Debug>>:/guard:cf>)
         target_link_options(${target} PRIVATE $<$<NOT:$<CONFIG:Debug>>:/guard:cf>)
@@ -505,17 +505,27 @@ endfunction()
 # or weakens a protection the policy turns on: the stack protector, fortify, control-flow
 # protection, standard-library hardening, the sanitizers, and clang-cl's hardening. clang-cl
 # accepts either prefix, so both are checked. An option is checked in every piece
-# (_cpp_policy_option_pieces), and named whole in the problem. Undefining _FORTIFY_SOURCE is
-# allowed only when a definition that keeps the policy's level follows in the same list, as
-# in the policy's own options and triplets.
+# (_cpp_policy_option_pieces), and named whole in the problem; what -Wp, passes to the
+# preprocessor is checked too. Undefining _FORTIFY_SOURCE is refused: the policy defines it at
+# its level itself, and the only -U_FORTIFY_SOURCE allowed is the policy's own, which
+# cpp_policy_apply adds as two list elements and is taken out before the check.
 # (The parameter must not be called `problems`: it would shadow the caller's list.)
 function(_cpp_policy_check_options what options out_list)
     set(found ${${out_list}})
-    set(unfortified "")
+    string(REPLACE "$<$<NOT:$<CONFIG:Debug>>:-U_FORTIFY_SOURCE;-D_FORTIFY_SOURCE=3>" ""
+        options "${options}")
     foreach(option IN LISTS options)
         _cpp_policy_option_pieces("${option}" pieces)
-        set(problem "")
+        set(expanded "")
         foreach(piece IN LISTS pieces)
+            list(APPEND expanded "${piece}")
+            if(piece MATCHES "^-Wp,(.+)$")
+                string(REPLACE "," ";" passed "${CMAKE_MATCH_1}")
+                list(APPEND expanded ${passed})
+            endif()
+        endforeach()
+        set(problem "")
+        foreach(piece IN LISTS expanded)
             if(piece STREQUAL "-Wno-missing-designated-field-initializers")
                 # The policy's own (cpp_policy_apply, POLICY.md 2.10).
             elseif(piece MATCHES "^-Wno-|^/wd[0-9]" OR piece MATCHES "^[-/]w$" OR piece STREQUAL "/W0")
@@ -527,14 +537,11 @@ function(_cpp_policy_check_options what options out_list)
                    OR piece MATCHES "^[-/]U(_LIBCPP_HARDENING_MODE|_GLIBCXX_ASSERTIONS|_MSVC_STL_HARDENING)$")
                 set(problem "turns hardening off")
             elseif(piece MATCHES "^[-/]U_FORTIFY_SOURCE$")
-                set(unfortified "${option}")
+                set(problem "turns hardening off")
             elseif(piece MATCHES "^[-/]D(.*)$")
-                set(definition "${CMAKE_MATCH_1}")
-                _cpp_policy_definition_weakens("${definition}" weakens)
+                _cpp_policy_definition_weakens("${CMAKE_MATCH_1}" weakens)
                 if(weakens)
                     set(problem "turns hardening off")
-                elseif(definition MATCHES "^_FORTIFY_SOURCE=")
-                    set(unfortified "")
                 endif()
             endif()
         endforeach()
@@ -542,11 +549,6 @@ function(_cpp_policy_check_options what options out_list)
             list(APPEND found "${what} ${problem}: ${option}")
         endif()
     endforeach()
-    if(NOT unfortified STREQUAL "")
-        string(REPLACE ";" " " unfortified "${unfortified}")
-        list(APPEND found
-            "${what} turns hardening off: ${unfortified}, with no -D_FORTIFY_SOURCE=3 after it")
-    endif()
     set(${out_list} ${found} PARENT_SCOPE)
 endfunction()
 
