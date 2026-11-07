@@ -7,17 +7,16 @@
 # pinned to that commit, in CMakeLists.txt and in its CI workflow, and gets that release's
 # policy files, agent instructions and settings, and a small program that shows each layer,
 # with its tests. It uses vcpkg, at least for doctest: vcpkg.json gets the baseline your
-# VCPKG_ROOT is checked out at. (--vcpkg, needed before v0.19.0, is still accepted.) The
-# folder becomes a git repository with the hooks enabled, and the template is its first
-# commit, so that the project's own first commit shows only the project's work.
+# VCPKG_ROOT is checked out at. The folder becomes a git repository with the hooks enabled,
+# and the template is its first commit, so that the project's own first commit shows only the
+# project's work.
 set -eu
 
 usage() {
     echo "usage: sh new-project.sh <folder> <Name>" >&2
     exit 2
 }
-[ $# -ge 2 ] && [ $# -le 3 ] || usage
-[ $# -eq 2 ] || [ "$3" = --vcpkg ] || usage
+[ $# -eq 2 ] || usage
 dest=$1
 name=$2
 [ -n "${VCPKG_ROOT:-}" ] || {
@@ -48,12 +47,16 @@ cmake "-DPOLICY_ROOT=$policy" "-DDEST=$dest" "-DNAME=$name" "-DCOMMIT=$commit" "
 git -C "$dest" init --quiet
 # The template is committed before the hooks are enabled: it is this release's, unchanged,
 # and cpp-policy's own CI builds and checks it (tests/new_project).
+# The message has a body, as the commit-msg hook requires (POLICY.md 8.2), so that the
+# fallback below passes it once the hooks are on.
+subject="chore: start from cpp-policy $tag's template"
+body="The template as cpp-policy $tag generates it, unchanged."
 git -C "$dest" add --all
-if git -C "$dest" commit --quiet -m "chore: start from cpp-policy $tag's template" 2>/dev/null; then
+if git -C "$dest" commit --quiet -m "$subject" -m "$body" 2>/dev/null; then
     committed="The template is committed; the project's work starts at the next commit."
 else
     committed="git could not commit the template (no user.name or user.email?). Commit it
-before changing anything: git add --all && git commit -m \"chore: start from cpp-policy $tag's template\""
+before changing anything: git add --all && git commit -m \"$subject\" -m \"$body\""
 fi
 git -C "$dest" config core.hooksPath tools/hooks
 echo

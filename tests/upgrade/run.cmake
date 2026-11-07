@@ -4,10 +4,9 @@
 #
 # - it moves the GIT_TAG pin and the CI gate pin to the new release's commit and tag, copies
 #   the policy files (hooks executable), leaves other lines alone and shows the CHANGELOG entry;
-# - with a vcpkg.json, it copies tools/vcpkg/ and replaces the lines that loaded vcpkg before
-#   v0.15.0 with an include of tools/vcpkg/setup.cmake;
-# - it refuses a working folder with uncommitted changes, an unknown tag, and vcpkg lines it
-#   doesn't know, changing nothing.
+# - it adds .claude/settings.json when the project has none;
+# - with a vcpkg.json, it copies tools/vcpkg/;
+# - it refuses a working folder with uncommitted changes and an unknown tag, changing nothing.
 # The gate isn't run (--no-gate): that needs a real project. On Windows the script runs under
 # the sh of Git for Windows.
 
@@ -61,8 +60,8 @@ endfunction()
 
 # Writes one release of the fake policy: every copied file says which release it is.
 function(release version changelog)
-    foreach(name IN ITEMS .clang-tidy .clang-format CMakePresets.json tools/hooks/pre-commit
-                     tools/hooks/pre-push)
+    foreach(name IN ITEMS .clang-tidy .clang-format CMakePresets.json .claude/settings.json
+                     tools/hooks/pre-commit tools/hooks/pre-push)
         file(WRITE "${policy}/${name}" "# ${name} of ${version}\n")
     endforeach()
     file(WRITE "${policy}/CHANGELOG.md" "# Changelog\n\n${changelog}")
@@ -97,22 +96,13 @@ release(2.0.0 "## 2.0.0 (2026-02-01)\n\nSecond: do the upgrade steps.\n\n## 1.0.
 run("${policy}" ${git} rev-parse HEAD)
 string(STRIP "${out}" new)
 
-# The project, on release 1.0.0, with dependencies loaded the way releases before v0.15.0 did.
-set(old_vcpkg_lines
-    "# vcpkg's toolchain is loaded here, before project(), so CMakePresets.json stays cpp-policy's\n"
-    "# unchanged copy. Without VCPKG_ROOT its path would be broken, and CMake's own error doesn't say\n"
-    "# why (cpp-policy POLICY.md 1.1).\n"
-    "if(NOT DEFINED ENV{VCPKG_ROOT})\n"
-    "    message(FATAL_ERROR \"VCPKG_ROOT is not set: set it to the vcpkg directory (README: Building).\")\n"
-    "endif()\n"
-    "set(CMAKE_TOOLCHAIN_FILE \"\$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake\" CACHE FILEPATH\n"
-    "    \"vcpkg's toolchain (the presets are cpp-policy's unchanged copy)\")\n")
-string(JOIN "" old_vcpkg_lines ${old_vcpkg_lines})
+# The project, on release 1.0.0, with dependencies loaded through tools/vcpkg/setup.cmake.
+set(vcpkg_include "include(\"\${CMAKE_CURRENT_SOURCE_DIR}/tools/vcpkg/setup.cmake\")\n")
 file(WRITE "${project}/vcpkg.json" "{ \"name\": \"fixture\", \"dependencies\": [] }\n")
 file(WRITE "${project}/CMakeLists.txt"
     "cmake_minimum_required(VERSION 3.29)\n"
     "\n"
-    "${old_vcpkg_lines}"
+    "${vcpkg_include}"
     "\n"
     "project(fixture LANGUAGES CXX)\n"
     "include(FetchContent)\n"
@@ -135,7 +125,8 @@ file(WRITE "${project}/AGENTS.md"
     "## Never\n\n- The project's own rule.\n")
 file(WRITE "${project}/CHANGELOG.md"
     "# Changelog\n\nPolicy: cpp-policy v1.0.0.\n\n## 0.1.0\n\nOn the policy v1.0.0 since the start.\n")
-# Release 1.0.0's files, as the project copied them.
+# Release 1.0.0's files, as the project copied them; .claude/settings.json is left out, as
+# in a project generated before there was one.
 run("${policy}" ${git} checkout --quiet v1.0.0 -- .)
 foreach(name IN ITEMS .clang-tidy .clang-format CMakePresets.json tools/hooks/pre-commit
                      tools/hooks/pre-push)
@@ -163,18 +154,6 @@ expect("NOT;code;EQUAL;0;AND;found;GREATER;-1" "it must fail on an unknown tag")
 run("${project}" ${git} status --porcelain)
 set(nothing "")
 expect("out;STREQUAL;nothing" "an unknown tag must leave the project unchanged")
-
-# Refused: vcpkg loaded with other lines than the old releases gave. Nothing may change.
-file(READ "${project}/CMakeLists.txt" cmake)
-string(REPLACE "(README: Building)" "(see our wiki)" edited "${cmake}")
-file(WRITE "${project}/CMakeLists.txt" "${edited}")
-run("${project}" ${git} commit --quiet -am "our own vcpkg lines")
-run("${project}" ${upgrade} v2.0.0 --no-gate)
-string(FIND "${out}" "doesn't load vcpkg with the lines" found)
-expect("NOT;code;EQUAL;0;AND;found;GREATER;-1" "it must refuse vcpkg lines it doesn't know")
-run("${project}" ${git} status --porcelain)
-expect("out;STREQUAL;nothing" "unknown vcpkg lines must leave the project unchanged")
-run("${project}" ${git} reset --quiet --hard HEAD~1)
 
 # The upgrade.
 run("${project}" ${upgrade} v2.0.0 --no-gate)
@@ -206,8 +185,8 @@ expect("pinned;GREATER;-1;AND;untouched;GREATER;-1" "the CI gate must be pinned 
 string(FIND "${ci}" "benchmark.yml@${new} # v2.0.0\n" pinned)
 expect("pinned;GREATER;-1" "the CI benchmark workflow must be pinned to v2.0.0's commit")
 
-foreach(name IN ITEMS .clang-tidy .clang-format CMakePresets.json tools/hooks/pre-commit
-                     tools/hooks/pre-push)
+foreach(name IN ITEMS .clang-tidy .clang-format CMakePresets.json .claude/settings.json
+                     tools/hooks/pre-commit tools/hooks/pre-push)
     file(READ "${project}/${name}" content)
     set(wanted "# ${name} of 2.0.0\n")
     expect("content;STREQUAL;wanted" "${name} must be v2.0.0's copy")
@@ -226,20 +205,15 @@ expect("handed;GREATER;-1;AND;ran;GREATER;-1" "it must hand over to the release'
 string(FIND "${out}" "?? tools/hooks/commit-msg" listed)
 expect("listed;GREATER;-1" "the changes shown must include a file the release adds")
 
-# A project with a vcpkg.json gets the release's tools/vcpkg/, loaded by one include in place
-# of the old lines, with the rest of CMakeLists.txt as it was.
+# A project with a vcpkg.json gets the release's tools/vcpkg/, and the line that loads it stays.
 foreach(name IN LISTS vcpkg_files)
     file(READ "${project}/${name}" content)
     set(wanted "# ${name} of 2.0.0\n")
     expect("content;STREQUAL;wanted" "${name} must be v2.0.0's copy")
 endforeach()
-string(FIND "${cmake}" "${old_vcpkg_lines}" stale)
-string(FIND "${cmake}" "cmake_minimum_required(VERSION 3.29)\n\n# vcpkg is loaded before project()"
-    replaced)
-string(FIND "${cmake}"
-    "include(\"\${CMAKE_CURRENT_SOURCE_DIR}/tools/vcpkg/setup.cmake\")\n\nproject(fixture" included)
-expect("stale;EQUAL;-1;AND;replaced;GREATER;-1;AND;included;GREATER;-1"
-    "the old vcpkg lines must become the include of tools/vcpkg/setup.cmake, in their place:\n${cmake}")
+string(FIND "${cmake}" "cmake_minimum_required(VERSION 3.29)\n\n${vcpkg_include}\nproject(fixture"
+    kept)
+expect("kept;GREATER;-1" "the line that loads vcpkg must stay as it was:\n${cmake}")
 
 # --- A library's pin (POLICY.md 11.7): moved to a release's commit, with the tag beside it.
 set(library "${WORK}/geometry")

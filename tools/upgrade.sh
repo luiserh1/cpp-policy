@@ -13,9 +13,9 @@
 # GIT_REPOSITORY. The script changes only what a release defines, and checks every change:
 #   - the GIT_TAG pin in CMakeLists.txt: the release's commit, with the tag in a comment;
 #   - the pins of cpp-policy's CI gate in .github/workflows/, if there are any;
-#   - the copies of .clang-tidy, .clang-format, CMakePresets.json and tools/hooks/;
-#   - with a vcpkg.json, the copies of tools/vcpkg/, and the lines in CMakeLists.txt that load
-#     vcpkg (the ones releases before v0.15.0 gave become an include of tools/vcpkg/setup.cmake);
+#   - the copies of .clang-tidy, .clang-format, CMakePresets.json, .claude/settings.json and
+#     tools/hooks/;
+#   - with a vcpkg.json, the copies of tools/vcpkg/;
 #   - in AGENTS.md, everything from "## Before you say you are done" up to "## Never" (when
 #     the gate runs, and how agents work for the owner), which becomes the release's; the rest
 #     of the file is the project's and is left alone;
@@ -153,55 +153,6 @@ rewrite() {
     cat "$work/rewrite" >"$file"
 }
 
-# vcpkg is loaded through the policy's tools/vcpkg/setup.cmake (POLICY.md 1.1). Projects from
-# before v0.15.0 load it with these lines instead; they are replaced in step 4. Checked before
-# anything changes, so a project that loads vcpkg some other way is left as it was.
-vcpkg_include='include("${CMAKE_CURRENT_SOURCE_DIR}/tools/vcpkg/setup.cmake")'
-cat >"$work/vcpkg-old" <<'EOF'
-# vcpkg's toolchain is loaded here, before project(), so CMakePresets.json stays cpp-policy's
-# unchanged copy. Without VCPKG_ROOT its path would be broken, and CMake's own error doesn't say
-# why (cpp-policy POLICY.md 1.1).
-if(NOT DEFINED ENV{VCPKG_ROOT})
-    message(FATAL_ERROR "VCPKG_ROOT is not set: set it to the vcpkg directory (README: Building).")
-endif()
-set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE FILEPATH
-    "vcpkg's toolchain (the presets are cpp-policy's unchanged copy)")
-EOF
-cat >"$work/vcpkg-new" <<'EOF'
-# vcpkg is loaded before project(), where it installs the dependencies, through cpp-policy's
-# files in tools/vcpkg/: they build the dependencies like the project (cpp-policy POLICY.md 1.1).
-include("${CMAKE_CURRENT_SOURCE_DIR}/tools/vcpkg/setup.cmake")
-EOF
-# Writes CMakeLists.txt with the old lines replaced to $work/CMakeLists.txt, or fails unless
-# they appear exactly once.
-replace_vcpkg_lines() {
-    awk 'FILENAME == ARGV[1] { old[++n] = $0; next }
-         FILENAME == ARGV[2] { new[++m] = $0; next }
-         { line[++count] = $0 }
-         END {
-             found = 0
-             for (i = 1; i <= count - n + 1; i++) {
-                 same = 1
-                 for (j = 1; j <= n && same; j++) same = (line[i + j - 1] == old[j])
-                 if (same) { found++; at = i }
-             }
-             if (found != 1) exit 1
-             for (i = 1; i <= count; i++) {
-                 if (i == at) { for (j = 1; j <= m; j++) print new[j]; i += n - 1; continue }
-                 print line[i]
-             }
-         }' "$work/vcpkg-old" "$work/vcpkg-new" CMakeLists.txt >"$work/CMakeLists.txt"
-}
-vcpkg_lines=no
-if [ -f vcpkg.json ] && ! grep -qF "$vcpkg_include" CMakeLists.txt; then
-    replace_vcpkg_lines ||
-        fail "CMakeLists.txt doesn't load vcpkg with the lines releases before v0.15.0 gave, so it
-can't be changed automatically. Load vcpkg before project() with this line instead, then run
-the upgrade again:
-  $vcpkg_include"
-    vcpkg_lines=yes
-fi
-
 # 1. The GIT_TAG pin, and its "# <tag>" comment (added if missing).
 rewrite CMakeLists.txt -e "${pin_line}s/[0-9a-f]\{40\}/$commit/"
 if sed -n "${pin_line}p" CMakeLists.txt | grep -q '#[[:space:]]*v[0-9]'; then
@@ -228,7 +179,8 @@ for workflow in .github/workflows/*.yml .github/workflows/*.yaml; do
 done
 
 # 3. The files projects copy unchanged. The hooks must stay executable.
-for name in .clang-tidy .clang-format CMakePresets.json; do
+mkdir -p .claude
+for name in .clang-tidy .clang-format CMakePresets.json .claude/settings.json; do
     cp "$policy/$name" "$name"
 done
 mkdir -p tools/hooks
@@ -236,7 +188,7 @@ for hook in "$policy"/tools/hooks/*; do
     cp "$hook" "tools/hooks/$(basename "$hook")"
     chmod 755 "tools/hooks/$(basename "$hook")"
 done
-for name in .clang-tidy .clang-format CMakePresets.json; do
+for name in .clang-tidy .clang-format CMakePresets.json .claude/settings.json; do
     cmp -s "$policy/$name" "$name" || fail "$name doesn't match $tag's copy after copying"
 done
 for hook in "$policy"/tools/hooks/*; do
@@ -254,19 +206,11 @@ if [ -f vcpkg.json ]; then
         cmp -s "$policy/tools/vcpkg/$name" "tools/vcpkg/$name" ||
             fail "tools/vcpkg/$name doesn't match $tag's copy after copying"
     done
-    if [ "$vcpkg_lines" = yes ]; then
-        # Again, on the file as step 1 left it (the pin isn't in the replaced lines).
-        replace_vcpkg_lines || fail "the lines that load vcpkg changed during the upgrade"
-        cat "$work/CMakeLists.txt" >CMakeLists.txt
-        grep -qF "$vcpkg_include" CMakeLists.txt ||
-            fail "CMakeLists.txt doesn't include tools/vcpkg/setup.cmake after the change"
-    fi
 fi
 
 # 5. AGENTS.md says when the gate runs, and releases change that: the section from "## Before
-# you say you are done" up to "## Never" becomes the release's. Until v0.38.0 the owner did
-# this with a script of their own after each release, and the uncommitted file then stopped
-# this script. A file without exactly one such section is left alone, and said so.
+# you say you are done" up to "## Never" becomes the release's. A file without exactly one
+# such section is left alone, and said so.
 agents_note=
 template=$policy/template/AGENTS.md.in
 section_start='^## Before you say you are done'
@@ -318,14 +262,11 @@ echo "The .gitignore and .gitattributes lines the release requires are checked b
 [ -z "$changelog_note" ] || echo "$changelog_note"
 [ -z "$agents_note" ] || echo "$agents_note"
 
-# 8. The gate, with the preset for this system (as the git hooks choose it).
+# 8. The local gate, through its launcher (POLICY.md 8), which picks the preset for this
+# system.
 if [ "$gate" = yes ]; then
-    case "$(uname -s)" in
-        MINGW* | MSYS* | CYGWIN*) preset=win-check ;;
-        *) preset=check ;;
-    esac
-    cmake --workflow --preset "$preset"
-    echo "upgrade: done, and the $preset gate passed. Review the diff, then commit it."
+    sh tools/hooks/gate
+    echo "upgrade: done, and the gate passed. Review the diff, then commit it."
 else
     echo "upgrade: done (gate not run). Review the diff, run the gate, then commit it."
 fi
