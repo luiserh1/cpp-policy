@@ -270,6 +270,12 @@ function(cpp_policy_apply target)
     if(NOT msvc_cli)
         target_compile_options(${target} PRIVATE
             $<$<NOT:$<CONFIG:Debug>>:-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=3>)
+        # And a check that the compile still has it: the configure checks below catch the usual
+        # spellings of an option that turns it off, this header every one that reaches the
+        # command line.
+        set(fortify_check "${CPP_POLICY_ROOT}/cmake/fortify/fortify_check.hpp")
+        target_compile_options(${target} PRIVATE
+            "$<$<NOT:$<CONFIG:Debug>>:SHELL:-include \"${fortify_check}\">")
         check_cxx_compiler_flag(-fstack-protector-strong CPP_POLICY_HAS_STACK_PROTECTOR)
         if(CPP_POLICY_HAS_STACK_PROTECTOR)
             target_compile_options(${target} PRIVATE -fstack-protector-strong)
@@ -506,15 +512,29 @@ endfunction()
 # protection, standard-library hardening, the sanitizers, and clang-cl's hardening. clang-cl
 # accepts either prefix, so both are checked. An option is checked in every piece
 # (_cpp_policy_option_pieces), and named whole in the problem; what -Wp, passes to the
-# preprocessor is checked too. Undefining _FORTIFY_SOURCE is refused: the policy defines it at
-# its level itself, and the only -U_FORTIFY_SOURCE allowed is the policy's own, which
-# cpp_policy_apply adds as two list elements and is taken out before the check.
+# preprocessor is checked too, and -U or -D followed by the macro as a word of its own.
+# Undefining _FORTIFY_SOURCE is refused: the policy defines it at its level itself. The only
+# -U_FORTIFY_SOURCE allowed is the policy's own, which cpp_policy_apply adds as exactly two
+# list elements; they are skipped. (fortify_check.hpp catches the spellings this misses.)
 # (The parameter must not be called `problems`: it would shadow the caller's list.)
 function(_cpp_policy_check_options what options out_list)
     set(found ${${out_list}})
-    string(REPLACE "$<$<NOT:$<CONFIG:Debug>>:-U_FORTIFY_SOURCE;-D_FORTIFY_SOURCE=3>" ""
-        options "${options}")
-    foreach(option IN LISTS options)
+    set(own_undefine "$<$<NOT:$<CONFIG:Debug>>:-U_FORTIFY_SOURCE")
+    set(own_define "-D_FORTIFY_SOURCE=3>")
+    set(previous_option "")
+    list(LENGTH options count)
+    set(index 0)
+    while(index LESS count)
+        list(GET options ${index} option)
+        math(EXPR index "${index} + 1")
+        if(option STREQUAL own_undefine AND index LESS count)
+            list(GET options ${index} next)
+            if(next STREQUAL own_define)
+                math(EXPR index "${index} + 1")
+                set(previous_option "${next}")
+                continue()
+            endif()
+        endif()
         _cpp_policy_option_pieces("${option}" pieces)
         set(expanded "")
         foreach(piece IN LISTS pieces)
@@ -524,6 +544,24 @@ function(_cpp_policy_check_options what options out_list)
                 list(APPEND expanded ${passed})
             endif()
         endforeach()
+        # A flag and its macro as two words ("-U _FORTIFY_SOURCE", "-D _FORTIFY_SOURCE=0"),
+        # within the option or across two of them, read as one.
+        set(joined "")
+        set(flag "")
+        if(previous_option MATCHES "^[-/][UD]$")
+            set(flag "${previous_option}")
+        endif()
+        foreach(piece IN LISTS expanded)
+            if(NOT flag STREQUAL "")
+                list(APPEND joined "${flag}${piece}")
+            endif()
+            set(flag "")
+            if(piece MATCHES "^[-/][UD]$")
+                set(flag "${piece}")
+            endif()
+        endforeach()
+        list(APPEND expanded ${joined})
+        set(previous_option "${option}")
         set(problem "")
         foreach(piece IN LISTS expanded)
             if(piece STREQUAL "-Wno-missing-designated-field-initializers")
@@ -548,7 +586,7 @@ function(_cpp_policy_check_options what options out_list)
         if(problem)
             list(APPEND found "${what} ${problem}: ${option}")
         endif()
-    endforeach()
+    endwhile()
     set(${out_list} ${found} PARENT_SCOPE)
 endfunction()
 

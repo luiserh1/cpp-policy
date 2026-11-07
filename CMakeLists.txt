@@ -12,9 +12,11 @@ if(PROJECT_IS_TOP_LEVEL)
     # a generated project by tests/new_project, where it has its own layers and confined area.
     # tests/new_project holds files added to that generated project, checked there too: they
     # need its doctest. tests/library holds two projects, each checked by its own gate there. The vcpkg port in tests/vcpkg_triplets stands for a third-party
-    # dependency (C code).
+    # dependency (C code). cmake/fortify holds a header that fails wherever fortify is off, as
+    # in the check build; tests/fortify builds it in a project of its own.
     list(APPEND CPP_POLICY_EXCLUDED_DIRS tests/audit tests/bad tests/bypass tests/format template
-        tests/new_project tests/library tests/vcpkg_triplets/project/ports)
+        tests/new_project tests/library tests/vcpkg_triplets/project/ports cmake/fortify
+        tests/fortify)
     enable_testing()
     cpp_policy_add_checks()
     add_subdirectory(tests)

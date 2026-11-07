@@ -1,0 +1,1 @@
+turns hardening off: -Wp,[$]<[$]<NOT:[$]<CONFIG:Debug>>:-U_FORTIFY_SOURCE.*turns hardening off: SHELL:-U _FORTIFY_SOURCE.*turns hardening off: _FORTIFY_SOURCE=0

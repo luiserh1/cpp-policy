@@ -301,6 +301,20 @@ add_test(NAME hooks/behavior
 set_tests_properties(hooks/behavior PROPERTIES
     ENVIRONMENT "GIT_DIR=${CMAKE_CURRENT_BINARY_DIR}/hooks_decoy.git")
 
+# Every test preset fails a run that selects no test.
+add_test(NAME presets/no_tests_action
+    COMMAND "${CMAKE_COMMAND}" "-DPOLICY_ROOT=${CPP_POLICY_ROOT}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/presets/no_tests_action.cmake")
+
+# The compile-time fortify check: a release build fails to compile when fortify is off. clang-cl
+# has no fortify, and the policy doesn't add the check there.
+if(NOT CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+    add_test(NAME fortify/compile_check
+        COMMAND "${CMAKE_COMMAND}" "-DPOLICY_ROOT=${CPP_POLICY_ROOT}"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/fortify" "-DCXX=${CMAKE_CXX_COMPILER}"
+                "-DMAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}" -P "${CMAKE_CURRENT_SOURCE_DIR}/fortify/run.cmake")
+endif()
+
 # tools/upgrade.sh against a fake cpp-policy with two releases (same GIT_DIR decoy).
 add_test(NAME upgrade/behavior
     COMMAND "${CMAKE_COMMAND}" "-DPOLICY_ROOT=${CPP_POLICY_ROOT}"
