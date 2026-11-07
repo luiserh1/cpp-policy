@@ -25,6 +25,13 @@ foreach(name IN ITEMS .clang-tidy .clang-format CMakePresets.json .gitignore .gi
     file(COPY_FILE "${POLICY_ROOT}/${name}" "${project}/${name}")
 endforeach()
 file(COPY "${POLICY_ROOT}/tools/hooks" DESTINATION "${project}/tools")
+# CI calls the gate at the policy's commit, as the audit requires of a project (POLICY.md 8).
+# (GIT_DIR, which this test may set to a decoy, would name another repository.)
+execute_process(COMMAND "${CMAKE_COMMAND}" -E env --unset=GIT_DIR "${GIT_EXECUTABLE}" rev-parse HEAD
+    WORKING_DIRECTORY "${POLICY_ROOT}"
+    OUTPUT_VARIABLE policy_commit OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+file(WRITE "${project}/.github/workflows/ci.yml"
+    "jobs:\n  gate:\n    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@${policy_commit}\n")
 
 file(WRITE "${project}/CMakeLists.txt"
     "cmake_minimum_required(VERSION 3.29)\n"

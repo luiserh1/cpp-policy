@@ -31,7 +31,8 @@
 # differ from the policy's, or its .gitignore / .gitattributes lack any line of the policy's
 # copies.
 # With POLICY_COMMIT set (the commit of cpp-policy the build uses), also fails if a GitHub
-# Actions workflow calls cpp-policy's gate at any other commit.
+# Actions workflow calls cpp-policy's gate at any other commit, or, with CHECK_PROJECT_FILES,
+# if no workflow calls it.
 
 cmake_minimum_required(VERSION 3.29)
 include("${CMAKE_CURRENT_LIST_DIR}/source_files.cmake")
@@ -220,6 +221,25 @@ foreach(file IN LISTS checked_files)
             endif()
             if(NOT line MATCHES "//[ \t]*[^ \t]")
                 report("${file}" ${number} "diagnostic pragma must give a reason in a trailing comment: // reason")
+            endif()
+        endif()
+
+        # A system_header pragma silences every warning in the rest of its file, and a
+        # no_sanitize attribute (any spelling) turns a sanitizer off in a function: both are
+        # suppressions (POLICY.md 5).
+        set(silencer "")
+        if(line MATCHES "#[ \t]*pragma[ \t]+(clang|GCC)[ \t]+system_header"
+           OR line MATCHES "_Pragma[ \t]*\\([ \t]*\"[ \t]*(clang|GCC)[ \t]+system_header")
+            set(silencer "system_header pragma")
+        elseif(line MATCHES "(^|[^A-Za-z0-9_])_*no_sanitize")
+            set(silencer "no_sanitize attribute")
+        endif()
+        if(NOT silencer STREQUAL "")
+            if(NOT confined)
+                report("${file}" ${number} "${silencer} outside a confined area (${CONFINED_DIRS})")
+            endif()
+            if(NOT line MATCHES "//[ \t]*[^ \t]")
+                report("${file}" ${number} "${silencer} must give a reason in a trailing comment: // reason")
             endif()
         endif()
 
@@ -496,16 +516,21 @@ if(CHECK_PROJECT_FILES AND NOT per_file)
 endif()
 
 # A project's CI must run the same policy as its build: the reusable workflows it calls
-# (cpp-policy/.github/workflows/gate.yml@<ref>, benchmark.yml@<ref>) must be pinned to the commit the build uses
-# (POLICY.md 8). A tag or branch name fails too: it can move.
+# (cpp-policy/.github/workflows/gate.yml@<ref>, benchmark.yml@<ref>) must be pinned to the
+# commit the build uses (POLICY.md 8). A tag or branch name fails too: it can move. With
+# CHECK_PROJECT_FILES, one of them must call the gate at all.
 if(POLICY_COMMIT AND NOT per_file AND NOT source_norm STREQUAL policy_norm)
     file(GLOB workflows RELATIVE "${SOURCE_DIR}"
         "${SOURCE_DIR}/.github/workflows/*.yml" "${SOURCE_DIR}/.github/workflows/*.yaml")
+    set(calls_gate FALSE)
     foreach(workflow IN LISTS workflows)
         cpp_policy_read_lines("${SOURCE_DIR}/${workflow}" lines)
         set(number 0)
         foreach(line IN LISTS lines)
             math(EXPR number "${number} + 1")
+            if(line MATCHES "^[ \t]*(-[ \t]*)?uses:[ \t]*[^ \t#]*cpp-policy/\\.github/workflows/gate\\.ya?ml@")
+                set(calls_gate TRUE)
+            endif()
             if(line MATCHES "cpp-policy/\\.github/workflows/([a-z_-]+)\\.ya?ml@([^ \t#]+)"
                AND NOT CMAKE_MATCH_2 STREQUAL POLICY_COMMIT)
                 set(called "${CMAKE_MATCH_1}")
@@ -515,6 +540,10 @@ if(POLICY_COMMIT AND NOT per_file AND NOT source_norm STREQUAL policy_norm)
             endif()
         endforeach()
     endforeach()
+    if(CHECK_PROJECT_FILES AND NOT calls_gate)
+        report(".github/workflows" 1
+            "no workflow calls cpp-policy's gate.yml; CI must run the gate (POLICY.md 8)")
+    endif()
 endif()
 
 list(LENGTH checked_files count)

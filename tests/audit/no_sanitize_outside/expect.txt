@@ -1,0 +1,1 @@
+src/app.cpp:2: error: no_sanitize attribute outside a confined area

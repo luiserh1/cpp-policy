@@ -30,6 +30,13 @@ function(make_project fixture name)
         file(COPY_FILE "${POLICY_ROOT}/${file}" "${dest}/${file}")
     endforeach()
     file(COPY "${POLICY_ROOT}/tools/hooks" "${POLICY_ROOT}/tools/vcpkg" DESTINATION "${dest}/tools")
+    # CI calls the gate at the policy's commit, as the audit requires (POLICY.md 8).
+    # (GIT_DIR, which this test may set to a decoy, would name another repository.)
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env --unset=GIT_DIR "${GIT_EXECUTABLE}" rev-parse HEAD
+        WORKING_DIRECTORY "${POLICY_ROOT}"
+        OUTPUT_VARIABLE policy_commit OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+    file(WRITE "${dest}/.github/workflows/ci.yml"
+        "jobs:\n  gate:\n    uses: luiserh1/cpp-policy/.github/workflows/gate.yml@${policy_commit}\n")
     # The audit asks that the hooks be enabled, which needs a repository.
     execute_process(COMMAND "${GIT_EXECUTABLE}" init --quiet WORKING_DIRECTORY "${dest}")
     execute_process(COMMAND "${GIT_EXECUTABLE}" config core.hooksPath tools/hooks

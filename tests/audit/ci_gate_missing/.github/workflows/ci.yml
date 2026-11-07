@@ -1,0 +1,8 @@
+name: CI
+on: push
+jobs:
+  # The gate, commented out, doesn't count.
+  # gate:
+  #   uses: luiserh1/cpp-policy/.github/workflows/gate.yml@0123456789abcdef0123456789abcdef01234567
+  benchmark:
+    uses: luiserh1/cpp-policy/.github/workflows/benchmark.yml@0123456789abcdef0123456789abcdef01234567
