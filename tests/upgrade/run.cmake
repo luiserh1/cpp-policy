@@ -5,6 +5,8 @@
 # - it moves the GIT_TAG pin and the CI gate pin to the new release's commit and tag, copies
 #   the policy files (hooks executable), leaves other lines alone and shows the CHANGELOG entry;
 # - it adds .claude/settings.json when the project has none;
+# - in AGENTS.md it replaces everything above "## This project" and keeps the rest; a file
+#   without that heading gets the release's part, the heading, and its old content below;
 # - with a vcpkg.json, it copies tools/vcpkg/;
 # - it refuses a working folder with uncommitted changes and an unknown tag, changing nothing.
 # The gate isn't run (--no-gate): that needs a real project. On Windows the script runs under
@@ -84,9 +86,9 @@ set(vcpkg_files tools/vcpkg/setup.cmake tools/vcpkg/llvm.cmake
 foreach(name IN LISTS vcpkg_files)
     file(WRITE "${policy}/${name}" "# ${name} of 2.0.0\n")
 endforeach()
-# And the template of AGENTS.md, whose section on the gate the upgrade brings.
-file(WRITE "${policy}/template/AGENTS.md.in"
-    "# @NAME@\n\n## Before you say you are done\n\nRun the gate of 2.0.0.\n\n## Never\n\n- The template's own.\n")
+# And the template of AGENTS.md, whose part above "## This project" the upgrade brings.
+set(policy_part "# Instructions\n\n## Before you say you are done\n\nRun the gate of 2.0.0.\n\n## This project\n")
+file(WRITE "${policy}/template/AGENTS.md.in" "${policy_part}")
 # And its own upgrade.sh, which the one under test must hand over to: this script plus one
 # line that says it ran.
 file(READ "${POLICY_ROOT}/tools/upgrade.sh" script)
@@ -118,11 +120,10 @@ file(WRITE "${project}/.github/workflows/ci.yml"
     "      vcpkg: true\n"
     "  benchmark:\n"
     "    uses: someone/cpp-policy/.github/workflows/benchmark.yml@${old} # v1.0.0\n")
-# The project's own instructions and changelog: the upgrade replaces one section of the
-# first and one line of the second.
-file(WRITE "${project}/AGENTS.md"
-    "# Fixture\n\nThe project's own words.\n\n## Before you say you are done\n\nRun the gate of 1.0.0.\n\n"
-    "## Never\n\n- The project's own rule.\n")
+# The project's own instructions and changelog. AGENTS.md is from before "## This project":
+# policy and project mixed.
+set(old_agents "# Fixture\n\nThe project's own words.\n\n## Before you say you are done\n\nRun the gate of 1.0.0.\n")
+file(WRITE "${project}/AGENTS.md" "${old_agents}")
 file(WRITE "${project}/CHANGELOG.md"
     "# Changelog\n\nPolicy: cpp-policy v1.0.0.\n\n## 0.1.0\n\nOn the policy v1.0.0 since the start.\n")
 # Release 1.0.0's files, as the project copied them; .claude/settings.json is left out, as
@@ -163,9 +164,11 @@ expect("changelog;GREATER;-1" "it must show the release's CHANGELOG entry")
 string(FIND "${out}" "First." older)
 expect("older;EQUAL;-1" "it must show only the new release's CHANGELOG entry")
 file(READ "${project}/AGENTS.md" agents)
-set(wanted "# Fixture\n\nThe project's own words.\n\n## Before you say you are done\n\nRun the gate of 2.0.0.\n\n## Never\n\n- The project's own rule.\n")
+set(wanted "${policy_part}\n<!-- AGENTS.md as it was before cpp-policy v2.0.0, which put the policy's part\nabove. Keep what is this project's own, delete the rest, and remove this\ncomment. -->\n\n${old_agents}")
 expect("agents;STREQUAL;wanted"
-    "AGENTS.md must get the release's section on the gate and keep the rest as it was")
+    "AGENTS.md without \"## This project\" must get the release's part, the heading, and its old content")
+string(FIND "${out}" "Keep what is this project's own there" note)
+expect("note;GREATER;-1" "it must say that AGENTS.md needs pruning once")
 file(READ "${project}/CHANGELOG.md" project_changelog)
 set(wanted "# Changelog\n\nPolicy: cpp-policy v2.0.0.\n\n## 0.1.0\n\nOn the policy v1.0.0 since the start.\n")
 expect("project_changelog;STREQUAL;wanted" "the changelog's policy line must name v2.0.0, and only that line")
@@ -204,6 +207,19 @@ string(FIND "${out}" "upgrade.sh of 2.0.0 is running" ran)
 expect("handed;GREATER;-1;AND;ran;GREATER;-1" "it must hand over to the release's own upgrade.sh")
 string(FIND "${out}" "?? tools/hooks/commit-msg" listed)
 expect("listed;GREATER;-1" "the changes shown must include a file the release adds")
+
+# Once pruned, the next upgrade replaces the policy's part only.
+file(WRITE "${project}/AGENTS.md"
+    "# Old\n\nRun the gate of 1.0.0.\n\n## This project\n\nThe project's own words.\n")
+run("${project}" ${git} add --all)
+run("${project}" ${git} commit --quiet -m "upgraded")
+run("${project}" ${upgrade} v2.0.0 --no-gate)
+expect("code;EQUAL;0" "the upgrade of a pruned AGENTS.md must succeed")
+file(READ "${project}/AGENTS.md" agents)
+set(wanted "${policy_part}\nThe project's own words.\n")
+expect("agents;STREQUAL;wanted"
+    "AGENTS.md must get the release's part above \"## This project\" and keep what is below")
+run("${project}" ${git} checkout --quiet -- AGENTS.md)
 
 # A project with a vcpkg.json gets the release's tools/vcpkg/, and the line that loads it stays.
 foreach(name IN LISTS vcpkg_files)

@@ -1,10 +1,17 @@
 # Instructions for AI agents
 
+<!-- Everything above "## This project" is cpp-policy's: tools/upgrade.sh
+replaces it with each release's. This project's own instructions go under
+that heading. -->
+
 This project follows **cpp-policy** (fetched by CMake; rules in
 `build/<preset>/_deps/cpp_policy-src/POLICY.md`, or
 https://github.com/luiserh1/cpp-policy/blob/main/POLICY.md). That folder holds
 the release of the last configure: after the pin in `CMakeLists.txt` moves,
-run `cmake --preset <preset>` before reading it.
+run `cmake --preset <preset>` before reading it. Read the section for what
+you are doing (below), not the whole file. cpp-policy's `CHANGELOG.md` holds
+the evidence behind each rule: it is for revising a rule, not for following
+it.
 
 ## The rules in short
 
@@ -17,19 +24,38 @@ run `cmake --preset <preset>` before reading it.
   trailing `_` on private data members, `UPPER_CASE` macros.
 - Design: plain data is a `struct` with free functions; a `class` only to
   protect an invariant or own a resource; `enum class` or `std::variant` for
-  a closed set of kinds; no inheritance without asking first.
+  a closed set of kinds; inheritance only when code outside the module adds
+  kinds chosen at run time (POLICY.md 15.2).
 - Functions: at most 80 lines, 6 parameters and 4 levels of nesting; files at
-  most 350 lines (aim for 250).
+  most 350 lines (aim for 250), or 500 under `tests/`.
 - Expected failures return `std::expected`; exceptions only for truly
   exceptional cases. Every exception is caught in `main`, and at the top of
   every thread function.
 - Threads: `std::jthread` and `std::scoped_lock`; no data shared between
   threads without synchronization.
 - Low-level code (OS APIs, the C runtime, reinterpret casts) lives only in
-  `src/lowlevel/`, behind a safe interface.
-- Dependencies: ask before adding one.@VCPKG_AGENTS@
-  A dependency's headers are included only from the modules that
-  `cpp_policy_confine_includes()` in `CMakeLists.txt` allows.
+  the confined directories, `src/lowlevel/` (and `lib/<name>/lowlevel/` in a
+  library), behind a safe interface.
+- Dependencies: ask before adding one. Each `vcpkg.json` entry needs
+  `"default-features": false` and a `"$reason"`. Every dependency has a
+  `cpp_policy_confine_includes()` line in `CMakeLists.txt` naming the
+  modules that may include its headers, `NONE` when no module may
+  (POLICY.md 11.6).
+
+## Where the rules are
+
+| When you are | Read in POLICY.md |
+|---|---|
+| Writing code | 2 (the subset), 3 (errors), 4 (low-level code), 15 (design) |
+| Adding a module, a file or a layer | 11.1 to 11.4 |
+| Adding a dependency | 1.1, 11.6 |
+| Adding a program | 13.5: it gets a size budget, `NOT_BUILT` for a system it isn't built on, or `cpp_policy_tool()` if it is never shipped |
+| Offering a library, or using one | 11.7 |
+| Writing tests | 13 |
+| Making it faster | 14 |
+| Ending a stage of work | 8, and 8.1 for what no tool checks |
+| Upgrading cpp-policy | 10 |
+| Meeting a rule that seems wrong | 5 (suppressions), then stop and ask (below) |
 
 ## Layers
 
@@ -69,7 +95,7 @@ in this project's own code or tests.
 - A fix for a bug comes with a test that fails without it, in
   `TEST_SUITE("regression")`.
 - In a port, tests compare with the original's output on the same inputs.
-- No sleeps, no skipped tests, no state shared between test cases.
+- No sleeps, no skipped tests.
 - The release workflow checks each program's size budget
   (`cpp_policy_size_budget()` in `CMakeLists.txt`). Never set or raise a
   budget yourself: if a change goes over it, go back to the code first and
@@ -81,30 +107,31 @@ in this project's own code or tests.
   When the owner has approved a growth on one system, the others' numbers
   are removed in that commit and set from what CI prints in the next
   (POLICY.md 13.5).
-- A command that processes input of unbounded size has a memory test with
-  `cpp_policy::peak_heap_bytes()` (POLICY.md 13.5). It may keep 1 KiB per
-  input (its name and a small record). Never raise that budget yourself: if
-  a command needs more, say what it keeps and ask the owner.
+- A server, and every command that processes input of unbounded size, has
+  a memory test with `cpp_policy::live_heap_bytes()` or `peak_heap_bytes()`
+  (POLICY.md 13.5). A server keeps nothing per request; a command may keep
+  1 KiB per input (its name and a small record). Never raise that budget
+  yourself: if a command needs more, say what it keeps and ask the owner.
 
 ## Before you say you are done
 
-Call work done only after checking its result where it lives (the file read back, the
-program or the test run), and say which. A cause you haven't measured is a guess: call it
-one. Another agent's report is not proof.
+Call work done only after checking its result where it lives (the file read
+back, the program or the test run), and say which. A cause you haven't
+measured is a guess: call it one. Another agent's report is not proof.
 
-After editing C++ files, check them right away (a few seconds per file; pre-commit
-does the same for the staged files):
+After editing C++ files, check them right away (a few seconds per file;
+pre-commit does the same for the staged files):
 
 ```
 sh tools/hooks/tidy-files <file>...
 ```
 
-It reports what the gate will say about those files, without the tests: the
-format, the file's length, suppressions and `// boundary:` comments,
-test-case names, and clang-tidy. It says "NOT CHECKED" for a file this build
-doesn't compile: for a new file, add it to `CMakeLists.txt` first.
+It reports what the local gate will say about those files, without the
+tests: the format, the file's length, suppressions and `// boundary:`
+comments, test-case names, and clang-tidy. It says "NOT CHECKED" for a file
+this build doesn't compile: for a new file, add it to `CMakeLists.txt` first.
 
-Run the full gate and make sure it passes, **at the end of each stage of
+Run the local gate and make sure it passes, **at the end of each stage of
 work and always before anything joins the main line** (a stage is what ends
 in a push or a merge):
 
@@ -112,7 +139,7 @@ in a push or a merge):
 sh tools/hooks/gate
 ```
 
-The gate and `git push` (whose hook runs the gate) need `VCPKG_ROOT` in the
+The local gate and `git push` (whose hook runs it) need `VCPKG_ROOT` in the
 shell of that same command: a variable set in an earlier command is gone.
 
 Not before every commit. Between commits, the commit hook and `tidy-files`
@@ -141,17 +168,18 @@ races are found there and nowhere else.
 sh tools/hooks/gate tsan
 ```
 
-`sh tools/hooks/gate` runs `cmake --workflow --preset check` (`win-check` on Windows), one gate
-at a time on the machine, and ends with `gate: passed` or `gate: FAILED`.
-Read that line, or the command's own exit code: don't chain other commands
-after it and read theirs. A workflow that failed is remembered until it
-passes again in this folder, and `git push` is refused meanwhile. A gate
-that passed on the commit you push, with nothing uncommitted, is remembered
-too: the push doesn't run it again.
+`sh tools/hooks/gate` runs `cmake --workflow --preset check` (`win-check` on
+Windows), one at a time on the machine, and ends with `gate: passed` or
+`gate: FAILED`. Read that line, or the command's own exit code: don't chain
+other commands after it and read theirs. A workflow that failed is
+remembered until it passes again in this folder, and `git push` is refused
+meanwhile. A gate that passed on the commit you push, with nothing
+uncommitted, is remembered too: the push doesn't run it again.
 
-A test that times out is run once more. If the gate's last lines say a test
-"timed out and passed on a second run" and you have seen that test named
-before, tell the owner: it may be a deadlock, not chance.
+A test that times out is run once more. The local gate remembers, on this
+machine, each test that needed that second run; when one needs it again, the
+gate fails ("needed a second run before, too"). Tell the owner: it may be a
+deadlock, not chance. Don't delete the record to get past it.
 
 Formatting problems: `sh tools/hooks/tidy-files --format <file>...` (or every
 file: `cmake --build --preset check --target policy-format-fix`).
@@ -159,8 +187,12 @@ file: `cmake --build --preset check --target policy-format-fix`).
 To check a commit message before the hooks run:
 `sh tools/hooks/commit-msg <file with the message>`.
 
-A stage ends on a branch of its own: push it, wait until CI is green on every
-system, then ask the owner. Nothing joins `main` without the owner's word.
+Before the stage ends, go through what no tool checks (POLICY.md 8.1) for
+what you changed.
+
+A stage ends on a branch of its own: push it, wait until the CI gate is green
+on every system, then ask the owner. Nothing joins `main` without the owner's
+word.
 
 ## Working for the owner
 
@@ -200,8 +232,8 @@ system, then ask the owner. Nothing joins `main` without the owner's word.
 
 ## Never
 
-- Add `NOLINT` suppressions outside `src/lowlevel/`. Inside it, name the
-  check and give a reason: `// NOLINT(check-name): reason`.
+- Add `NOLINT` suppressions outside the confined directories. Inside them,
+  name the check and give a reason: `// NOLINT(check-name): reason`.
 - Edit `.clang-tidy`, `.clang-format`, `CMakePresets.json`, compile flags in
   `CMakeLists.txt`, `tools/`, `.github/`, `AGENTS.md` or agent settings
   (`.claude/`).
@@ -212,3 +244,5 @@ system, then ask the owner. Nothing joins `main` without the owner's word.
 
 If a rule seems wrong or impossible to satisfy, stop and explain what it
 prevents instead of working around it. The owner takes it to cpp-policy.
+
+## This project

@@ -48,7 +48,6 @@ else()
 endif()
 
 file(READ "${template}/vcpkg-toolchain.cmake.in" VCPKG_TOOLCHAIN)
-set(VCPKG_AGENTS " Each `vcpkg.json` entry needs\n  `\"default-features\": false` and a `\"$reason\"`.")
 
 # The release's policy files, unchanged; the hooks stay executable.
 file(MAKE_DIRECTORY "${DEST}/.claude" "${DEST}/.github/workflows")

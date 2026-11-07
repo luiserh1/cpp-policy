@@ -16,9 +16,8 @@
 #   - the copies of .clang-tidy, .clang-format, CMakePresets.json, .claude/settings.json and
 #     tools/hooks/;
 #   - with a vcpkg.json, the copies of tools/vcpkg/;
-#   - in AGENTS.md, everything from "## Before you say you are done" up to "## Never" (when
-#     the gate runs, and how agents work for the owner), which becomes the release's; the rest
-#     of the file is the project's and is left alone;
+#   - in AGENTS.md, everything above "## This project", which becomes the release's; what is
+#     under that heading is the project's and is left alone;
 #   - in CHANGELOG.md, the line "Policy: cpp-policy v<version>." (POLICY.md 11.5).
 # An older copy hands over to the release's own upgrade.sh, which knows what the release
 # changed. It then shows the diff and the release's CHANGELOG entry and runs the gate. It commits
@@ -208,33 +207,34 @@ if [ -f vcpkg.json ]; then
     done
 fi
 
-# 5. AGENTS.md says when the gate runs, and releases change that: the section from "## Before
-# you say you are done" up to "## Never" becomes the release's. A file without exactly one
-# such section is left alone, and said so.
+# 5. AGENTS.md: everything above "## This project" is the policy's, and becomes the release's;
+# what is under that heading is the project's and is kept. A file without the heading gets the
+# release's part, the heading, and then its whole old content under a comment, for the project
+# to prune by hand once. A file with the heading twice is left alone, and said so.
 agents_note=
 template=$policy/template/AGENTS.md.in
-section_start='^## Before you say you are done'
-section_end='^## Never'
-has_section() {
-    [ "$(grep -c "$section_start" "$1")" = 1 ] && [ "$(grep -c "$section_end" "$1")" = 1 ]
-}
-if [ -f AGENTS.md ] && [ -f "$template" ]; then
-    if has_section AGENTS.md && has_section "$template"; then
-        awk -v start="$section_start" -v end="$section_end" -v template="$template" '
-            $0 ~ start {
-                inside = 0
-                while ((getline line < template) > 0) {
-                    if (line ~ start) inside = 1
-                    if (line ~ end) inside = 0
-                    if (inside) print line
-                }
-                skipping = 1
-            }
-            $0 ~ end { skipping = 0 }
-            !skipping { print }' AGENTS.md >"$work/AGENTS.md"
+heading='^## This project$'
+if [ -f AGENTS.md ] && [ -f "$template" ] && [ "$(grep -c "$heading" "$template")" = 1 ]; then
+    count=$(grep -c "$heading" AGENTS.md || true)
+    if [ "$count" -le 1 ]; then
+        awk -v heading="$heading" '{ print } $0 ~ heading { exit }' "$template" >"$work/AGENTS.md"
+        if [ "$count" = 1 ]; then
+            awk -v heading="$heading" 'found { print } $0 ~ heading { found = 1 }' AGENTS.md \
+                >>"$work/AGENTS.md"
+        else
+            {
+                echo
+                echo "<!-- AGENTS.md as it was before cpp-policy $tag, which put the policy's part"
+                echo "above. Keep what is this project's own, delete the rest, and remove this"
+                echo "comment. -->"
+                echo
+                cat AGENTS.md
+            } >>"$work/AGENTS.md"
+            agents_note="AGENTS.md had no \"## This project\" heading: the release's part is now above it, and the old file below it, under a comment. Keep what is this project's own there and delete the rest, once."
+        fi
         cat "$work/AGENTS.md" >AGENTS.md
     else
-        agents_note="AGENTS.md has no single section \"## Before you say you are done\" before \"## Never\": left as it was. Compare it with the release's template/AGENTS.md.in by hand."
+        agents_note="AGENTS.md has \"## This project\" more than once: left as it was. Compare it with the release's template/AGENTS.md.in by hand."
     fi
 fi
 
