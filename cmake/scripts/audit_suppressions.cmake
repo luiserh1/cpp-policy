@@ -224,15 +224,18 @@ foreach(file IN LISTS checked_files)
             endif()
         endif()
 
-        # A system_header pragma silences every warning in the rest of its file, and a
-        # no_sanitize attribute (any spelling) turns a sanitizer off in a function: both are
-        # suppressions (POLICY.md 5).
+        # A system_header pragma silences every warning in the rest of its file, and these
+        # attributes turn a sanitizer or a protection off in a function (in every spelling:
+        # [[clang::...]], __attribute__((...)), __declspec(...)): all are suppressions
+        # (POLICY.md 5).
         set(silencer "")
         if(line MATCHES "#[ \t]*pragma[ \t]+(clang|GCC)[ \t]+system_header"
            OR line MATCHES "_Pragma[ \t]*\\([ \t]*\"[ \t]*(clang|GCC)[ \t]+system_header")
             set(silencer "system_header pragma")
-        elseif(line MATCHES "(^|[^A-Za-z0-9_])_*no_sanitize")
-            set(silencer "no_sanitize attribute")
+        elseif(line MATCHES "(^|[^A-Za-z0-9_])_*(no_sanitize|no_address_safety_analysis|disable_sanitizer_instrumentation|no_stack_protector|nocf_check|safebuffers)")
+            set(silencer "${CMAKE_MATCH_2} attribute")
+        elseif(line MATCHES "(^|[^A-Za-z0-9_])guard[ \t]*\\([ \t]*nocf")
+            set(silencer "guard(nocf) attribute")
         endif()
         if(NOT silencer STREQUAL "")
             if(NOT confined)
