@@ -1,10 +1,10 @@
 # cpp-policy
 
-Shared, versioned C++ policy: a restricted modern C++23 subset enforced by
-Clang warnings, clang-tidy, checks at configure time, an audit of the
-sources and a format check. The rules are in [POLICY.md](POLICY.md); how
-cpp-policy itself is maintained (moving the toolchain pins) is in
-[MAINTAINING.md](MAINTAINING.md).
+A versioned C++ policy for the owner's projects: a restricted modern C++23
+subset enforced by Clang warnings, clang-tidy, checks at configure time, an
+audit of the sources and a format check. The rules are in
+[POLICY.md](POLICY.md); how cpp-policy itself is maintained (moving the
+toolchain pins) is in [MAINTAINING.md](MAINTAINING.md).
 
 ## Starting a new project
 

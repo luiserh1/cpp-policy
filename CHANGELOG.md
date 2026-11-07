@@ -22,8 +22,10 @@ changes come with this release.
 
 1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.42.0`. An
    older copy hands over to this release's own. Besides the pins and the
-   copied files, it now copies `.claude/settings.json`, and ends with the
-   local gate through its launcher.
+   copied files, it now copies `.claude/settings.json` (from the release's
+   `template/`), and ends with the local gate through its launcher. 0.41.0's
+   step 1 describes the old way `AGENTS.md` was changed; step 2 here
+   replaces it.
 2. **`AGENTS.md`:** everything above the heading `## This project` is now
    the policy's, and each upgrade replaces it. A file without that heading
    (every project's today) gets this release's part, then the heading, then
@@ -41,18 +43,23 @@ changes come with this release.
    - A test preset's run that matches no test fails (`-R` with a wrong
      name), where it passed.
    - Configuration checks options and definitions inside generator
-     expressions and `SHELL:`, and rejects `-U_FORTIFY_SOURCE` unless
-     `-D_FORTIFY_SOURCE=3` follows it. It fails a project that sets
-     `CPP_POLICY_CONFINED_DIRS` or `CPP_POLICY_EXCLUDED_DIRS`.
-   - The audit treats `#pragma clang system_header` and
-     `[[clang::no_sanitize]]` as suppressions (confined directories only,
-     with a reason), and fails a project whose workflows don't call
+     expressions, `SHELL:` and `-Wp,`, and refuses `-U_FORTIFY_SOURCE` in a
+     project's own options (the policy defines fortify at 3 itself). It
+     fails a project that sets `CPP_POLICY_CONFINED_DIRS` or
+     `CPP_POLICY_EXCLUDED_DIRS`.
+   - The audit treats `#pragma clang system_header` and the attributes that
+     turn a sanitizer or a protection off (`no_sanitize` and its variants,
+     `no_address_safety_analysis`, `disable_sanitizer_instrumentation`,
+     `no_stack_protector`, `nocf_check`, `safebuffers`, `guard(nocf)`) as
+     suppressions: confined directories only, with a reason. As with
+     `NOLINT`, a comment that names one outside a confined directory fails
+     too. The audit also fails a project whose workflows don't call
      cpp-policy's `gate.yml`.
    - `CPP_POLICY_GATE_LOCK` naming a file fails at once.
 
    Searched in the five projects on 2026-11-07: no project's own code uses
-   the patterns configuration and the audit now reject, none sets the
-   directories, and every one's CI calls `gate.yml`.
+   the options or attributes configuration and the audit now reject, none
+   sets the directories, and every one's CI calls `gate.yml`.
 4. From 0.41.0: a stage ends on its own branch, pushed and green in CI
    before the owner merges it; `ROADMAP.md` gets a "Now" section when it is
    first used.
@@ -62,35 +69,48 @@ changes come with this release.
 - **Generator expressions and `SHELL:` no longer hide options**
   (POLICY.md 6). `$<$<CONFIG:Release>:-fno-stack-protector>`,
   `SHELL:-fcf-protection=none` and `$<1:_FORTIFY_SOURCE=1>` passed
-  configuration, because whole options were compared. `-U_FORTIFY_SOURCE`
-  is allowed only before a definition that keeps the level, as the policy's
-  own triplets have it. Bypass fixtures `genex_options`, `unfortified`.
+  configuration, because whole options were compared; `-Wp,` passes
+  options to the preprocessor and is looked into too. `-U_FORTIFY_SOURCE`
+  is refused in a project's options: the policy defines the level itself,
+  and a definition after it can sit under a condition that never holds.
+  Bypass fixtures `genex_options`, `unfortified`,
+  `unfortified_conditional`. *Rejected:* allowing `-U` when
+  `-D_FORTIFY_SOURCE=3` follows under the same condition (more code, for
+  something no project writes).
 - **The confined and excluded directories are fixed** (POLICY.md 4 and 6).
   A project could add one with a line, and an excluded directory then
   skipped every check with nothing printed. A library's `lowlevel` folder
   is still added on its own. Bypass fixtures `excluded_dirs`,
   `confined_dirs`.
-- **`#pragma clang system_header` and `[[clang::no_sanitize]]` are
-  suppressions** (POLICY.md 5): the first silences every warning in the rest
-  of its file and the second turns a sanitizer off, and the audit saw
-  neither.
+- **`#pragma clang system_header` and the attributes that turn a sanitizer
+  or a protection off are suppressions** (POLICY.md 5): the first silences
+  every warning in the rest of its file, the others turn a sanitizer, the
+  stack protector or control-flow checks off in a function, and the audit
+  saw none of them. Each name the audit knows has a fixture
+  (`silencer_spellings_outside`); a name it doesn't know is review's
+  (8.1).
 - **The audit requires a workflow that calls `gate.yml`.** It checked the
   pins of the workflows a project calls, but a project that called none
   passed.
 - **`upgrade.sh` copies `.claude/settings.json`,** a policy file nothing
-  refreshed. POLICY.md 9 promised that what agents can't be stopped from
-  doing is caught afterwards; it now says what is caught, and what is only
-  copied (`AGENTS.md`, agent settings).
+  refreshed, from the release's `template/`. The self-test `upgrade/behavior`
+  now also upgrades a project to a release made of this repository's own
+  files, so a path the script gets wrong fails it. POLICY.md 9 promised that
+  what agents can't be stopped from doing is caught afterwards; it now says
+  what is caught, and what is only copied (`AGENTS.md`, agent settings).
 
 ### Fixed: traps
 
 - **A test that needed a second run is remembered,** machine-wide, in
-  `retried/<project>.txt` under the tidy cache's root; the second time, the
-  local gate fails. CI only names such tests. *Why:* "a test named twice is
-  a finding" relied on agents remembering, which they can't. *Rejected:*
-  removing the retry, which a busy machine still needs.
+  `retried/<project>.txt` in the user's cpp-policy cache folder (on a Mac,
+  `~/Library/Caches/cpp-policy`), also when the workflow failed for another
+  reason; the second time, the local gate fails. CI only names such tests. The
+  self-test `hooks/behavior` checks that the launcher asks for it. *Why:* "a
+  test named twice is a finding" relied on agents remembering, which they
+  can't. *Rejected:* removing the retry, which a busy machine still needs.
 - **`noTestsAction: error` in the test presets.** `ctest -R` with a name
-  that matched nothing printed "No tests were found" and passed. Three
+  that matched nothing printed "No tests were found" and passed
+  (`template/new_project` now runs one and requires it to fail). Three
   texts said each test case was its own CTest test; a module's unit tests
   are one, and the texts now say how to run one case.
 - **The launcher's lock:** a path that is a file, or that can't be
@@ -98,7 +118,8 @@ changes come with this release.
   over once it is a minute old. Both waited forever.
 - **The launcher everywhere:** `upgrade.sh`, POLICY.md 9 and the template's
   README ran `cmake --workflow` directly, without the lock, the last line or
-  the failure memory.
+  the failure memory. `upgrade/behavior` checks that `upgrade.sh` ends with
+  the launcher.
 - **The generated project's first commit has a body,** so the fallback
   command `new-project.sh` prints passes the commit-msg hook.
 - README, the templates and comments corrected where they disagreed with
@@ -130,7 +151,7 @@ changes come with this release.
   its `ROADMAP.md` item, and section 9's copy of the working agreement to a
   pointer to `AGENTS.md`. 8.1 lists every rule no tool checks, one line
   each. "The owner" is defined once, as the person who decides for a
-  project. 2,409 lines became 2,250. *Why:* the file served four readers
+  project. 2,409 lines became 2,268. *Why:* the file served four readers
   (agents, the owner, cpp-policy's maintainer, and anyone asking why), and
   is about 35,000 tokens (an estimate) for an agent that reads it whole.
   *Rejected:* splitting it into several files.
@@ -154,6 +175,8 @@ changes come with this release.
 - **An owner's exception for one package's license** is built when a
   project needs one (`ROADMAP.md`).
 - `benchmark.yml` stays while ToneMatcher uses it.
+- `-fsanitize-ignorelist=` still passes the configure checks; found in the
+  release's review and outside what was decided (`ROADMAP.md`).
 
 ## 0.41.0 (2026-11-06)
 
@@ -258,10 +281,10 @@ work beyond `upgrade.sh`.
   something to install); pushing `main` once per stage (faults still land
   on it).
 - **CTest gets eight jobs** (POLICY.md 7). *Why:* on Alfar's 1,152 tests,
-  quiet Mac: 275 s at four, 197 s at eight, 184 s at ten; `tsan` 1,013 s at
-  four, 628 s at eight. *Rejected:* as many as the cores, which needs
-  presets version 11 and CMake 4.3; ten, for 7% more and slow tests nearer
-  their limits (39 of 60 s in `check`).
+  quiet Mac: 275 and 280 s at four, 197 and 200 s at eight, 184 s at ten;
+  `tsan` 1,013 s at four, 628 s at eight. *Rejected:* as many as the cores,
+  which needs presets version 11 and CMake 4.3; ten, for 7% more and slow
+  tests nearer their limits (39 of 60 s in `check`).
 - **The commit hook checks the staged files only,** through `tidy-files`,
   and does nothing for a commit without a C++ file. *Why:* a commit failed
   on two half-written files that weren't part of it, and a commit of
@@ -517,7 +540,9 @@ ToneMatcher.
   `tsan` run took 2,498 s for 911 tests and 19 of them passed 60 s, with no
   race found. The build had been left at `-O0` when `check` was optimized.
   At `-O1` the same tests take 757 s and two pass 60 s; ThreadSanitizer
-  still costs two to three times what the check build does, so the limit
+  still costs two to three times what the check build does (Alfar's longest
+  tests took 20 to 30 s in `check` and 55 to over 60 s under `tsan`,
+  2026-10-12; not the same tests one by one), so the limit
   that catches a hung test in `check` was the real limit of every test
   under `tsan`. Measured on a copy of Alfar, 911 tests on one Mac: at `-O2`,
   589 s, with the same two tests at 57 s; no level reported a race. With this
@@ -1612,20 +1637,20 @@ minor release (POLICY.md 10).
 
 - **`cpp_policy::live_heap_bytes()`, `peak_heap_bytes()` and
   `reset_peak_heap_bytes()`** (`#include <cpp_policy/heap_bytes.hpp>`), for
-  benchmark tests: an exact count of the C++ heap, made by replacing
-  `operator new` and `operator delete` in the test program. Self-test
+  benchmark tests: an exact count of the C++ heap, made by replacing `operator
+  new` and `operator delete` in the test program. Self-test
   `testing/heap_bytes`; the generated-project test uses it on every system.
   *Why:* ToneMatcher reported that its `diff` memory test grew 4% on an idle
-  machine and 30.6% on a busy CI machine, with the same code. Reproduced
-  here with a program that only allocates and frees 1 MB buffers: the
-  operating system's peak grew +80% idle and anywhere from +1% to +81% under
-  load, because it depends on whether the allocator reuses a freed block.
-  Measured on macOS, six 1 MB buffers per round, from 10 rounds to 50: +80
-  to +82% in 6 of 6 idle runs; +1% to +81% over 12 runs with 14 busy
-  processes; 0.0% in 8 of 8 with eight warm-up runs. With eight warm-up
-  runs ToneMatcher's `diff` test still failed 1 run in 10 on a loaded Mac.
-  macOS's peak physical footprint moved the same way. A count of live bytes
-  can't vary. The owner chose it (2026-10-01).
+  machine and 30.6% on a busy CI machine, with the same code. Reproduced here
+  with a program that only allocates and frees 1 MB buffers: the operating
+  system's peak grew +80% idle and anywhere from +1% to +81% under load,
+  because it depends on whether the allocator reuses a freed block. Measured
+  on macOS, six 1 MB buffers per round, from 10 rounds to 50: +80 to +82% in 6
+  of 6 idle runs; +1%, +19%, +68% and +81%, mixed over 12 runs with 14 busy
+  processes; 0.0% in 8 of 8 with eight warm-up runs. With eight warm-up runs
+  ToneMatcher's `diff` test still failed 1 run in 10 on a loaded Mac. macOS's
+  peak physical footprint moved the same way. A count of live bytes can't
+  vary. The owner chose it (2026-10-01).
   - It doesn't see memory a C library takes with `malloc()`, or mapped
     files; `peak_memory_bytes()` stays for those.
   - In builds with sanitizers nothing is replaced and it reads 0. The `check`
@@ -2903,7 +2928,8 @@ fail: a minor release, which before 1.0 may break code (POLICY.md 10).
 - POLICY.md 2.9: formatting, and why the limit stays at 100 columns. *Why:*
   the limit was accepted provisionally and reviewed after real use (1,785
   lines across cpp-policy and SimpleLocalServer): 80 would rewrap about 11% of
-  them, and nothing past 100 is code clang-format could wrap.
+  them, and about 5% of lines went past 90; nothing past 100 is code
+  clang-format could wrap.
 
 ## 0.6.1 (2026-09-27)
 

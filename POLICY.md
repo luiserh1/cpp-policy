@@ -3,11 +3,14 @@
 > **Version:** the `project()` version in `CMakeLists.txt`; changes are listed in
 > `CHANGELOG.md`. Enforced by the `cpp-policy` module, clang-tidy config and self-tests.
 
-This document defines the restricted, modern subset of C++ used by every
-project that consumes `cpp-policy`. Most rules are enforced mechanically
-(compiler warnings, clang-tidy, the suppression audit). This document is the
-human-readable reference and the source of truth when a tool and this text
-disagree.
+This document defines the restricted, modern subset of C++ used by the
+owner's projects, the ones that consume `cpp-policy`. **The owner** is the
+person who decides for a project: what it does, the exceptions to these
+rules it may have, and what joins its main line; the rules say "the owner"
+for that role. Most rules are enforced mechanically (compiler warnings,
+clang-tidy, the configure checks and the audit, section 8). This document is
+the human-readable reference and the source of truth when a tool and this
+text disagree.
 
 ---
 
@@ -26,13 +29,13 @@ disagree.
 
 Notes:
 - Extensions are off so that the code is standard C++, which another
-  compiler or a later Clang reads the same way.
+  compiler or a later Clang reads the same way (since 0.1.0).
 - One compiler on every system, one release of it: one set of warnings and
-  of clang-tidy findings, so a check passes or fails the same way everywhere.
-  GCC and MSVC's own compiler (`cl.exe`) are not supported. They may be added
-  later as extra build jobs without changing these rules.
+  of clang-tidy findings, so a check passes or fails the same way everywhere
+  (since 0.1.0). GCC and MSVC's own compiler (`cl.exe`) are not supported.
+  They may be added later as extra build jobs without changing these rules.
 - One generator, Ninja, on every system: the same build files and the same
-  parallel build, from the same presets.
+  parallel build, from the same presets (since 0.1.0).
 - On macOS use Homebrew LLVM, not Apple Clang. Apple Clang has a different
   version scheme and doesn't ship clang-tidy.
 - clang-tidy and clang-format are located next to the compiler, so all three
@@ -75,7 +78,8 @@ project would otherwise have to write and maintain. When one is needed:
 
 - **License:** permissive open source only: MIT, BSD-2-Clause, BSD-3-Clause,
   Apache-2.0, BSL-1.0, Zlib, ISC, 0BSD, Unlicense, CC0-1.0, IJG, libpng-2.0.
-  No GPL: projects link statically, so the GPL would cover the whole program.
+  No GPL: projects link statically, so the GPL would cover the whole program
+  (since 0.3.0).
   LGPL or any other license needs a review and a change to this list, made
   in cpp-policy.
   - **A license written `A AND B` needs both on the list;** `A OR B` needs
@@ -238,7 +242,7 @@ data member set from a reference in the constructor and commented
 
 `long` is 64 bits on macOS and Linux but 32 bits on Windows, so code that
 stores a large value in a `long` works on one platform and silently truncates
-on another. `int` is 32 bits on every supported platform.
+on another. `int` is 32 bits on every supported platform (since 0.2.0).
 
 ### 2.4 Preprocessor
 
@@ -255,7 +259,8 @@ include directives.
 guards because the pragma isn't standard. With one compiler on every system
 it works everywhere, it has no name to invent or to keep in step when a header
 is copied or renamed, and its one weak spot, two copies of the same header
-included together, stops the compile with a redefinition error (since 0.42.0).
+included together, stops the compile with a redefinition error (the rule
+since 0.1.0; this reason since 0.42.0).
 
 **Modules are not used yet.** Code uses `#include`, not C++20 modules or
 C++23 `import std`. Reasons, as of LLVM 23 and CMake 4.4:
@@ -330,7 +335,8 @@ Rules:
 - Keep critical sections short: prepare outside the lock, lock only to touch
   the shared data.
 - Don't call code you don't control (callbacks, another object's virtual
-  functions) while holding a lock; that is how deadlocks start. When two locks
+  functions) while holding a lock; that is how deadlocks start (since
+  0.3.0). When two locks
   are needed, take them together with one `std::scoped_lock`.
 - A condition variable needs `std::unique_lock`: it unlocks while waiting,
   which `std::scoped_lock` can't. That is the one place for it.
@@ -349,12 +355,12 @@ pools) is not covered yet (W3, section 12).
 
 ### 2.9 Formatting
 
-Formatting is clang-format's job (`.clang-format`, checked by the local and CI gates): LLVM
-style with 4-space indents and a limit of **100 columns**. The limit was
-reviewed after the first real use: about 5% of lines go past 90 columns, and
-only `NOLINT` comments (which clang-format doesn't wrap, section 5) and text
-embedded in the code go past 100. 80 would rewrap about one line in nine;
-120 is too wide for side-by-side diffs and phone screens.
+Formatting is clang-format's job (`.clang-format`, checked by the local and
+CI gates): LLVM style with 4-space indents and a limit of **100 columns**.
+80 would rewrap ordinary code, and 120 is too wide for side-by-side diffs
+and phone screens; past 100 there are only `NOLINT` comments, which
+clang-format doesn't wrap (section 5), and text embedded in the code (since
+0.7.0).
 
 `sh tools/hooks/tidy-files --format <file>...` formats the files named, and
 `cmake --build --preset check --target policy-format-fix` every source. Both
@@ -527,8 +533,13 @@ A suppression is any of:
 - a formatting switch: `// clang-format off`;
 - a pragma or attribute that silences checks for the code around it:
   `#pragma clang system_header` (every warning in the rest of the file), and
-  `no_sanitize` in any spelling (`[[clang::no_sanitize(...)]]`,
-  `__attribute__((no_sanitize_address))`);
+  the attributes that turn a sanitizer or a protection off in a function,
+  in any of their spellings (`[[clang::...]]`, `__attribute__((...))`,
+  `__declspec(...)`): `no_sanitize` and its variants,
+  `no_address_safety_analysis`, `disable_sanitizer_instrumentation`,
+  `no_stack_protector`, `nocf_check`, `safebuffers` and `guard(nocf)`. The
+  audit knows these names; one it doesn't know is still a suppression, and
+  review's to find;
 - a sanitizer suppression: an entry in a sanitizer's suppression list.
 
 Rules, enforced by the suppression audit (the `policy-audit` target,
@@ -606,11 +617,12 @@ settings:
   source files or `CMAKE_CXX_FLAGS`;
 - no options or definitions that weaken a protection the policy turns on:
   `-fno-stack-protector` (or the weaker `-fstack-protector`),
-  `-fcf-protection=none`, `_FORTIFY_SOURCE` below 3 or undefined with no
-  `-D_FORTIFY_SOURCE=3` after it, a standard-library hardening macro turned
-  off, `-fno-sanitize=…`, and `clang-cl`'s `/GS-`, `/guard:cf-` and `/sdl-`;
-  `CPP_POLICY_HARDENING` has no "off" value (7.2);
-- each of these also inside a generator expression or `SHELL:`
+  `-fcf-protection=none`, `_FORTIFY_SOURCE` below 3 or undefined at all (the
+  policy defines it at 3 itself; its own `-U` before that is the only one
+  allowed), a standard-library hardening macro turned off, `-fno-sanitize=…`,
+  and `clang-cl`'s `/GS-`, `/guard:cf-` and `/sdl-`; `CPP_POLICY_HARDENING`
+  has no "off" value (7.2);
+- each of these also inside a generator expression, `SHELL:` or `-Wp,`
   (`$<$<CONFIG:Release>:-fno-stack-protector>`), since 0.42.0;
 - no `SKIP_LINTING`, and no changes to `CXX_CLANG_TIDY`;
 - no change to the excluded directories (`build`, `out`, `.git`,
@@ -670,8 +682,8 @@ are optimized (`RelWithDebInfo`, see 7.3), so `win-debug` is the one to step
 through. The `release` workflow runs the tests on the optimized build, where
 some bugs only appear; it is meant for CI rather than every push. So is the
 `tsan` workflow: ThreadSanitizer can't be combined with AddressSanitizer, so
-it needs a build of its own, and `clang-cl` doesn't provide it. `dev` and
-`debug` stay at `-O0`, so that a debugger shows every variable.
+it needs a build of its own, and `clang-cl` doesn't provide it (since 0.3.0).
+`dev` and `debug` stay at `-O0`, so that a debugger shows every variable.
 
 Test presets:
 - Every test has a 60-second timeout, so a hung test fails instead of holding
@@ -746,7 +758,8 @@ project uses is compiled as a dependency, section 11.7): `-Wall -Wextra -Wpedant
 With `clang-cl`, `/W4` replaces `-Wall -Wextra` (in `clang-cl`, `-Wall` means
 `-Weverything`). Each warning on the list points at a kind of bug the subset
 bans (conversions that lose data, shadowing, old-style casts, null pointers)
-and rarely fires on correct code; as errors, none is left for later.
+and rarely fires on correct code; as errors, none is left for later (since
+0.1.0).
 
 One warning of `-Wextra` is off: `-Wmissing-designated-field-initializers`.
 It rejected `Options{.width = 4}` whenever another member had no default
@@ -791,11 +804,11 @@ compiling (indirect calls are checked against a table of valid targets) and
 when linking (the table and the PE flag; lld-link doesn't add them on its
 own). Stack cookies need no flag: `clang-cl` compiles with a strong stack
 protector by default (`-stack-protector 2`, the equivalent of
-`-fstack-protector-strong`). The audit rejects the options that turn either
-off, in both spellings (`/GS-`, `-guard:cf-`, `/sdl-`, ...). The self-test
-reads a program's PE header and requires `GUARD_CF` with a non-empty
-function table, plus lld-link's ASLR and no-execute defaults
-(`DYNAMIC_BASE`, `HIGH_ENTROPY_VA`, `NX_COMPAT`).
+`-fstack-protector-strong`). The configure checks reject the options that turn
+either off, in both spellings (`/GS-`, `-guard:cf-`, `/sdl-`, ...). The
+self-test reads a program's PE header and requires `GUARD_CF` with a non-empty
+function table, plus lld-link's ASLR and no-execute defaults (`DYNAMIC_BASE`,
+`HIGH_ENTROPY_VA`, `NX_COMPAT`).
 
 ## 8. Enforcement layers
 
@@ -953,7 +966,11 @@ so one run reports every finding instead of the first.
 
 Review covers these, and agents following `AGENTS.md`. `AGENTS.md` sends an
 agent here at the end of each stage.
-- 1.1: a dependency is lightweight and alive.
+- 1.1: a dependency is lightweight and alive; the ports' changes read before
+  `builtin-baseline` moves; no vcpkg binary cache the project doesn't
+  control.
+- 5: an attribute that turns a sanitizer or a protection off under a name
+  the audit doesn't know.
 - 2.1: a reference, not a pointer, for an argument that must be present.
 - 2.2: `const char*` as a string type (a pattern can't tell it from `argv`
   or a pointer into a buffer); pointer and length parameters (indexing the
@@ -968,10 +985,11 @@ agent here at the end of each stage.
   that return `std::expected` (ignoring the result is caught).
 - 4: the comment on why a confined source file is confined.
 - 9: how agents work for the owner, as `AGENTS.md` states it.
-- 11: extracting a helper (11.2), comment and document accuracy (11.4), the
-  changelog's rejected options and the roadmap's layout (11.5), a confine
-  line for every dependency (11.6), a library release green on every system
-  (11.7).
+- 10.1: the text that names the toolchain pins (README, `AGENTS.md`).
+- 11: extracting a helper (11.2), the target of 250 lines a file (11.3),
+  comment and document accuracy (11.4), the changelog's rejected options
+  and the roadmap's layout (11.5), a confine line for every dependency
+  (11.6), a library release green on every system (11.7).
 - 13.4: `REQUIRE` versus `CHECK`, one behavior per test, fakes, no sleeps,
   nothing on screen, tests through public headers, real data used by hand.
 - 13.5: a size budget on every system for each shipped program, and a
@@ -1014,9 +1032,8 @@ left as it is.
 
 ## 9. AI agents
 
-**The owner** is the person who decides for a project: what it does, the
-exceptions to these rules it may have, and what joins its main line. The
-rules here and in `AGENTS.md` say "the owner" for that role.
+"The owner" is the person who decides for a project (the introduction);
+`AGENTS.md` uses the word the same way.
 
 - Agent instructions live in `AGENTS.md`. Projects don't have a `CLAUDE.md`:
   Claude Code (v2.1.277 or later) reads `AGENTS.md` directly, but only when no
@@ -1201,7 +1218,8 @@ declared. Files directly in `src/` (`main.cpp`) are the top.
 | Limit, test sources (under `tests/`) | 500 | The same |
 
 A file of one responsibility rarely needs more than 250 lines, and one past
-350 usually holds two; the limit makes the split happen when it is cheap.
+350 usually holds two; the limit makes the split happen when it is cheap
+(since 0.2.0, enforced since 0.6.0).
 
 - When a new feature would push a file past the target, split the file by
   responsibility first, then add the feature.
@@ -1224,7 +1242,7 @@ A file of one responsibility rarely needs more than 250 lines, and one past
 
 - Comments describe the **current** behavior, never its history ("used to",
   "now also"): their reader needs what the code does, and the history is in
-  the commits.
+  the commits (since 0.2.0).
 - When code changes, related comments change in the same commit, **and so
   does every document and every text the program shows its users** (its
   help, its messages). A change of wording isn't finished until a search
@@ -1234,7 +1252,7 @@ A file of one responsibility rarely needs more than 250 lines, and one past
   the change itself (8.2).
 - Prefer describing meaning over repeating values that live in constants
   ("at most `max_message_bytes`", not "at most 4096 bytes"): a value written
-  twice goes stale when the constant changes.
+  twice goes stale when the constant changes (since 0.2.0).
 - Temporary behavior is marked with `TODO:` and enough context for someone
   else to resolve it.
 - Don't comment what the code already says clearly; comment why.
@@ -2007,7 +2025,7 @@ see what another keeps (since 0.21.0).
   warm-up, on every system.** A program's peak first rises while it settles:
   allocator pools, thread pools, caches, the operating system's buffers.
   That rise is not a leak. Measure the curve once on each system (the peak
-  after each of many rounds). Then (since 0.20.2):
+  after each of many rounds). Then (since 0.20.1):
   - For a server, either run the work once, unmeasured, before the first
     reading, sized past the latest bend, or choose an N that is past it.
   - For a batch command, warm up with several runs of N inputs, never with

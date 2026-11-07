@@ -62,7 +62,7 @@ git -C "$dest" config core.hooksPath tools/hooks
 echo
 echo "$committed"
 echo "Next, in $dest:"
-echo "  sh tools/hooks/gate                 (the gate: cmake --workflow --preset check)"
+echo "  sh tools/hooks/gate                 (the local gate: the check workflow)"
 echo "The program has no size budget yet: the release workflow prints its size on each"
 echo "system, and the budgets are yours to approve (POLICY.md 13.5)."
 echo "Then describe the project in README.md and its first version in ROADMAP.md, and"

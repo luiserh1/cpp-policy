@@ -76,7 +76,8 @@ env:
   # apt.llvm.org signing key.
   LLVM_APT_KEY_FINGERPRINT: 6084F3CF814B57C1CF12EFD515CF4D18AF4F7421
   # The Microsoft toolset (MSVC libraries, standard library and runtime) of self-hosted Windows
-  # runners, major.minor: 14.44 is Visual Studio 2022 17.14, which only gets servicing updates.
+  # runners, major.minor: 14.44 is Visual Studio 2022 17.14. It moves in a toolchain window, with
+  # the other pins (MAINTAINING.md).
   MSVC_TOOLSET: '14.44'
 
 jobs:

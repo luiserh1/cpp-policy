@@ -7,8 +7,8 @@ with one part of its own first: the freeze.
 
 ## Frozen after 0.42.0
 
-The owner's plan (2026-11-07): 0.42.0 takes in what the review of
-2026-11-06 found, and nothing else. The policy then stays frozen until every
+The owner's plan (2026-11-07): 0.42.0 takes in only what the owner decided
+on the review of 2026-11-06. The policy then stays frozen until every
 project has upgraded to it, top-down (cli-cpparser and ToneMatcher, then
 Alfar, SimpleLocalServer and GalleryOrganizer). The freeze has two
 exceptions: a defect of the policy that makes correct code fail, and a need
@@ -23,6 +23,10 @@ that blocks a project. Meanwhile:
       10-core Mac only.
 - [ ] "As many jobs as the machine has cores" once CMake 4.3 (presets
       version 11) can be the minimum.
+- [ ] `-fsanitize-ignorelist=` passes the configure checks (found in the
+      review of release-0.42): a sanitizer suppression list, which POLICY.md
+      5 counts as a suppression. Not closed in 0.42.0, which takes in only
+      what was decided.
 
 ## Later
 
