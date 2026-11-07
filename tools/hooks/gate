@@ -92,6 +92,10 @@ trap 'rm -rf "$lock"' EXIT
 trap 'exit 130' INT TERM HUP
 
 # Keep the machine awake for as long as the workflow runs.
+# CTest's log of the last run is what the retry memory reads (below): one left by an earlier
+# run would be read again when this workflow stops before its tests.
+rm -f "build/$preset/Testing/Temporary/LastTest.log"
+
 if command -v caffeinate >/dev/null 2>&1; then
     caffeinate -s -i cmake --workflow --preset "$preset"
 elif command -v systemd-inhibit >/dev/null 2>&1 &&
@@ -106,8 +110,8 @@ code=$?
 # A passing test that used most of its time limit is named here, before the last line: it
 # is the next one to fail on a busy machine (POLICY.md 13.2). A test that needed a second run
 # is remembered on this machine, and needing it again fails the gate (POLICY.md 7); that is
-# recorded when the workflow failed for another reason too. The script is the policy's copy
-# that the build fetched.
+# recorded when the workflow's tests ran and something else failed too. The script is the
+# policy's copy that the build fetched, and does nothing without this run's test log.
 config=build/$preset/cpp_policy_config.cmake
 if [ -f "$config" ]; then
     policy=$(sed -n 's/^set(POLICY_ROOT \[==\[\(.*\)\]==\])$/\1/p' "$config")

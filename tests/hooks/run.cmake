@@ -262,6 +262,17 @@ run(${with_stub} tools/hooks/gate)
 string(FIND "${out}" "-DREMEMBER=ON" remembered)
 expect("code;EQUAL;3;AND;remembered;GREATER;-1"
     "a failed workflow must keep its exit code, and its retried tests must still be recorded")
+file(WRITE "${WORK}/stub/cmake" "#!/bin/sh\necho \"stub cmake $*\"\nexit 3\n")
+run(${with_stub} tools/hooks/gate)
+expect("code;EQUAL;3" "a failed workflow must keep its own exit code when the record fails too")
+# The test log an earlier run left is gone before the workflow starts, so a workflow that stops
+# before its tests can't have that run's retries read again as repeats.
+set(last_log "${repo}/build/win-check/Testing/Temporary/LastTest.log")
+file(WRITE "${last_log}" "an earlier run's log\n")
+run(${with_stub} tools/hooks/gate)
+if(EXISTS "${last_log}")
+    message(FATAL_ERROR "hooks: the gate kept an earlier run's test log for the retry memory")
+endif()
 file(WRITE "${WORK}/stub/cmake" "#!/bin/sh\necho \"stub cmake $*\"\n")
 file(REMOVE_RECURSE "${repo}/build/win-check")
 file(REMOVE "${repo}/build/cpp_policy_gate_failed_win-check")
