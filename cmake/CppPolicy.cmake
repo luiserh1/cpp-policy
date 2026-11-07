@@ -24,10 +24,35 @@ option(CPP_POLICY_CLANG_TIDY "Run clang-tidy as part of the build" OFF)
 option(CPP_POLICY_EXCEPTIONS "Enable C++ exceptions and RTTI" ON)
 set(CPP_POLICY_HARDENING "fast" CACHE STRING "Standard library hardening level: fast, debug")
 set_property(CACHE CPP_POLICY_HARDENING PROPERTY STRINGS fast debug)
-set(CPP_POLICY_CONFINED_DIRS "src/lowlevel" CACHE STRING
-    "Directories (relative to the project root) where suppressions and low-level code are allowed")
-set(CPP_POLICY_EXCLUDED_DIRS "build;out;.git;third_party;external;vcpkg_installed" CACHE STRING
-    "Directories (relative to the project root) that the audit and format checks skip")
+# Whether the project being configured is cpp-policy itself (its self-test).
+function(_cpp_policy_is_self out)
+    file(REAL_PATH "${CMAKE_SOURCE_DIR}" source)
+    file(REAL_PATH "${CPP_POLICY_ROOT}" root)
+    if(source STREQUAL root)
+        set(${out} TRUE PARENT_SCOPE)
+    else()
+        set(${out} FALSE PARENT_SCOPE)
+    endif()
+endfunction()
+
+# Where suppressions and low-level code are allowed, and what the checks skip, relative to the
+# project root. Only cpp-policy sets them (POLICY.md 4, 6): a project that sets
+# CPP_POLICY_CONFINED_DIRS or CPP_POLICY_EXCLUDED_DIRS to anything else fails configuration
+# (_cpp_policy_verify_targets). cpp-policy's own self-test adds its fixtures to them. A
+# library's lowlevel folder is added to the confined ones on its own.
+function(_cpp_policy_fixed_dirs confined_out excluded_out)
+    set(confined "src/lowlevel")
+    set(excluded "build;out;.git;third_party;external;vcpkg_installed")
+    _cpp_policy_is_self(self)
+    if(self)
+        list(APPEND confined ${CPP_POLICY_CONFINED_DIRS})
+        list(APPEND excluded ${CPP_POLICY_EXCLUDED_DIRS})
+        list(REMOVE_DUPLICATES confined)
+        list(REMOVE_DUPLICATES excluded)
+    endif()
+    set(${confined_out} "${confined}" PARENT_SCOPE)
+    set(${excluded_out} "${excluded}" PARENT_SCOPE)
+endfunction()
 # The release presets turn it on (POLICY.md 13.2): a unit program's test cases run in a random
 # order, from a seed kept in the build folder, so that state one case leaves behind for the
 # next shows. Configuring with -DCPP_POLICY_TEST_SEED=<seed> repeats an order.
@@ -391,7 +416,8 @@ function(_cpp_policy_project_targets dir out)
         cmake_path(IS_PREFIX CMAKE_BINARY_DIR "${sub}" NORMALIZE in_build_tree)
         cmake_path(RELATIVE_PATH sub BASE_DIRECTORY "${CMAKE_SOURCE_DIR}" OUTPUT_VARIABLE rel)
         set(excluded FALSE)
-        foreach(dir_name IN LISTS CPP_POLICY_EXCLUDED_DIRS)
+        _cpp_policy_fixed_dirs(confined_dirs excluded_dirs)
+        foreach(dir_name IN LISTS excluded_dirs)
             if(rel STREQUAL dir_name OR rel MATCHES "^${dir_name}/")
                 set(excluded TRUE)
             endif()
@@ -418,7 +444,8 @@ function(_cpp_policy_project_tests dir out)
         cmake_path(IS_PREFIX CMAKE_BINARY_DIR "${sub}" NORMALIZE in_build_tree)
         cmake_path(RELATIVE_PATH sub BASE_DIRECTORY "${CMAKE_SOURCE_DIR}" OUTPUT_VARIABLE rel)
         set(excluded FALSE)
-        foreach(dir_name IN LISTS CPP_POLICY_EXCLUDED_DIRS)
+        _cpp_policy_fixed_dirs(confined_dirs excluded_dirs)
+        foreach(dir_name IN LISTS excluded_dirs)
             if(rel STREQUAL dir_name OR rel MATCHES "^${dir_name}/")
                 set(excluded TRUE)
             endif()
@@ -453,31 +480,73 @@ function(_cpp_policy_definition_weakens definition out)
     set(${out} ${weakens} PARENT_SCOPE)
 endfunction()
 
+# The pieces of an option or definition that a generator expression or "SHELL:" can hide
+# (POLICY.md 6): it is split at '$', '<', '>' and spaces, and each part is kept with every
+# text that follows one of its colons. `$<$<CONFIG:Release>:-w>` gives, among others, "-w";
+# `$<1:/guard:cf->` gives "/guard:cf-".
+function(_cpp_policy_option_pieces item out)
+    set(pieces "")
+    string(REGEX REPLACE "[$<> ]" ";" parts "${item}")
+    foreach(part IN LISTS parts)
+        while(NOT part STREQUAL "")
+            list(APPEND pieces "${part}")
+            string(FIND "${part}" ":" colon)
+            if(colon EQUAL -1)
+                break()
+            endif()
+            math(EXPR colon "${colon} + 1")
+            string(SUBSTRING "${part}" ${colon} -1 part)
+        endwhile()
+    endforeach()
+    set(${out} "${pieces}" PARENT_SCOPE)
+endfunction()
+
 # Appends a problem to the list named by `out_list` for each option that turns warnings off,
 # or weakens a protection the policy turns on: the stack protector, fortify, control-flow
 # protection, standard-library hardening, the sanitizers, and clang-cl's hardening. clang-cl
-# accepts either prefix, so both are checked.
+# accepts either prefix, so both are checked. An option is checked in every piece
+# (_cpp_policy_option_pieces), and named whole in the problem. Undefining _FORTIFY_SOURCE is
+# allowed only when a definition that keeps the policy's level follows in the same list, as
+# in the policy's own options and triplets.
 # (The parameter must not be called `problems`: it would shadow the caller's list.)
 function(_cpp_policy_check_options what options out_list)
     set(found ${${out_list}})
+    set(unfortified "")
     foreach(option IN LISTS options)
-        if(option STREQUAL "-Wno-missing-designated-field-initializers")
-            # The policy's own (cpp_policy_apply, POLICY.md 2.10).
-        elseif(option MATCHES "-Wno-|/wd[0-9]" OR option MATCHES "^[-/]w$" OR option STREQUAL "/W0")
-            list(APPEND found "${what} turns warnings off: ${option}")
-        elseif(option MATCHES "^[-/](GS|guard:cf|sdl)-$"
-               OR option MATCHES "^-fno-stack-protector$|^-fstack-protector$"
-               OR (option MATCHES "^-fcf-protection=" AND NOT option MATCHES "^-fcf-protection=full$")
-               OR option MATCHES "^-fno-sanitize="
-               OR option MATCHES "^[-/]U(_LIBCPP_HARDENING_MODE|_GLIBCXX_ASSERTIONS|_MSVC_STL_HARDENING)$")
-            list(APPEND found "${what} turns hardening off: ${option}")
-        elseif(option MATCHES "^[-/]D(.*)$")
-            _cpp_policy_definition_weakens("${CMAKE_MATCH_1}" weakens)
-            if(weakens)
-                list(APPEND found "${what} turns hardening off: ${option}")
+        _cpp_policy_option_pieces("${option}" pieces)
+        set(problem "")
+        foreach(piece IN LISTS pieces)
+            if(piece STREQUAL "-Wno-missing-designated-field-initializers")
+                # The policy's own (cpp_policy_apply, POLICY.md 2.10).
+            elseif(piece MATCHES "^-Wno-|^/wd[0-9]" OR piece MATCHES "^[-/]w$" OR piece STREQUAL "/W0")
+                set(problem "turns warnings off")
+            elseif(piece MATCHES "^[-/](GS|guard:cf|sdl)-$"
+                   OR piece MATCHES "^-fno-stack-protector$|^-fstack-protector$"
+                   OR (piece MATCHES "^-fcf-protection=" AND NOT piece MATCHES "^-fcf-protection=full$")
+                   OR piece MATCHES "^-fno-sanitize="
+                   OR piece MATCHES "^[-/]U(_LIBCPP_HARDENING_MODE|_GLIBCXX_ASSERTIONS|_MSVC_STL_HARDENING)$")
+                set(problem "turns hardening off")
+            elseif(piece MATCHES "^[-/]U_FORTIFY_SOURCE$")
+                set(unfortified "${option}")
+            elseif(piece MATCHES "^[-/]D(.*)$")
+                set(definition "${CMAKE_MATCH_1}")
+                _cpp_policy_definition_weakens("${definition}" weakens)
+                if(weakens)
+                    set(problem "turns hardening off")
+                elseif(definition MATCHES "^_FORTIFY_SOURCE=")
+                    set(unfortified "")
+                endif()
             endif()
+        endforeach()
+        if(problem)
+            list(APPEND found "${what} ${problem}: ${option}")
         endif()
     endforeach()
+    if(NOT unfortified STREQUAL "")
+        string(REPLACE ";" " " unfortified "${unfortified}")
+        list(APPEND found
+            "${what} turns hardening off: ${unfortified}, with no -D_FORTIFY_SOURCE=3 after it")
+    endif()
     set(${out_list} ${found} PARENT_SCOPE)
 endfunction()
 
@@ -485,10 +554,14 @@ endfunction()
 function(_cpp_policy_check_definitions what definitions out_list)
     set(found ${${out_list}})
     foreach(definition IN LISTS definitions)
-        _cpp_policy_definition_weakens("${definition}" weakens)
-        if(weakens)
-            list(APPEND found "${what} turns hardening off: ${definition}")
-        endif()
+        _cpp_policy_option_pieces("${definition}" pieces)
+        foreach(piece IN LISTS pieces)
+            _cpp_policy_definition_weakens("${piece}" weakens)
+            if(weakens)
+                list(APPEND found "${what} turns hardening off: ${definition}")
+                break()
+            endif()
+        endforeach()
     endforeach()
     set(${out_list} ${found} PARENT_SCOPE)
 endfunction()
@@ -496,6 +569,20 @@ endfunction()
 # Runs once, after the whole project is configured (deferred by cpp_policy_add_checks).
 function(_cpp_policy_verify_targets)
     set(problems "")
+    # A build folder from before 0.42.0 has both in its cache, with the values below.
+    _cpp_policy_fixed_dirs(confined_dirs excluded_dirs)
+    _cpp_policy_is_self(self)
+    foreach(kind IN ITEMS confined excluded)
+        if(self)
+            break()
+        endif()
+        string(TOUPPER "CPP_POLICY_${kind}_DIRS" variable)
+        if(DEFINED ${variable} AND NOT "${${variable}}" STREQUAL "${${kind}_dirs}")
+            list(JOIN ${variable} ", " set_to)
+            list(JOIN ${kind}_dirs ", " fixed)
+            list(APPEND problems "${variable} is set to '${set_to}': only cpp-policy sets the ${kind} directories (${fixed}), POLICY.md 4 and 6")
+        endif()
+    endforeach()
     # The test programs (cpp_policy_add_tests), which have one clang-tidy check fewer; their
     # sources are written down for tidy-files, which checks files outside the build.
     get_property(test_targets GLOBAL PROPERTY CPP_POLICY_TEST_TARGETS)
@@ -1623,7 +1710,7 @@ function(cpp_policy_add_checks)
     get_property(library_layers GLOBAL PROPERTY CPP_POLICY_LIBRARY_LAYERS)
     get_property(used_libraries GLOBAL PROPERTY CPP_POLICY_USED_LIBRARIES)
     # A library's lowlevel module is a confined area like src/lowlevel (POLICY.md 4).
-    set(confined_dirs "${CPP_POLICY_CONFINED_DIRS}")
+    _cpp_policy_fixed_dirs(confined_dirs excluded_dirs)
     if(library)
         list(APPEND confined_dirs "lib/${library}/lowlevel")
     endif()
@@ -1633,7 +1720,7 @@ function(cpp_policy_add_checks)
         "set(POLICY_ROOT [==[${CPP_POLICY_ROOT}]==])\n"
         "set(POLICY_COMMIT [==[${policy_commit}]==])\n"
         "set(CONFINED_DIRS [==[${confined_dirs}]==])\n"
-        "set(EXCLUDED_DIRS [==[${CPP_POLICY_EXCLUDED_DIRS}]==])\n"
+        "set(EXCLUDED_DIRS [==[${excluded_dirs}]==])\n"
         "set(LAYERS [==[${layers}]==])\n"
         "set(CONFINED_INCLUDES [==[${confined_includes}]==])\n"
         "set(LIBRARY [==[${library}]==])\n"

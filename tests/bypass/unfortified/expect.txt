@@ -1,0 +1,1 @@
+app.cpp turns hardening off: SHELL:-U_FORTIFY_SOURCE, with no -D_FORTIFY_SOURCE=3 after it

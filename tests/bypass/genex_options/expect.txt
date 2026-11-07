@@ -1,0 +1,1 @@
+turns hardening off: [$]<[$]<CONFIG:Release>:-fno-stack-protector>.*turns warnings off: [$]<1:-w>.*turns hardening off: SHELL:-fcf-protection=none.*turns hardening off: [$]<[$]<NOT:[$]<CONFIG:Debug>>:/guard:cf->.*turns hardening off: [$]<1:_FORTIFY_SOURCE=1>

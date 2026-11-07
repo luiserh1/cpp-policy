@@ -1,0 +1,1 @@
+CPP_POLICY_EXCLUDED_DIRS is set to '.*gen': only cpp-policy sets the excluded directories

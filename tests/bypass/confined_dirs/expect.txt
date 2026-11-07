@@ -1,0 +1,1 @@
+CPP_POLICY_CONFINED_DIRS is set to '.*src/fast': only cpp-policy sets the confined directories
