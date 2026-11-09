@@ -741,8 +741,11 @@ function(_cpp_policy_verify_tests)
         if(NOT CMAKE_MATCH_1 IN_LIST labels)
             list(APPEND problems "test '${test}' doesn't have the label '${CMAKE_MATCH_1}'")
         endif()
+        # ENVIRONMENT_MODIFICATION too: "ASAN_OPTIONS=set:detect_leaks=0" there does the same.
         get_property(environment TEST "${test}" DIRECTORY "${dir}" PROPERTY ENVIRONMENT)
-        foreach(variable IN LISTS environment)
+        get_property(modification TEST "${test}" DIRECTORY "${dir}"
+            PROPERTY ENVIRONMENT_MODIFICATION)
+        foreach(variable IN LISTS environment modification)
             if(variable MATCHES "^(ASAN|LSAN|UBSAN|TSAN|MSAN)_OPTIONS=")
                 list(APPEND problems "test '${test}' sets ${variable}: sanitizer options "
                     "aren't a test's to set (POLICY.md 5)")

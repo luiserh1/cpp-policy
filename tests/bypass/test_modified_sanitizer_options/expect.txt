@@ -1,0 +1,1 @@
+test .integration/app/starts. sets ASAN_OPTIONS=set:detect_leaks=0: sanitizer options
