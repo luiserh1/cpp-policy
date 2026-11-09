@@ -100,15 +100,16 @@ Any copy of this repository's `tools/upgrade.sh` works (from v0.10.1 on): it
 fetches the release from the project's `GIT_REPOSITORY` and hands over to the
 release's own `upgrade.sh`, which knows what that release changed. It
 moves the `GIT_TAG` pin and the CI gate pins to the release's commit (with
-the tag in the comment), copies `.clang-tidy`, `.clang-format`,
-`CMakePresets.json`, `.claude/settings.json`, `tools/hooks/` and
+the tag in the comment), adds `branches: ['**']` under a bare `push:` in
+those CI files so that a tag push starts no run, copies `.clang-tidy`,
+`.clang-format`, `CMakePresets.json`, `.claude/settings.json`, `tools/hooks/` and
 `tools/vcpkg/`, replaces the policy's part of `AGENTS.md` (everything above
 `## This project`) with the release's, updates the `Policy:` line of
 `CHANGELOG.md`, checks every change, shows the diff and the release's
 CHANGELOG entry (follow its "Upgrading a project" steps), and runs the local
 gate. It commits nothing. `--no-gate` skips the gate.
 These are policy files, so in a project that follows `AGENTS.md` the owner
-runs it, not an agent.
+runs it, or an agent with the owner's word for that upgrade (POLICY.md 9).
 
 Copy `.clang-tidy` and `.clang-format` into the project root unchanged. The
 copies are for editors: clangd and IDEs look for these files next to the

@@ -17,7 +17,8 @@ which lifted the freeze.
 1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.43.0`, by the
    owner or by an agent with the owner's word for this upgrade (POLICY.md 9,
    new). It also adds `branches: ['**']` under a bare `push:` in the CI
-   file, so a tag push starts no run; a `push:` with filters of its own is
+   file, so a tag push starts no run; any other push trigger (filters of
+   its own, `on: push`, a list, a `tags:` filter beside the branches) is
    left alone and named.
 2. **What can fail after it, and is the project's to fix:**
    - Windows `win-check` now runs UndefinedBehaviorSanitizer with ASan, as
@@ -25,7 +26,8 @@ which lifted the freeze.
      test.
    - Configuration refuses `-fsanitize-ignorelist=` (and
      `-fsanitize-system-ignorelist=`, `-fsanitize-blacklist=`) and
-     `-fsanitize-recover=` in a project's own options.
+     `-fsanitize-recover=` in a project's own options, and a sanitizer's
+     options in a test's `ENVIRONMENT_MODIFICATION`.
    - The audit fails when `AGENTS.md` above `## This project` differs from
      the release's `template/AGENTS.md.in`, and names the first line that
      differs. `upgrade.sh` writes that part, so only a later hand edit fails.
@@ -47,6 +49,12 @@ which lifted the freeze.
   `-fsanitize-recover=undefined` or `=all` added, exit 0, the code after the
   overflow ran, and only a printed report showed it. Refused; fixture
   `bypass/sanitizer_recover`.
+- **A test could set a sanitizer's options through
+  `ENVIRONMENT_MODIFICATION`** (found by the review of release-0.43). The
+  check read only `ENVIRONMENT`: `ASAN_OPTIONS=set:detect_leaks=0` there
+  passed configuration, while the same in `ENVIRONMENT` was refused
+  (checked on one probe project). Both are read now; fixture
+  `bypass/test_modified_sanitizer_options`.
 
 ### Fixed: traps
 
@@ -96,6 +104,10 @@ which lifted the freeze.
 
 - The home server's core count and "as many jobs as the machine has cores"
   wait (`ROADMAP.md`).
+- Two older ways past the sanitizers, found by the same review, go to
+  `ROADMAP.md`: `-fno-sanitize-address-use-after-scope` and `-mllvm`
+  options. A rule for every `-fno-sanitize-*` needs care, since the policy
+  passes `-fno-sanitize-recover=undefined` itself.
 
 ## 0.42.0 (2026-11-07)
 

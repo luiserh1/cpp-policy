@@ -567,8 +567,9 @@ Rules, enforced by the suppression audit (the `policy-audit` target,
    add their own.
 6. **A test doesn't set a sanitizer's options.** `ASAN_OPTIONS`,
    `LSAN_OPTIONS` and the like in a test's environment are rejected at
-   configuration: `detect_leaks=0` there switched a check off where nothing
-   showed it.
+   configuration, in `ENVIRONMENT` and, since 0.43.0, in
+   `ENVIRONMENT_MODIFICATION`: `detect_leaks=0` there switched a check off
+   where nothing showed it.
    - The one case with a way through: a test program that opens a window.
      On macOS, LeakSanitizer then reports what AppKit and CoreFoundation
      keep for the life of the process. Suppressing those by library would
@@ -1114,6 +1115,8 @@ about how to work.
   machine that configures a project.
 - Projects upgrade with `tools/upgrade.sh <tag>` (README, "Upgrading"): it
   moves both pins and the copied policy files together and checks the result.
+  In the CI file it also adds `branches: ['**']` under a bare `push:`, and
+  names any other push trigger (section 8).
   It also brings the release's text into `AGENTS.md`: everything above the
   heading `## This project` is the policy's and becomes the release's, and
   what follows that heading is the project's own, left as it is (since
