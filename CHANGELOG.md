@@ -3,6 +3,50 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.44.0 (2026-11-10)
+
+A minor release, and one that **can make passing code fail** (before 1.0 a
+minor release may; POLICY.md 10). It takes in the owner's decision of
+2026-11-10 on the two older ways past the sanitizers that the review of
+release-0.43 found.
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** none.
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.44.0`, by the
+   owner or by an agent with the owner's word for this upgrade (POLICY.md 9).
+2. **What can fail after it, and is the project's to fix:** configuration
+   refuses any sanitizer option in a project's own options
+   (`-fsanitize…`, `-fno-sanitize…`, `/fsanitize…`) that isn't word for word
+   one the policy passes itself, and refuses `-mllvm` and `-Xclang`.
+
+   Searched on 2026-11-10 (`git grep` of each project's tracked files,
+   outside the policy's copied `tools/`): cli-cpparser, ToneMatcher, Alfar
+   and SimpleLocalServer use none of these options.
+
+### Fixed: holes
+
+- **Sanitizer options are the policy's** (found by the review of
+  release-0.43). The configure checks refused a list of options that weaken
+  a sanitizer, extended with each hole found;
+  `-fno-sanitize-address-use-after-scope` and
+  `"SHELL:-mllvm -asan-instrument-reads=0"` still passed.
+  `clang --help-hidden` (LLVM 23) lists more that weaken a check, not tried
+  one by one: `-fsanitize-address-use-after-return=never`,
+  `-fsanitize-undefined-ignore-overflow-pattern=`,
+  `-fsanitize-skip-hot-cutoff=`, `-fno-sanitize-thread-memory-access` and
+  its siblings. Now every sanitizer option of a project's own is refused
+  unless it is word for word one of the policy's
+  (`-fsanitize=address,undefined`, `-fno-sanitize-recover=undefined`,
+  `-fsanitize=thread`, and clang-cl's `/fsanitize=address` and
+  `-fsanitize=undefined`), and `-mllvm` and `-Xclang` are refused outright.
+  Fixture `bypass/sanitizer_options`, configured with the sanitizers on:
+  the four routes are reported, and the policy's own options are not.
+  - *Rejected:* extending the list (it reopens with each LLVM release), and
+    checking `compile_commands.json` as well (a new mechanism, kept for a
+    route this misses).
+
 ## 0.43.0 (2026-11-09)
 
 A minor release, and one that **can make passing code fail** (before 1.0 a

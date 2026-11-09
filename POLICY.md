@@ -625,10 +625,16 @@ settings:
   allowed), a standard-library hardening macro turned off, `-fno-sanitize=…`,
   and `clang-cl`'s `/GS-`, `/guard:cf-` and `/sdl-`; `CPP_POLICY_HARDENING`
   has no "off" value (7.2);
-- no sanitizer ignore list (`-fsanitize-ignorelist=`, its system and old
-  `-fsanitize-blacklist=` spellings), which silences a sanitizer by function
-  or file for the whole build, and no `-fsanitize-recover=`, which lets a
-  test pass with a finding printed (since 0.43.0);
+- no sanitizer option of the project's own: the sanitizers' options are
+  the policy's, so any option that starts with `-fsanitize`, `-fno-sanitize`
+  or `/fsanitize` is refused unless it is word for word one the policy
+  passes itself (since 0.44.0). A list of the options that weaken a check
+  would never be complete: clang 23 alone has several, and each LLVM
+  release can add more. Among them: an ignore list (`-fsanitize-ignorelist=`), which
+  silences a sanitizer by function or file for the whole build, and
+  `-fsanitize-recover=`, which lets a test pass with a finding printed;
+- no `-mllvm` or `-Xclang`, which pass any setting to the compiler's
+  internals, the sanitizers' instrumentation among them (since 0.44.0);
 - each of these also inside a generator expression, `SHELL:` or `-Wp,`
   (`$<$<CONFIG:Release>:-fno-stack-protector>`), and with the macro as a word
   of its own (`-U _FORTIFY_SOURCE`), since 0.42.0;

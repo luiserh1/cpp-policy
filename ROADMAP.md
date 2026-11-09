@@ -119,11 +119,6 @@ Releases A and B (0.30.0, 0.32.0) are out. Open:
 
 ### Waiting
 
-- [ ] **Two older ways past the sanitizers** (found by the review of
-      release-0.43): `-fno-sanitize-address-use-after-scope` and `-mllvm`
-      options (`"SHELL:-mllvm -asan-instrument-reads=0"`) pass the configure
-      checks. A rule for every `-fno-sanitize-*` has to leave the policy's
-      own `-fno-sanitize-recover=undefined` alone.
 - [ ] **The tidy cache on Windows:** how much a Windows check job skips after
       a local gate on the same machine; only the self-test has run there.
       (macOS, in the projects' CI on the owner's Mac: Alfar's check job went
