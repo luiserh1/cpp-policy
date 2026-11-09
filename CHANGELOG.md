@@ -3,6 +3,33 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## Unreleased
+
+### Measured
+
+- **The tidy cache in real CI, on Windows** (closes the ROADMAP item). Each
+  project's Windows CI runs on a runner of its own in the Windows virtual
+  machine on the owner's home server; there is no local gate there, so what
+  it gains comes from one CI run reusing the files an earlier one checked.
+  The "Run the check workflow" step of each project's Windows check job,
+  from GitHub's API on 2026-11-10:
+  - Alfar: 630–678 s before the cache (v0.40), 614 s on the first run
+    after the upgrade, 322–396 s after that;
+  - ToneMatcher: 142–145 s before, 149 s on the first run, 66–165 s after
+    (most 66–101 s);
+  - SimpleLocalServer: 70–109 s before, 89 s on the first run, 33–79 s
+    after.
+
+  The first run after an upgrade costs what it did before, as expected: the
+  policy's configuration is in every fingerprint. As with the macOS
+  figures (0.43.0), the code changed between these runs, so the cache's
+  share isn't separated; and that the virtual machine keeps its folders
+  between runs is inferred from the drop, not checked on the server.
+  - *Not done:* measuring the cache's share on its own. The owner closed
+    the item on 2026-11-10 with these figures: the question that mattered,
+    whether Windows CI gains, has an answer of the same quality as the
+    macOS one.
+
 ## 0.44.0 (2026-11-10)
 
 A minor release, and one that **can make passing code fail** (before 1.0 a

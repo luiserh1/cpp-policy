@@ -119,11 +119,6 @@ Releases A and B (0.30.0, 0.32.0) are out. Open:
 
 ### Waiting
 
-- [ ] **The tidy cache on Windows:** how much a Windows check job skips after
-      a local gate on the same machine; only the self-test has run there.
-      (macOS, in the projects' CI on the owner's Mac: Alfar's check job went
-      from 1,303–1,492 s to 602–689 s after the cache arrived, with its code
-      changing too; see CHANGELOG 0.43.0.)
 - [ ] **The home server's core count:** CTest gets eight jobs, measured on a
       10-core Mac only. Needs the server conversation; blocks nothing.
 - [ ] **"As many jobs as the machine has cores"** once CMake 4.3 (presets
