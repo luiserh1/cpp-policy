@@ -1,0 +1,1 @@
+sets a sanitizer option, which only the policy sets: -fno-sanitize-address-use-after-scope.*passes an option to the compiler.s internals: SHELL:-mllvm -asan-instrument-reads=0.*passes an option to the compiler.s internals: -Xclang.*app.cpp sets a sanitizer option, which only the policy sets: [$]<[$]<CONFIG:Debug>:-fsanitize-address-use-after-return=never>

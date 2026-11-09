@@ -515,6 +515,8 @@ endfunction()
 # accepts either prefix, so both are checked. An option is checked in every piece
 # (_cpp_policy_option_pieces), and named whole in the problem; what -Wp, passes to the
 # preprocessor is checked too, and -U or -D followed by the macro as a word of its own.
+# A sanitizer option (-fsanitize..., -fno-sanitize..., /fsanitize...) is refused unless it is
+# word for word one of the policy's own, and so are -mllvm and -Xclang.
 # Undefining _FORTIFY_SOURCE is refused: the policy defines it at its level itself. The only
 # -U_FORTIFY_SOURCE allowed is the policy's own, which cpp_policy_apply adds as exactly two
 # list elements; they are skipped. (fortify_check.hpp catches the spellings this misses.)
@@ -523,6 +525,9 @@ function(_cpp_policy_check_options what options out_list)
     set(found ${${out_list}})
     set(own_undefine "$<$<NOT:$<CONFIG:Debug>>:-U_FORTIFY_SOURCE")
     set(own_define "-D_FORTIFY_SOURCE=3>")
+    # The sanitizer options cpp_policy_apply passes itself (and clang-cl's), word for word.
+    set(own_sanitizer -fsanitize=address,undefined -fno-sanitize-recover=undefined
+        -fsanitize=thread /fsanitize=address -fsanitize=undefined)
     set(previous_option "")
     list(LENGTH options count)
     set(index 0)
@@ -586,6 +591,14 @@ function(_cpp_policy_check_options what options out_list)
                 # The policy's -fno-sanitize-recover=undefined stops a test at its first
                 # finding; recovering prints the finding and lets the test pass.
                 set(problem "lets a sanitizer's finding pass")
+            elseif(piece MATCHES "^[-/]f(no-)?sanitize" AND NOT piece IN_LIST own_sanitizer)
+                # Every other sanitizer option is the policy's to set (POLICY.md 6): a list of
+                # the ones that weaken a check would never be complete.
+                set(problem "sets a sanitizer option, which only the policy sets")
+            elseif(piece MATCHES "^[-/](mllvm|Xclang)(=|$)")
+                # These pass any setting to the compiler's internals, among them the
+                # sanitizers' instrumentation (-mllvm -asan-instrument-reads=0).
+                set(problem "passes an option to the compiler's internals")
             elseif(piece MATCHES "^[-/]D(.*)$")
                 _cpp_policy_definition_weakens("${CMAKE_MATCH_1}" weakens)
                 if(weakens)
