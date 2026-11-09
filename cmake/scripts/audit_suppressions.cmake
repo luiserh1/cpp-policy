@@ -28,7 +28,8 @@
 # `// boundary: which`, on the same line (POLICY.md 3).
 # With CHECK_PROJECT_FILES, also fails if the project's .clang-tidy, .clang-format,
 # CMakePresets.json, git hooks (tools/hooks/) or, with a vcpkg.json, vcpkg files (tools/vcpkg/)
-# differ from the policy's, or its .gitignore / .gitattributes lack any line of the policy's
+# differ from the policy's, or AGENTS.md above "## This project" differs from the release's
+# template/AGENTS.md.in, or its .gitignore / .gitattributes lack any line of the policy's
 # copies.
 # With POLICY_COMMIT set (the commit of cpp-policy the build uses), also fails if a GitHub
 # Actions workflow calls cpp-policy's gate at any other commit, or, with CHECK_PROJECT_FILES,
@@ -499,6 +500,46 @@ if(CHECK_PROJECT_FILES AND NOT per_file AND NOT source_norm STREQUAL policy_norm
             endif()
         endif()
     endforeach()
+    # AGENTS.md down to "## This project" is the policy's, which upgrade.sh replaces; below the
+    # heading is the project's own (POLICY.md 9). The two parts are compared as text, and the
+    # first line that differs is named. (Read whole: a list of lines would split at ";".)
+    set(heading "\n## This project\n")
+    if(NOT EXISTS "${SOURCE_DIR}/AGENTS.md")
+        report("AGENTS.md" 1 "missing; start from cpp-policy's template/AGENTS.md.in")
+    else()
+        file(READ "${POLICY_ROOT}/template/AGENTS.md.in" policy_text)
+        file(READ "${SOURCE_DIR}/AGENTS.md" agents_text)
+        string(APPEND agents_text "\n")
+        string(FIND "${policy_text}" "${heading}" policy_end)
+        string(FIND "${agents_text}" "${heading}" agents_end)
+        if(agents_end EQUAL -1)
+            report("AGENTS.md" 1 "has no \"## This project\" heading; upgrade.sh puts the policy's part above it")
+        else()
+            string(LENGTH "${heading}" length)
+            math(EXPR policy_end "${policy_end} + ${length}")
+            math(EXPR agents_end "${agents_end} + ${length}")
+            string(SUBSTRING "${policy_text}" 0 ${policy_end} wanted)
+            string(SUBSTRING "${agents_text}" 0 ${agents_end} found)
+            if(NOT found STREQUAL wanted)
+                set(number 1)
+                while(TRUE)
+                    string(FIND "${wanted}" "\n" wanted_end)
+                    string(FIND "${found}" "\n" found_end)
+                    string(SUBSTRING "${wanted}" 0 ${wanted_end} wanted_line)
+                    string(SUBSTRING "${found}" 0 ${found_end} found_line)
+                    if(NOT wanted_line STREQUAL found_line OR wanted_end EQUAL -1 OR found_end EQUAL -1)
+                        break()
+                    endif()
+                    math(EXPR wanted_end "${wanted_end} + 1")
+                    math(EXPR found_end "${found_end} + 1")
+                    string(SUBSTRING "${wanted}" ${wanted_end} -1 wanted)
+                    string(SUBSTRING "${found}" ${found_end} -1 found)
+                    math(EXPR number "${number} + 1")
+                endwhile()
+                report("AGENTS.md" ${number} "differs from cpp-policy's template/AGENTS.md.in above \"## This project\"; that part is the policy's, and only what is below the heading is the project's")
+            endif()
+        endif()
+    endif()
 endif()
 
 # The policy's .gitignore and .gitattributes are the required minimum: a project's copies

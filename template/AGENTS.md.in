@@ -1,8 +1,9 @@
 # Instructions for AI agents
 
 <!-- Everything above "## This project" is cpp-policy's: tools/upgrade.sh
-replaces it with each release's. This project's own instructions go under
-that heading. -->
+replaces it with each release's, and the audit checks it is that release's
+copy. This project's own instructions go under that heading, written by the
+owner or with the owner's word. -->
 
 This project follows **cpp-policy** (fetched by CMake; rules in
 `build/<preset>/_deps/cpp_policy-src/POLICY.md`, or
@@ -235,8 +236,11 @@ word.
 - Add `NOLINT` suppressions outside the confined directories. Inside them,
   name the check and give a reason: `// NOLINT(check-name): reason`.
 - Edit `.clang-tidy`, `.clang-format`, `CMakePresets.json`, compile flags in
-  `CMakeLists.txt`, `tools/`, `.github/`, `AGENTS.md` or agent settings
-  (`.claude/`).
+  `CMakeLists.txt`, `tools/`, `.github/`, agent settings (`.claude/`), or
+  `AGENTS.md` above `## This project`. The one exception is an upgrade of
+  the policy, with the owner's word for that upgrade: run `upgrade.sh`,
+  which writes these files, and prune `AGENTS.md` as it asks.
+- Edit what is under `## This project` without the owner's word.
 - Create a `CLAUDE.md`: Claude Code reads this file only while there is none.
 - Bypass git hooks (`--no-verify`, or overriding `core.hooksPath`).
 - "Fix" a toolchain error by changing the build. If the compiler check fails,

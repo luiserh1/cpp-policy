@@ -1,0 +1,1 @@
+AGENTS\.md:3: error: differs from cpp-policy.s template/AGENTS\.md\.in above "## This project"

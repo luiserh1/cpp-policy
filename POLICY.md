@@ -607,7 +607,8 @@ The following files define enforcement and must not be weakened in a project:
   before adding one, as for any dependency (1.1), and then writes it.
 - the git hooks in `tools/hooks/`, and any other `tools/` scripts
 - with dependencies, `tools/vcpkg/` (how vcpkg builds them, section 1.1)
-- `AGENTS.md`, agent settings (`.claude/settings.json`)
+- the policy's part of `AGENTS.md` (above `## This project`), agent settings
+  (`.claude/settings.json`)
 - CI workflows (`.github/workflows/`)
 
 Rules can't be switched off from CMake either. At the end of configuration
@@ -646,8 +647,10 @@ Projects can't change the rules locally:
   (`tools/hooks/`) and, with a `vcpkg.json`, vcpkg files (`tools/vcpkg/`) must
   match the policy's: the audit compares them byte for byte, and
   `tools/upgrade.sh` copies them;
-- the policy's part of `AGENTS.md` and `.claude/settings.json` are copied by
-  `tools/upgrade.sh`, but not compared;
+- the policy's part of `AGENTS.md`, everything above `## This project`, must
+  be the release's `template/AGENTS.md.in` down to that heading: the audit
+  compares it and names the first line that differs (since 0.43.0);
+- `.claude/settings.json` is copied by `tools/upgrade.sh`, but not compared;
 - a CI workflow must call cpp-policy's `gate.yml`, pinned to the commit the
   build uses (the audit checks both, section 8);
 - the build always uses the policy's copies of the configuration files (on
@@ -1076,11 +1079,19 @@ left as it is.
   `sed -i` on a policy file, or `git -c core.hooksPath=…`). Most of what an
   agent can't be stopped from doing is caught afterwards: the audit rejects
   edited copies of `.clang-tidy`, `.clang-format`, `CMakePresets.json`, the
-  hooks and the vcpkg files, and a CI that doesn't call the CI gate; the
-  configure checks reject weakened build settings; and the CI gate runs again
-  on a clean machine. An edit to `AGENTS.md` or to the agent settings isn't
-  caught: `upgrade.sh` puts the policy's text back at the next upgrade.
-  Agent settings are a guide, not a security boundary.
+  hooks, the vcpkg files and the policy's part of `AGENTS.md`, and a CI
+  that doesn't call the CI gate; the configure checks reject weakened build
+  settings; and the CI gate runs again on a clean machine. An edit to the
+  agent settings isn't caught: `upgrade.sh` puts them back at the next
+  upgrade. Agent settings are a guide, not a security boundary. An edit to
+  `AGENTS.md` is asked, not refused: below its heading it is the project's,
+  and changes with the owner's word.
+- **An upgrade is the owner's, or an agent's with the owner's word for that
+  upgrade.** `upgrade.sh` writes files no agent edits otherwise (`tools/`,
+  `.claude/`, `AGENTS.md`), and a release may ask for `AGENTS.md` to be
+  pruned by hand; with the rule naming no one, an agent couldn't do either.
+  What is under `## This project` is the project's own instructions: an
+  agent changes them with the owner's word (since 0.43.0).
 
 **How agents work for the owner** is the section of that name in
 `AGENTS.md`, part of the policy's text that `upgrade.sh` refreshes. Its
