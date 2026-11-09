@@ -24,6 +24,7 @@ file(MAKE_DIRECTORY "${project}/src/app" "${project}/tools")
 foreach(name IN ITEMS .clang-tidy .clang-format CMakePresets.json .gitignore .gitattributes)
     file(COPY_FILE "${POLICY_ROOT}/${name}" "${project}/${name}")
 endforeach()
+file(COPY_FILE "${POLICY_ROOT}/template/AGENTS.md.in" "${project}/AGENTS.md")
 file(COPY "${POLICY_ROOT}/tools/hooks" DESTINATION "${project}/tools")
 # CI calls the gate at the policy's commit, as the audit requires of a project (POLICY.md 8).
 # (GIT_DIR, which this test may set to a decoy, would name another repository.)
