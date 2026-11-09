@@ -3,6 +3,100 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
+## 0.43.0 (2026-11-09)
+
+A minor release, and one that **can make passing code fail** (before 1.0 a
+minor release may; POLICY.md 10). It takes in the owner's decisions of
+2026-11-09 on the coordinator's queue after the round of upgrades to 0.42.0,
+which lifted the freeze.
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** none.
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.43.0`, by the
+   owner or by an agent with the owner's word for this upgrade (POLICY.md 9,
+   new). It also adds `branches: ['**']` under a bare `push:` in the CI
+   file, so a tag push starts no run; a `push:` with filters of its own is
+   left alone and named.
+2. **What can fail after it, and is the project's to fix:**
+   - Windows `win-check` now runs UndefinedBehaviorSanitizer with ASan, as
+     macOS and Linux do: undefined behavior in Windows-only code now stops a
+     test.
+   - Configuration refuses `-fsanitize-ignorelist=` (and
+     `-fsanitize-system-ignorelist=`, `-fsanitize-blacklist=`) and
+     `-fsanitize-recover=` in a project's own options.
+   - The audit fails when `AGENTS.md` above `## This project` differs from
+     the release's `template/AGENTS.md.in`, and names the first line that
+     differs. `upgrade.sh` writes that part, so only a later hand edit fails.
+
+   Searched in the four upgraded projects on 2026-11-09: none uses the
+   refused options, and each one's `AGENTS.md` above the heading is 0.42.0's
+   copy.
+
+### Fixed: holes
+
+- **A sanitizer ignore list passed the configure checks** (found in the
+  review of release-0.42, left for after the freeze). It silences a
+  sanitizer by function or file for the whole build, outside any confined
+  directory and with no reason. Refused in every spelling; fixture
+  `bypass/sanitizer_ignorelist`.
+- **`-fsanitize-recover=` undid `-fno-sanitize-recover=undefined`** (found
+  while closing the one above). Measured with clang 23 on a signed overflow
+  under the policy's flags: exit 134 and nothing after it; with
+  `-fsanitize-recover=undefined` or `=all` added, exit 0, the code after the
+  overflow ran, and only a printed report showed it. Refused; fixture
+  `bypass/sanitizer_recover`.
+
+### Fixed: traps
+
+- **No one could do an upgrade** (SimpleLocalServer, 2026-11-09). 0.42.0's
+  step 2 asked for `AGENTS.md` to be pruned by hand, while `AGENTS.md`'s
+  own "Never" forbade agents every file `upgrade.sh` writes (`tools/`,
+  `.claude/`, `AGENTS.md`), and no text named who did it. The owner's
+  decision: an upgrade is the owner's, or an agent's with the owner's word
+  for that upgrade; agents never edit `AGENTS.md` above `## This project`,
+  and edit what is under it with the owner's word. The agent settings now
+  ask for an edit to `AGENTS.md` instead of refusing it, so that word can
+  be given. The audit checks the policy's part (fixtures
+  `audit/agents_differs`, `audit/agents_no_heading`).
+  - *Rejected:* `upgrade.sh` pruning by itself when every old paragraph is
+    the policy's: it would have helped one project of four (SimpleLocalServer;
+    cli-cpparser, ToneMatcher and Alfar kept text of their own).
+
+### Changed
+
+- **A tag push starts no run.** A release is tagged on a commit whose run
+  was green, so the tag's run tested the same files again: about 50 minutes
+  of the Mac per release (Alfar's figure, not measured here), and it could
+  only fail by chance, as Alfar's v0.8.1 tag run did on a flaky test. The
+  CI template and cpp-policy's own CI file run on branches only
+  (POLICY.md 8).
+  - *Rejected:* a tag run only when its commit has no green run (machinery
+    for a rule already broken), and keeping tag runs.
+- **UndefinedBehaviorSanitizer on Windows.** It was left out at 0.1.0
+  without being tried. With ASan, whose runtime carries its checks, it
+  links with nothing more and works: the new self-test `ub/detected`
+  passes on macOS, Linux and Windows (CI run 42695221589), and fails when
+  `-fno-sanitize-recover=undefined` is removed (POLICY.md 7.3).
+
+### Measured
+
+- **The tidy cache in real CI, on macOS.** The projects' macOS runners on
+  the owner's Mac run as the owner's user, so they share the cache with
+  local gates. The check workflow step of Alfar's macOS check job took
+  1,303–1,492 s on 2026-11-04 (v0.40, no cache) and 602–689 s on main and
+  release branches on 2026-11-09 (v0.42); one branch run took 951 s, and the
+  first run after the upgrade 1,359 s. ToneMatcher's took 107–275 s before
+  and 52–146 s after. The code changed between those runs as well, so how
+  much of the drop is the cache isn't separated. Windows stays open
+  (`ROADMAP.md`).
+
+### Decided and not done
+
+- The home server's core count and "as many jobs as the machine has cores"
+  wait (`ROADMAP.md`).
+
 ## 0.42.0 (2026-11-07)
 
 A minor release, and one that **can make passing code fail** (before 1.0 a

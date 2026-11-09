@@ -2,34 +2,7 @@
 
 Open work on cpp-policy itself: what comes next, and why. What's done is in
 `CHANGELOG.md`, with the reasons; items are removed from here in the commit
-that resolves them. The layout is the one POLICY.md 11.5 gives projects,
-with one part of its own first: the freeze.
-
-## Frozen after 0.42.0
-
-The owner's plan (2026-11-07): 0.42.0 takes in only what the owner decided
-on the review of 2026-11-06. The policy then stays frozen until every
-project has upgraded to it, top-down (cli-cpparser and ToneMatcher, then
-Alfar, SimpleLocalServer and GalleryOrganizer). The freeze has two
-exceptions: a defect of the policy that makes correct code fail, and a need
-that blocks a project. Meanwhile:
-
-- [ ] ToneMatcher's scratch folder lock names its process (POLICY.md 13.4),
-      in ToneMatcher's own step after its upgrade.
-- [ ] The tidy cache in a real CI job: how much a macOS check job skips
-      after a local gate on the same commit (measured only between two
-      local folders), and on Windows (only the self-test has run there).
-- [ ] The home server's core count: CTest gets eight jobs, measured on a
-      10-core Mac only.
-- [ ] "As many jobs as the machine has cores" once CMake 4.3 (presets
-      version 11) can be the minimum.
-- [ ] `-fsanitize-ignorelist=` passes the configure checks (found in the
-      review of release-0.42): a sanitizer suppression list, which POLICY.md
-      5 counts as a suppression. Not closed in 0.42.0, which takes in only
-      what was decided.
-- [ ] UBSan on Windows, with ASan, in `win-check` (owner, 2026-11-07): it
-      was left out at 0.1.0 without being tried (POLICY.md 7.3), and the
-      documentation then said the two together link with `/MD`.
+that resolves them. The layout is the one POLICY.md 11.5 gives projects.
 
 ## Later
 
@@ -146,6 +119,15 @@ Releases A and B (0.30.0, 0.32.0) are out. Open:
 
 ### Waiting
 
+- [ ] **The tidy cache on Windows:** how much a Windows check job skips after
+      a local gate on the same machine; only the self-test has run there.
+      (macOS, in the projects' CI on the owner's Mac: Alfar's check job went
+      from 1,303–1,492 s to 602–689 s after the cache arrived, with its code
+      changing too; see CHANGELOG 0.43.0.)
+- [ ] **The home server's core count:** CTest gets eight jobs, measured on a
+      10-core Mac only. Needs the server conversation; blocks nothing.
+- [ ] **"As many jobs as the machine has cores"** once CMake 4.3 (presets
+      version 11) can be the minimum; the minimum is 3.29.
 - [ ] **Modules experiment:** once CMake makes `import std` stable, convert
       one module of a project (e.g. SimpleLocalServer's `message/sanitize`)
       and check that clang-tidy and the gate still pass (POLICY.md 2.4 says

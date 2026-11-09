@@ -624,6 +624,10 @@ settings:
   allowed), a standard-library hardening macro turned off, `-fno-sanitize=…`,
   and `clang-cl`'s `/GS-`, `/guard:cf-` and `/sdl-`; `CPP_POLICY_HARDENING`
   has no "off" value (7.2);
+- no sanitizer ignore list (`-fsanitize-ignorelist=`, its system and old
+  `-fsanitize-blacklist=` spellings), which silences a sanitizer by function
+  or file for the whole build, and no `-fsanitize-recover=`, which lets a
+  test pass with a finding printed (since 0.43.0);
 - each of these also inside a generator expression, `SHELL:` or `-Wp,`
   (`$<$<CONFIG:Release>:-fno-stack-protector>`), and with the macro as a word
   of its own (`-U _FORTIFY_SOURCE`), since 0.42.0;
@@ -804,10 +808,11 @@ What to know:
   Visual Studio component "C++ AddressSanitizer" for `stl_asan.lib` (README).
 - ASan does not work with the debug C runtime, so the Windows `dev` preset
   uses the release runtime (`/MD`) with debug info.
-- UBSan is not enabled on Windows (since 0.1.0). At 0.1.0 its runtime was
-  documented as linking with the release runtime only together with ASan,
-  and it was left out rather than tried. The code it would check is the
-  code macOS and Linux run it on, apart from confined Windows files.
+- UBSan runs with ASan, as on the other systems: its checks come from the
+  ASan runtime the policy links, so it needs nothing more at the link. It
+  was left out from 0.1.0 without being tried, and found to work in 0.43.0;
+  the self-test `ub/detected` checks on every system that a signed overflow
+  is reported and stops the program.
 - ThreadSanitizer isn't available with `clang-cl`, so Windows has no `tsan`
   workflow.
 
