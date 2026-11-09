@@ -1,0 +1,1 @@
+turns a sanitizer off: -fsanitize-ignorelist=ignore.txt.*turns a sanitizer off: SHELL:-fsanitize-system-ignorelist=ignore.txt.*app.cpp turns a sanitizer off: -fsanitize-blacklist=ignore.txt

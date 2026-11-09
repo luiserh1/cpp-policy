@@ -576,6 +576,14 @@ function(_cpp_policy_check_options what options out_list)
                 set(problem "turns hardening off")
             elseif(piece MATCHES "^[-/]U_FORTIFY_SOURCE$")
                 set(problem "turns hardening off")
+            elseif(piece MATCHES "^[-/]fsanitize-(system-)?(ignorelist|blacklist)=")
+                # An ignore list silences a sanitizer by function or file for the whole build,
+                # outside any confined directory and with no reason (POLICY.md 5).
+                set(problem "turns a sanitizer off")
+            elseif(piece MATCHES "^[-/]fsanitize-recover(=|$)")
+                # The policy's -fno-sanitize-recover=undefined stops a test at its first
+                # finding; recovering prints the finding and lets the test pass.
+                set(problem "lets a sanitizer's finding pass")
             elseif(piece MATCHES "^[-/]D(.*)$")
                 _cpp_policy_definition_weakens("${CMAKE_MATCH_1}" weakens)
                 if(weakens)

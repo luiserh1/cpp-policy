@@ -1,0 +1,1 @@
+lets a sanitizer's finding pass: -fsanitize-recover=undefined.*app.cpp lets a sanitizer's finding pass: SHELL:-fsanitize-recover=all
