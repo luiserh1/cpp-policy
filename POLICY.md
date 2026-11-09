@@ -871,11 +871,16 @@ land on `main` (since 0.41.0).
 
 In CI, a run that a newer push to the same branch made obsolete is
 cancelled (`gate.yml`): stopped on a branch; on the default branch the run
-in progress finishes and only runs still waiting are dropped; never for a
-tag. A cancelled run is neither a pass nor a failure, and no rule needs
-every pushed commit to have a result: pre-push ran the local gate before the
-push, and a release is tagged on the commit whose run is green
-(section 10).
+in progress finishes and only runs still waiting are dropped. A cancelled
+run is neither a pass nor a failure, and no rule needs every pushed commit
+to have a result: pre-push ran the local gate before the push, and a
+release is tagged on the commit whose run is green (section 10).
+
+**A tag push starts no run.** The CI file runs on branches only
+(`branches: ['**']` under `push:`, from the template; `upgrade.sh` adds it
+to a bare `push:`): the tag goes on a commit whose run was green, so a run
+for it would test the same files again, and could only fail by chance
+(since 0.43.0).
 
 **The launcher.** `sh tools/hooks/gate [workflow]` runs the workflow and
 adds what a machine shared by several unattended agents needs (since

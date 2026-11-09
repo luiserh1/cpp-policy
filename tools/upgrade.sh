@@ -165,6 +165,7 @@ sed -n "${pin_line}p" CMakeLists.txt | grep -q "$commit.*# $tag" ||
 # 2. The CI pins: every call to one of cpp-policy's workflows (gate.yml, benchmark.yml) moves
 # to the same commit.
 gate_ref='cpp-policy/\.github/workflows/[a-z_-]*\.ya*ml@'
+ci_note=
 for workflow in .github/workflows/*.yml .github/workflows/*.yaml; do
     [ -f "$workflow" ] || continue
     grep -q "$gate_ref" "$workflow" || continue
@@ -174,6 +175,20 @@ for workflow in .github/workflows/*.yml .github/workflows/*.yaml; do
         -e "\\|$gate_ref|s|#[[:space:]]*v[0-9][0-9.]*|# $tag|"
     if grep "$gate_ref" "$workflow" | grep -qv "@$commit"; then
         fail "$workflow still calls a cpp-policy workflow at another commit"
+    fi
+    # A tag push starts no run: a release is tagged on a commit whose run was green
+    # (POLICY.md 8). A bare "push:" gets the branch filter; one with filters of its own is left
+    # as it is, and said so.
+    if grep -q '^  push:$' "$workflow"; then
+        awk -v filter="    branches: ['**']" '
+            pending && $0 !~ /^    / { print filter }
+            { pending = 0; print }
+            /^  push:$/ { pending = 1 }
+            END { if (pending) print filter }' "$workflow" >"$work/rewrite"
+        cat "$work/rewrite" >"$workflow"
+    fi
+    if grep -q '^  push:$' "$workflow" && ! grep -q "^    branches: \['\*\*'\]$" "$workflow"; then
+        ci_note="$ci_note $workflow runs on push with filters of its own: check that a tag push starts no run (POLICY.md 8)."
     fi
 done
 
@@ -265,6 +280,7 @@ echo "---"
 echo "The .gitignore and .gitattributes lines the release requires are checked by the audit."
 [ -z "$changelog_note" ] || echo "$changelog_note"
 [ -z "$agents_note" ] || echo "$agents_note"
+[ -z "$ci_note" ] || echo "${ci_note# }"
 
 # 8. The local gate, through its launcher (POLICY.md 8), which picks the preset for this
 # system.

@@ -5,7 +5,10 @@
 name: CI
 
 on:
+  # Branches only: a release is tagged on a commit whose run was green, so a tag push
+  # would run the same commit again (POLICY.md 8).
   push:
+    branches: ['**']
   workflow_dispatch:
 
 permissions:

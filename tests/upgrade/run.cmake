@@ -114,6 +114,10 @@ file(WRITE "${project}/CMakeLists.txt"
     "    GIT_TAG        ${old}) # v1.0.0\n"
     "FetchContent_MakeAvailable(cpp_policy)\n")
 file(WRITE "${project}/.github/workflows/ci.yml"
+    "on:\n"
+    "  push:\n"
+    "  workflow_dispatch:\n"
+    "\n"
     "jobs:\n"
     "  gate:\n"
     "    uses: someone/cpp-policy/.github/workflows/gate.yml@${old} # v1.0.0\n"
@@ -121,6 +125,11 @@ file(WRITE "${project}/.github/workflows/ci.yml"
     "      vcpkg: true\n"
     "  benchmark:\n"
     "    uses: someone/cpp-policy/.github/workflows/benchmark.yml@${old} # v1.0.0\n")
+# A workflow whose push has filters of its own is left alone, with a note.
+set(own_filters "on:\n  push:\n    tags-ignore: ['v*']\n\njobs:\n  gate:\n"
+    "    uses: someone/cpp-policy/.github/workflows/gate.yml@${old} # v1.0.0\n")
+string(REPLACE ";" "" own_filters "${own_filters}")
+file(WRITE "${project}/.github/workflows/nightly.yml" "${own_filters}")
 # The project's own instructions and changelog. AGENTS.md is from before "## This project":
 # policy and project mixed.
 set(old_agents "# Fixture\n\nThe project's own words.\n\n## Before you say you are done\n\nRun the gate of 1.0.0.\n")
@@ -188,6 +197,14 @@ string(FIND "${ci}" "      vcpkg: true\n" untouched)
 expect("pinned;GREATER;-1;AND;untouched;GREATER;-1" "the CI gate must be pinned to v2.0.0's commit")
 string(FIND "${ci}" "benchmark.yml@${new} # v2.0.0\n" pinned)
 expect("pinned;GREATER;-1" "the CI benchmark workflow must be pinned to v2.0.0's commit")
+string(FIND "${ci}" "on:\n  push:\n    branches: ['**']\n  workflow_dispatch:\n" filtered)
+expect("filtered;EQUAL;0" "a bare push trigger must get the branch filter, so a tag push runs nothing")
+file(READ "${project}/.github/workflows/nightly.yml" nightly)
+string(REPLACE "@${old}" "@${new}" nightly_wanted "${own_filters}")
+string(REPLACE "# v1.0.0" "# v2.0.0" nightly_wanted "${nightly_wanted}")
+expect("nightly;STREQUAL;nightly_wanted" "a push trigger with filters of its own must be left alone")
+string(FIND "${out}" ".github/workflows/nightly.yml runs on push with filters of its own" noted)
+expect("noted;GREATER;-1" "a push trigger with filters of its own must be named in the output")
 
 foreach(name IN ITEMS .clang-tidy .clang-format CMakePresets.json
                      tools/hooks/pre-commit tools/hooks/pre-push)
@@ -219,6 +236,10 @@ run("${project}" ${git} add --all)
 run("${project}" ${git} commit --quiet -m "upgraded")
 run("${project}" ${upgrade} v2.0.0 --no-gate)
 expect("code;EQUAL;0" "the upgrade of a pruned AGENTS.md must succeed")
+file(READ "${project}/.github/workflows/ci.yml" ci)
+string(REGEX MATCHALL "branches:" filters "${ci}")
+list(LENGTH filters filters)
+expect("filters;EQUAL;1" "a second upgrade must not add the branch filter again")
 file(READ "${project}/AGENTS.md" agents)
 set(wanted "${policy_part}\nThe project's own words.\n")
 expect("agents;STREQUAL;wanted"
