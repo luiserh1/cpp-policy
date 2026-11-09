@@ -298,7 +298,9 @@ function(cpp_policy_apply target)
     # Sanitizers. See POLICY.md 7.3 for the Windows limitations.
     if(CPP_POLICY_SANITIZERS)
         if(msvc_cli)
-            target_compile_options(${target} PRIVATE /fsanitize=address)
+            # UBSan's checks come from the ASan runtime the policy links (POLICY.md 7.3).
+            target_compile_options(${target} PRIVATE /fsanitize=address
+                -fsanitize=undefined -fno-sanitize-recover=undefined)
             set_target_properties(${target} PROPERTIES MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
             _cpp_policy_windows_asan_runtime(${target})
         else()

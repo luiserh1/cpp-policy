@@ -36,6 +36,19 @@ if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
     endif()
 endif()
 
+# --- UndefinedBehaviorSanitizer: a signed overflow must be reported, and stop the program
+# (-fno-sanitize-recover), on every system, clang-cl included.
+if(CPP_POLICY_SANITIZERS)
+    add_executable(policy_ub_overflow ub/overflow.cpp)
+    cpp_policy_apply(policy_ub_overflow)
+    add_test(NAME ub/detected COMMAND policy_ub_overflow)
+    set_tests_properties(ub/detected PROPERTIES
+        PASS_REGULAR_EXPRESSION "runtime error"
+        FAIL_REGULAR_EXPRESSION "after the overflow"
+        # On macOS the stop is an abort, which CTest counts as a failure whatever the output.
+        ENVIRONMENT_MODIFICATION "UBSAN_OPTIONS=set:abort_on_error=0")
+endif()
+
 # --- LeakSanitizer: a deliberate leak must be reported (ASan builds on macOS and Linux).
 # The dev and check test presets turn leak detection on (it is off by default on macOS);
 # the test only appends abort_on_error=0, so it fails if the preset stops doing that.
