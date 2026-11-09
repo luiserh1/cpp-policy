@@ -12,7 +12,8 @@
 # (build/check/_deps/cpp_policy-src). The release itself is fetched from the project's
 # GIT_REPOSITORY. The script changes only what a release defines, and checks every change:
 #   - the GIT_TAG pin in CMakeLists.txt: the release's commit, with the tag in a comment;
-#   - the pins of cpp-policy's CI gate in .github/workflows/, if there are any;
+#   - the pins of cpp-policy's CI gate in .github/workflows/, if there are any, and in those
+#     files branches: ['**'] under a bare "push:", so that a tag push starts no run;
 #   - the copies of .clang-tidy, .clang-format, CMakePresets.json, .claude/settings.json and
 #     tools/hooks/;
 #   - with a vcpkg.json, the copies of tools/vcpkg/;
@@ -177,8 +178,8 @@ for workflow in .github/workflows/*.yml .github/workflows/*.yaml; do
         fail "$workflow still calls a cpp-policy workflow at another commit"
     fi
     # A tag push starts no run: a release is tagged on a commit whose run was green
-    # (POLICY.md 8). A bare "push:" gets the branch filter; one with filters of its own is left
-    # as it is, and said so.
+    # (POLICY.md 8). A bare "push:" gets the branch filter; any other push trigger is left as
+    # it is, and named.
     if grep -q '^  push:$' "$workflow"; then
         awk -v filter="    branches: ['**']" '
             pending && $0 !~ /^    / { print filter }
@@ -187,8 +188,13 @@ for workflow in .github/workflows/*.yml .github/workflows/*.yaml; do
             END { if (pending) print filter }' "$workflow" >"$work/rewrite"
         cat "$work/rewrite" >"$workflow"
     fi
-    if grep -q '^  push:$' "$workflow" && ! grep -q "^    branches: \['\*\*'\]$" "$workflow"; then
-        ci_note="$ci_note $workflow runs on push with filters of its own: check that a tag push starts no run (POLICY.md 8)."
+    # Any other spelling of a push trigger (on: push, a list, a comment after it, CRLF), or a
+    # tags filter beside the branches, is named rather than guessed at.
+    pushes=$(awk '{ sub(/#.*/, "") } /^jobs:/ { exit }
+        /(^|[^A-Za-z_])push([^A-Za-z_]|$)/ { found = 1 } END { print found + 0 }' "$workflow")
+    if [ "$pushes" = 1 ] && { ! grep -q "^    branches: \['\*\*'\]$" "$workflow" ||
+        grep -q '^    tags:' "$workflow"; }; then
+        ci_note="$ci_note $workflow: check that a tag push starts no run; its push trigger isn't a bare \"push:\" with branches: ['**'] alone (POLICY.md 8)."
     fi
 done
 

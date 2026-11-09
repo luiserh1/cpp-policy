@@ -203,8 +203,10 @@ file(READ "${project}/.github/workflows/nightly.yml" nightly)
 string(REPLACE "@${old}" "@${new}" nightly_wanted "${own_filters}")
 string(REPLACE "# v1.0.0" "# v2.0.0" nightly_wanted "${nightly_wanted}")
 expect("nightly;STREQUAL;nightly_wanted" "a push trigger with filters of its own must be left alone")
-string(FIND "${out}" ".github/workflows/nightly.yml runs on push with filters of its own" noted)
+string(FIND "${out}" ".github/workflows/nightly.yml: check that a tag push starts no run" noted)
 expect("noted;GREATER;-1" "a push trigger with filters of its own must be named in the output")
+string(FIND "${out}" ".github/workflows/ci.yml: check" named)
+expect("named;EQUAL;-1" "a bare push trigger, once filtered, must not be named")
 
 foreach(name IN ITEMS .clang-tidy .clang-format CMakePresets.json
                      tools/hooks/pre-commit tools/hooks/pre-push)
