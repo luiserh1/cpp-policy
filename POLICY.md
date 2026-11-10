@@ -982,7 +982,10 @@ differently.
   on macOS, `~/.cache/cpp-policy/tidy` on Linux,
   `%LOCALAPPDATA%\cpp-policy\tidy` on Windows. `CPP_POLICY_TIDY_CACHE`
   names another folder, or `off`. Entries are empty files; those unused for
-  30 days are removed by a configure, at most once a day.
+  30 days are removed by a configure, at most once a day. A cache folder
+  the user can't write fails the configure, which names it and the ways
+  out; otherwise the first file's clang-tidy would fail with CMake's "No
+  such file or directory".
 - GitHub's own machines start empty each time and gain nothing from it.
 - The self-test `tidy/cache` changes each input in turn and checks that
   only the files it concerns are checked again, and that a finding fails

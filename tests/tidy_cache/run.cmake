@@ -193,4 +193,25 @@ if(EXISTS "${WORK}/four/build/off")
     message(FATAL_ERROR "tidy_cache: with the cache off, a folder named 'off' was written")
 endif()
 
+# 9. A cache folder this user can't write: the configure says so, before any clang-tidy runs.
+# A folder under a plain file can't be made on any system, by any user (root included, as in
+# a container).
+file(WRITE "${WORK}/a_file" "")
+make_project("${WORK}/seven")
+execute_process(
+    COMMAND "${CMAKE_COMMAND}" -E env "CPP_POLICY_TIDY_CACHE=${WORK}/a_file/tidy"
+            "${CMAKE_COMMAND}" -S "${WORK}/seven" -B "${WORK}/seven/build" -G Ninja
+            "-DCMAKE_MAKE_PROGRAM=${MAKE_PROGRAM}" "-DCMAKE_CXX_COMPILER=${CXX}"
+            -DCPP_POLICY_CLANG_TIDY=ON
+    RESULT_VARIABLE code OUTPUT_VARIABLE out ERROR_VARIABLE err)
+if(code EQUAL 0)
+    message(FATAL_ERROR "tidy_cache: a cache folder that can't be written passed the "
+        "configure\n${out}${err}")
+endif()
+if(NOT "${out}${err}" MATCHES "the tidy cache's folder"
+        OR NOT "${out}${err}" MATCHES "CPP_POLICY_TIDY_CACHE")
+    message(FATAL_ERROR "tidy_cache: a cache folder that can't be written failed the "
+        "configure without saying so\n${out}${err}")
+endif()
+
 message("tidy_cache: OK")

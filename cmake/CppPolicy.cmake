@@ -331,11 +331,46 @@ function(cpp_policy_apply target)
     endif()
 endfunction()
 
+# A tidy cache folder this user can't write would fail the first file's clang-tidy, with
+# CMake's "No such file or directory" (the server's runners, 2026-11-08: Podman had made
+# ~/.cache root's). The configure says so first, with the ways out. CMake 3.29's
+# file(MAKE_DIRECTORY) can't report a failure, so `cmake -E` is asked instead.
+# Once per configure, from the first target clang-tidy is given to.
+function(_cpp_policy_check_tidy_cache)
+    get_property(checked GLOBAL PROPERTY CPP_POLICY_TIDY_CACHE_CHECKED)
+    if(checked)
+        return()
+    endif()
+    set_property(GLOBAL PROPERTY CPP_POLICY_TIDY_CACHE_CHECKED TRUE)
+    include("${CPP_POLICY_ROOT}/cmake/scripts/tidy_cache_dir.cmake")
+    cpp_policy_tidy_cache_dir(cache)
+    if(cache STREQUAL "off")
+        return()
+    endif()
+    string(RANDOM LENGTH 12 suffix)
+    set(probe "${cache}/tmp/writable-${suffix}")
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E make_directory "${cache}/tmp"
+        RESULT_VARIABLE made OUTPUT_QUIET ERROR_QUIET)
+    if(made EQUAL 0)
+        execute_process(COMMAND "${CMAKE_COMMAND}" -E touch "${probe}"
+            RESULT_VARIABLE made OUTPUT_QUIET ERROR_QUIET)
+        file(REMOVE "${probe}")
+    endif()
+    if(NOT made EQUAL 0)
+        message(FATAL_ERROR "cpp-policy: the tidy cache's folder ${cache} can't be written by "
+            "this user (POLICY.md 8), so clang-tidy would fail on the first file. Give the "
+            "folder, or the first of its parents that exists, to this user; or set "
+            "CPP_POLICY_TIDY_CACHE to another folder, or to off, for the configure and the "
+            "build.")
+    endif()
+endfunction()
+
 # clang-tidy as the build runs it: through tidy_cache.cmake, which skips a file that passed
 # with the same inputs (POLICY.md 8). On a Mac where a developer's gate and a CI runner check
 # the same commit, CI's check build of Alfar took 361 s instead of 984 s; filling the cache
 # cost 2%.
 function(_cpp_policy_tidy_command out)
+    _cpp_policy_check_tidy_cache()
     _cpp_policy_tidy_config(config)
     set(command "${CMAKE_COMMAND}" -P "${CPP_POLICY_ROOT}/cmake/scripts/tidy_cache.cmake" --
         "${CMAKE_SOURCE_DIR}" "${CMAKE_BINARY_DIR}" "${CPP_POLICY_CLANG_TIDY_EXE}"

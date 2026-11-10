@@ -5,6 +5,19 @@ Each entry says what changed and why. Projects read this before moving their
 
 ## Unreleased
 
+### Changed
+
+- **A tidy cache folder the user can't write fails the configure** (POLICY.md
+  8), naming the folder and the ways out: give it to the user, or set
+  `CPP_POLICY_TIDY_CACHE` to another folder or to `off`. *Why:* on the home
+  server's Linux runners `~/.cache` was root's (Podman had made it), and the
+  check build failed on the first file with CMake's "No such file or
+  directory"; the cause was a permission. The server fixed its side on
+  2026-11-08. *Rejected:* carrying on without the cache and a warning (in CI
+  nobody reads it, and a runner would lose its cache for good); leaving
+  CMake's message. The self-test `tidy/cache` configures with a cache folder
+  under a plain file.
+
 ### Measured
 
 - **The tidy cache in real CI, on Windows** (closes the ROADMAP item). Each
