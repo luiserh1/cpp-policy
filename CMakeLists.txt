@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.29)
-project(cpp_policy VERSION 0.44.0 LANGUAGES CXX)
+project(cpp_policy VERSION 0.44.1 LANGUAGES CXX)
 
 include(cmake/CppPolicy.cmake)
 

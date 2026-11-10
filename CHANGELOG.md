@@ -3,7 +3,21 @@
 Each entry says what changed and why. Projects read this before moving their
 `GIT_TAG` to a new release. Versioning rules: POLICY.md section 10.
 
-## Unreleased
+## 0.44.1 (2026-11-10)
+
+A patch release: nothing that passes stops passing. From the home server
+conversation's reply of 2026-11-10 on the server's cores.
+
+### Upgrading a project
+
+**Work beyond `upgrade.sh`:** none. Nothing a project copies changed.
+
+1. `sh build/check/_deps/cpp_policy-src/tools/upgrade.sh v0.44.1`, by the
+   owner or by an agent with the owner's word for this upgrade (POLICY.md 9).
+
+Only a machine whose tidy cache folder can't be written sees a difference:
+its check build already failed on the first file, and now its configure
+fails first, saying why.
 
 ### Changed
 

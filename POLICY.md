@@ -756,7 +756,7 @@ Test presets:
     and on the Mac ten gained 7% over eight. (A preset could say "as many
     as the machine has cores" only from presets version 11, which needs
     CMake 4.3; the policy's minimum is 3.29.) A runner with fewer than
-    eight cores runs eight anyway, each test more slowly.
+    eight cores runs eight anyway, each test more slowly (since 0.44.1).
 - The `dev` and `check` test presets turn on AddressSanitizer's leak
   detection (`ASAN_OPTIONS=detect_leaks=1`) and apply the policy's
   suppression list for false positives in the OS (section 5). Detection is on
@@ -985,7 +985,7 @@ differently.
   30 days are removed by a configure, at most once a day. A cache folder
   the user can't write fails the configure, which names it and the ways
   out; otherwise the first file's clang-tidy would fail with CMake's "No
-  such file or directory".
+  such file or directory" (since 0.44.1).
 - GitHub's own machines start empty each time and gain nothing from it.
 - The self-test `tidy/cache` changes each input in turn and checks that
   only the files it concerns are checked again, and that a finding fails
