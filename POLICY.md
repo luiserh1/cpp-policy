@@ -748,10 +748,15 @@ Test presets:
   `cpp_policy_parallel_tests()` (13.2).
   - *Why eight:* on a 10-core Mac, eight jobs took about 30% less time than
     four, and ten gained little more while bringing the slowest tests nearer
-    their limits (since 0.41.0).
-  - A preset can say "as many as the machine has cores" only from presets
-    version 11, which needs CMake 4.3; the policy's minimum is 3.29. A runner
-    with fewer than eight cores runs eight anyway, each test more slowly.
+    their limits (since 0.41.0). On the home server (2026-11-10) the Windows
+    virtual machine was fastest at eight, slower at thirty-two; Linux would
+    gain about 75 s a run at sixteen, but shares its presets with macOS.
+  - The number isn't taken from the machine's cores. The Windows virtual
+    machine reports 32 processors and was slower at 32 jobs than at eight,
+    and on the Mac ten gained 7% over eight. (A preset could say "as many
+    as the machine has cores" only from presets version 11, which needs
+    CMake 4.3; the policy's minimum is 3.29.) A runner with fewer than
+    eight cores runs eight anyway, each test more slowly.
 - The `dev` and `check` test presets turn on AddressSanitizer's leak
   detection (`ASAN_OPTIONS=detect_leaks=1`) and apply the policy's
   suppression list for false positives in the OS (section 5). Detection is on

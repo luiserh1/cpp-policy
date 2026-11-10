@@ -119,10 +119,6 @@ Releases A and B (0.30.0, 0.32.0) are out. Open:
 
 ### Waiting
 
-- [ ] **The home server's core count:** CTest gets eight jobs, measured on a
-      10-core Mac only. Needs the server conversation; blocks nothing.
-- [ ] **"As many jobs as the machine has cores"** once CMake 4.3 (presets
-      version 11) can be the minimum; the minimum is 3.29.
 - [ ] **Modules experiment:** once CMake makes `import std` stable, convert
       one module of a project (e.g. SimpleLocalServer's `message/sanitize`)
       and check that clang-tidy and the gate still pass (POLICY.md 2.4 says

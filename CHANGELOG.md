@@ -29,6 +29,28 @@ Each entry says what changed and why. Projects read this before moving their
     the item on 2026-11-10 with these figures: the question that mattered,
     whether Windows CI gains, has an answer of the same quality as the
     macOS one.
+- **The home server's test jobs** (closes the ROADMAP item). The server
+  conversation timed Alfar's tests at `adbe9a4` on 2026-11-10, with every
+  runner paused. The host has 64 cores (128 threads); the Windows virtual
+  machine has 32 virtual processors; 8 Linux and 6 Windows runners can run
+  jobs at once. Wall-clock seconds, each twice, all tests passed:
+  - Linux `check` (670 tests): 101–102 at four, 51 at eight, 26.5 at
+    sixteen, 19.3–19.4 at thirty-two; `tsan`: 111 at eight, 62 at sixteen;
+  - Windows `win-check` (670 tests): 126–127 at four, 70–71 at eight,
+    80–85 at thirty-two, where its slowest tests took twice as long.
+
+  The Mac's 1,153 tests include the GUI and window tests, built on macOS
+  only, so these figures don't compare with the Mac's. The slowest Linux
+  test took 15 s in `check` and 46 s in `tsan`, inside the default limits
+  of 60 and 180 (each test's own limit wasn't checked).
+  - *Decided:* eight stays everywhere. Windows is fastest at eight; Linux
+    would save about 75 s a run at sixteen, but Linux and macOS share
+    their presets, and on the Mac ten gained 7%.
+  - *Rejected:* Linux presets of their own, or a job count passed by the
+    gate (every project's presets or CI would change for 75 s a run).
+  - *Also dropped:* the ROADMAP item "as many jobs as the machine has
+    cores" once CMake 4.3 can be the minimum. The virtual machine's 32
+    would be its slowest setting measured (POLICY.md 7).
 
 ## 0.44.0 (2026-11-10)
 
